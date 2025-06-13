@@ -8,7 +8,6 @@ from typing import List, Optional, Dict
 from github import Github
 from config import Config
 
-
 class StateManager:
     """Manage posting state using GitHub Issues."""
     

@@ -44,7 +44,7 @@ OPENAI_API_KEY=your_openai_api_key
 ### 3. First Run
 
 1. Go to `Actions` tab in your repository
-2. Click on "Social Media Automation"
+2. Click on "Flickr to Instagram Automation"
 3. Click "Run workflow"
 4. Check "Run without posting (dry run)" for testing
 5. Click "Run workflow"
@@ -338,7 +338,7 @@ OPENAI_API_KEY=your_openai_api_key
 ### 3. Manual Trigger
 
 1. Go to `Actions` tab in your repository
-2. Click on "Social Media Automation"
+2. Click on "Flickr to Instagram Automation"
 3. Click "Run workflow"
 4. Select your destination and options
 5. Click "Run workflow"
@@ -545,7 +545,7 @@ python main.py --destination Istrien --log-level DEBUG
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
-5. Submit a pull request (mind you, I might be slow to reply due to limited time)
+5. Submit a pull request (Mind you, I might be slow to reply due to limited time.)
 
 ## License
 
