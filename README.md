@@ -2,6 +2,10 @@
 
 Automated social media posting system that posts one photo per day from a specific Flickr album to Instagram with AI-generated captions using GitHub Actions.
 
+Instagram's API requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
+
+The ID of a Flickr album (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the source configuration key.
+
 ## Features
 
 - 📅 **Daily Posting**: Posts one photo per day until the album is complete
