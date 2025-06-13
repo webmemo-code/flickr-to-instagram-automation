@@ -4,7 +4,7 @@ Automated social media posting system that posts one photo per day from a specif
 
 Instagram's API requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
 
-The ID of a Flickr album (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the source configuration key.
+The ID '72177720326826937' of a Flickr album (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the source configuration key.
 
 ## Features
 
