@@ -1,0 +1,286 @@
+name: Social Media Automation
+
+on:
+  # Daily posting at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * *'
+  
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without posting (dry run)'
+        type: boolean
+        default: false
+      show_stats:
+        description: 'Show statistics only'
+        type: boolean
+        default: false
+
+# Ensure only one automation runs at a time
+concurrency:
+  group: social-media-automation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write    # For state management via GitHub Issues
+  actions: read    # For accessing artifacts
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    environment:
+      name: production-social-media
+      url: https://github.com/${{ github.repository }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Validate environment variables
+        run: |
+          echo "Checking required environment variables..."
+          python -c "
+          import os
+          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID', 'OPENAI_API_KEY']
+          missing = [var for var in required if not os.getenv(var)]
+          if missing:
+              print(f'Missing required environment variables: {missing}')
+              exit(1)
+          print('All required environment variables are set')
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      
+      - name: Show statistics
+        if: ${{ inputs.show_stats == true }}
+        run: |
+          python main.py --stats
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if album is complete
+        id: check_complete
+        run: |
+          python -c "
+          import sys
+          import os
+          sys.path.append('.')
+          from config import Config
+          from state_manager import StateManager
+          from flickr_api import FlickrAPI
+          
+          config = Config()
+          repo_name = os.getenv('GITHUB_REPOSITORY')
+          state_manager = StateManager(config, repo_name)
+          flickr_api = FlickrAPI(config)
+          
+          photos = flickr_api.get_unposted_photos()
+          total_photos = len(photos) if photos else 0
+          
+          if state_manager.is_album_complete(total_photos):
+              print('Album is complete!')
+              print('ALBUM_COMPLETE=true' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+          else:
+              print('Album has remaining photos to post')
+              print('ALBUM_COMPLETE=false' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run automation (scheduled)
+        if: ${{ github.event_name == 'schedule' && env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          echo "Running scheduled automation..."
+          python main.py
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run automation (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          
+          echo "Running manual automation..."
+          python main.py $DRY_RUN_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Album complete notification
+        if: ${{ env.ALBUM_COMPLETE == 'true' }}
+        run: |
+          echo "🎉 Album is complete! All photos have been posted to Instagram."
+          echo "The automation will not run until you configure a new album."
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-logs-${{ github.run_id }}
+          path: |
+            *.log
+          retention-days: 30
+          compression-level: 6
+      
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## 📱 Social Media Automation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "**Trigger**: Scheduled (daily)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Trigger**: Manual" >> $GITHUB_STEP_SUMMARY
+            echo "**Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Show Stats**: ${{ inputs.show_stats }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "**Album Complete**: ${{ env.ALBUM_COMPLETE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          
+          # Add recent log entries if available
+          if [ -f "automation_$(date +%Y%m%d).log" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Recent Log Entries" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -20 "automation_$(date +%Y%m%d).log" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Retry job for failed automation (only for scheduled runs)
+  retry-automation:
+    runs-on: ubuntu-latest
+    needs: automation
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    timeout-minutes: 15
+    
+    environment:
+      name: production-social-media
+      url: https://github.com/${{ github.repository }}
+    
+    steps:
+      - name: Wait before retry
+        run: sleep 300  # Wait 5 minutes before retry
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Check if album is complete before retry
+        id: check_complete_retry
+        run: |
+          python -c "
+          import sys
+          import os
+          sys.path.append('.')
+          from config import Config
+          from state_manager import StateManager
+          from flickr_api import FlickrAPI
+          
+          config = Config()
+          repo_name = os.getenv('GITHUB_REPOSITORY')
+          state_manager = StateManager(config, repo_name)
+          flickr_api = FlickrAPI(config)
+          
+          photos = flickr_api.get_unposted_photos()
+          total_photos = len(photos) if photos else 0
+          
+          if state_manager.is_album_complete(total_photos):
+              print('Album is complete - no retry needed!')
+              print('ALBUM_COMPLETE=true' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+          else:
+              print('Album has remaining photos - proceeding with retry')
+              print('ALBUM_COMPLETE=false' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Retry automation
+        if: ${{ env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          echo "Retrying automation..."
+          python main.py
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload retry logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retry-automation-logs-${{ github.run_id }}
+          path: |
+            *.log
+          retention-days: 30
