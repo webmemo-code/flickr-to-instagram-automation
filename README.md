@@ -1,10 +1,10 @@
 # Flickr to Instagram Automation
 
-Automated social media posting system that posts one photo per day from a specific Flickr album to Instagram with AI-generated captions using GitHub Actions.
+Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
 
-Instagram's API requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
+**Instagram's API** requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
 
-The ID '72177720326826937' of a Flickr album (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the source configuration key.
+The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the **source configuration key**.
 
 ## Features
 
@@ -26,7 +26,7 @@ The ID '72177720326826937' of a Flickr album (found in the URL; for example, htt
 ```python
 @property
 def flickr_album_id(self) -> str:
-    return '72177720326826937'  # Your album ID here
+    return '01234567890123456'  # Your album ID here
 
 @property  
 def album_name(self) -> str:
