@@ -81,7 +81,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -95,7 +95,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -132,7 +132,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -148,7 +148,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -169,7 +169,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -281,7 +281,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -297,7 +297,7 @@ jobs:
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
-          FLICKR_USERNAME: ${{ secrets.FLICKR_USERNAME }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
