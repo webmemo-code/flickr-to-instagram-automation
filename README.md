@@ -2,9 +2,9 @@
 
 Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
 
-**Instagram's API** requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
+**Instagram's API** requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/[your_username]/albums/.
 
-The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the **source configuration key**.
+The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/[your_username]/albums/72177720326826937) serves as the **source configuration key**.
 
 ## Features
 
@@ -40,6 +40,7 @@ Add the following secrets to your GitHub repository (`Settings > Secrets and var
 ```
 FLICKR_API_KEY=your_flickr_api_key
 FLICKR_USER_ID=your_flickr_user_id
+FLICKR_USERNAME=your_flickr_username
 INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
 INSTAGRAM_ACCOUNT_ID=your_instagram_business_account_id
 OPENAI_API_KEY=your_openai_api_key
@@ -87,7 +88,7 @@ def album_name(self) -> str:
 
 Your Flickr album URL looks like:
 ```
-https://flickr.com/photos/schaerer/albums/72177720326826937
+https://flickr.com/photos/[your_username]/albums/72177720326826937
 ```
 
 The album ID is the number at the end: `72177720326826937`
@@ -334,6 +335,7 @@ Add the following secrets to your GitHub repository (`Settings > Secrets and var
 ```
 FLICKR_API_KEY=your_flickr_api_key
 FLICKR_USER_ID=your_flickr_user_id
+FLICKR_USERNAME=your_flickr_username
 INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
 INSTAGRAM_ACCOUNT_ID=your_instagram_business_account_id
 OPENAI_API_KEY=your_openai_api_key

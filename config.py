@@ -12,16 +12,17 @@ class Config:
     def __init__(self):
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
         self.flickr_user_id = os.getenv('FLICKR_USER_ID')
+        self.flickr_username = os.getenv('FLICKR_USERNAME')  # New: Flickr username for URLs
         self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
         self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.github_token = os.getenv('GITHUB_TOKEN')
         
-        # API endpoints
+        # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = 'https://graph.facebook.com/'
-        self.graph_api_version = 'v18.0'
-        self.openai_model = 'gpt-4o-mini'
+        self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
+        self.openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')  # Default to gpt-4o-mini
         
         # Validate required environment variables
         self._validate_config()
@@ -31,6 +32,7 @@ class Config:
         required_vars = {
             'FLICKR_API_KEY': self.flickr_api_key,
             'FLICKR_USER_ID': self.flickr_user_id,
+            'FLICKR_USERNAME': self.flickr_username,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
             'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
             'OPENAI_API_KEY': self.openai_api_key,
@@ -60,4 +62,4 @@ class Config:
     @property
     def album_url(self) -> str:
         """Get the Flickr album URL."""
-        return f"https://flickr.com/photos/schaerer/albums/{self.flickr_album_id}"
+        return f"https://flickr.com/photos/{self.flickr_username}/albums/{self.flickr_album_id}"
