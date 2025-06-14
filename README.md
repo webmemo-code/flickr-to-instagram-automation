@@ -539,11 +539,7 @@ python main.py --destination Istrien --log-level DEBUG
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request (Mind you, I might be slow to reply due to limited time.)
+I'm working on this repo in a very limited capacity. Therefore, I can't review PRs or develop the functionality any further.
 
 ## License
 
@@ -551,7 +547,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-For issues and questions:
-1. Check the troubleshooting section
-2. Review GitHub Issues for similar problems
-3. Create a new issue with detailed information
+Use this repo for free. It comes as is, i.e. I don't offer support due to limited time.
