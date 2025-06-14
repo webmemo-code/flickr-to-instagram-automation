@@ -21,29 +21,27 @@ The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for exampl
 ### 1. Repository Setup
 
 1. Fork or clone this repository
-2. Edit `config.py` to set your Flickr album ID:
+2. No code changes needed - all configuration is done via environment variables
 
-```python
-@property
-def flickr_album_id(self) -> str:
-    return '01234567890123456'  # Your album ID here
+### 2. Configure Secrets and Variables
 
-@property  
-def album_name(self) -> str:
-    return 'Your Album Name'   # Your album name here
-```
-
-### 2. Configure Secrets
-
-Add the following secrets to your GitHub repository (`Settings > Secrets and variables > Actions > Repository secrets`):
+Add the following **secrets** to your GitHub repository (`Settings > Secrets and variables > Actions > Repository secrets`):
 
 ```
 FLICKR_API_KEY=your_flickr_api_key
 FLICKR_USER_ID=your_flickr_user_id
-FLICKR_USERNAME=your_flickr_username
 INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
 INSTAGRAM_ACCOUNT_ID=your_instagram_business_account_id
 OPENAI_API_KEY=your_openai_api_key
+```
+
+Add the following **variables** to your GitHub repository (`Settings > Secrets and variables > Actions > Repository variables`):
+
+```
+FLICKR_USERNAME=your_flickr_username
+FLICKR_ALBUM_ID=your_flickr_album_id
+GRAPH_API_VERSION=v18.0 (optional)
+OPENAI_MODEL=gpt-4o-mini (optional)
 ```
 
 ### 3. First Run
@@ -70,19 +68,13 @@ The automation follows this simple process:
 
 ### Setting Your Album
 
-Edit the `config.py` file to specify your Flickr album:
+The system is now fully configurable via GitHub repository variables. No code changes are needed.
 
-```python
-@property
-def flickr_album_id(self) -> str:
-    """Get the Flickr album ID to process."""
-    return '72177720326826937'  # Replace with your album ID
+Set your Flickr album by updating the repository variables:
+- `FLICKR_ALBUM_ID`: Your specific album ID
+- `FLICKR_USERNAME`: Your Flickr username
 
-@property
-def album_name(self) -> str:
-    """Get the album name for logging and state management."""
-    return 'Istrien'  # Replace with your album name
-```
+To change albums, simply update the `FLICKR_ALBUM_ID` variable in your GitHub repository settings.
 
 ### Finding Your Album ID
 
@@ -187,13 +179,13 @@ When all photos in your album have been posted:
 1. 🎉 The automation displays "Album complete!"
 2. ⏸️ Scheduled runs automatically skip execution
 3. 📊 Statistics show 100% completion
-4. 🔄 To start a new album, update the `config.py` file
+4. 🔄 To start a new album, update the `FLICKR_ALBUM_ID` variable in GitHub repository settings
 
 ## Project Structure
 
 ```
 ├── main.py                 # Main automation script
-├── config.py              # Album configuration (EDIT THIS)
+├── config.py              # Configuration management (environment variables)
 ├── flickr_api.py          # Flickr API integration
 ├── caption_generator.py   # OpenAI caption generation
 ├── instagram_api.py       # Instagram posting
@@ -211,7 +203,7 @@ When all photos in your album have been posted:
 🎉 Album complete! All photos have been posted to Instagram.
 ```
 - This means all photos from your album have been successfully posted
-- To start posting from a new album, edit `config.py` with a new album ID
+- To start posting from a new album, update the `FLICKR_ALBUM_ID` variable in GitHub repository settings
 
 **Missing Environment Variables**
 ```
@@ -248,7 +240,7 @@ Error: Failed to retrieve photos
 ```
 Warning: No photos found in the album
 ```
-- Check that the album ID in `config.py` is correct
+- Check that the album ID in your GitHub repository variables is correct
 - Verify the album exists and contains photos
 - Ensure album is public or accessible with your API key
 
@@ -291,7 +283,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For issues and questions:
 
-1. **Check Album Configuration**: Verify your `config.py` settings
+1. **Check Configuration**: Verify your GitHub repository variables and secrets
 2. **Test with Dry Run**: Use `--dry-run` flag to test without posting
 3. **Review Logs**: Check GitHub Actions logs and artifacts
 4. **Statistics**: Use `--stats` to check progress and identify issues

@@ -13,6 +13,7 @@ class Config:
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
         self.flickr_user_id = os.getenv('FLICKR_USER_ID')
         self.flickr_username = os.getenv('FLICKR_USERNAME')  # New: Flickr username for URLs
+        self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')  # New: Flickr album ID from environment
         self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
         self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
@@ -33,6 +34,7 @@ class Config:
             'FLICKR_API_KEY': self.flickr_api_key,
             'FLICKR_USER_ID': self.flickr_user_id,
             'FLICKR_USERNAME': self.flickr_username,
+            'FLICKR_ALBUM_ID': self.flickr_album_id,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
             'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
             'OPENAI_API_KEY': self.openai_api_key,
@@ -47,12 +49,6 @@ class Config:
     def graph_endpoint_base(self) -> str:
         """Get the complete Graph API endpoint base URL."""
         return f"{self.graph_api_domain}{self.graph_api_version}/"
-    
-    @property
-    def flickr_album_id(self) -> str:
-        """Get the Flickr album ID to process."""
-        # Set your specific album ID here
-        return '72177720326826937'  # Istrien - Gourmet Fine Dining
     
     @property
     def album_name(self) -> str:
