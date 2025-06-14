@@ -122,12 +122,15 @@ jobs:
           photos = flickr_api.get_unposted_photos()
           total_photos = len(photos) if photos else 0
           
+          github_env = os.environ.get('GITHUB_ENV', '/dev/null')
           if state_manager.is_album_complete(total_photos):
               print('Album is complete!')
-              print('ALBUM_COMPLETE=true' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=true\n')
           else:
               print('Album has remaining photos to post')
-              print('ALBUM_COMPLETE=false' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=false\n')
           "
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
@@ -271,12 +274,15 @@ jobs:
           photos = flickr_api.get_unposted_photos()
           total_photos = len(photos) if photos else 0
           
+          github_env = os.environ.get('GITHUB_ENV', '/dev/null')
           if state_manager.is_album_complete(total_photos):
               print('Album is complete - no retry needed!')
-              print('ALBUM_COMPLETE=true' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=true\n')
           else:
               print('Album has remaining photos - proceeding with retry')
-              print('ALBUM_COMPLETE=false' >> os.environ.get('GITHUB_ENV', '/dev/null'))
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=false\n')
           "
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
