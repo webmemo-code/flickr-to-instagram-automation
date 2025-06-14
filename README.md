@@ -35,7 +35,7 @@ def album_name(self) -> str:
 
 ### 2. Configure Secrets
 
-Add the following secrets to your GitHub repository (`Settings > Secrets and variables > Actions`):
+Add the following secrets to your GitHub repository (`Settings > Secrets and variables > Actions > Repository secrets`):
 
 ```
 FLICKR_API_KEY=your_flickr_api_key
