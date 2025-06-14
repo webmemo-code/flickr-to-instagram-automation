@@ -65,7 +65,7 @@ jobs:
           echo "Checking required environment variables..."
           python -c "
           import os
-          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID', 'OPENAI_API_KEY']
+          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'FLICKR_ALBUM_ID', 'INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID', 'OPENAI_API_KEY']
           missing = [var for var in required if not os.getenv(var)]
           if missing:
               print(f'Missing required environment variables: {missing}')
@@ -82,6 +82,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -96,6 +97,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -136,6 +138,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -152,6 +155,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -173,6 +177,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -288,6 +293,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -304,6 +310,7 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
