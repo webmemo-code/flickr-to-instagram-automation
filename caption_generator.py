@@ -67,7 +67,7 @@ class CaptionGenerator:
             caption_parts.append(generated_caption)
         
         # Add standard footer
-        caption_parts.append("Travel Memo from a one-of-a-kind travel experience.")
+        caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
         
         # Add hashtags
         if photo_data.get('hashtags'):
