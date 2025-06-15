@@ -33,10 +33,11 @@ class StateManager:
                     for line in lines:
                         if line.startswith('**Photo ID:**'):
                             photo_id = line.split(':', 1)[1].strip()
-                            posted_ids.append(photo_id)
+                            if photo_id not in posted_ids:  # Avoid duplicates
+                                posted_ids.append(photo_id)
                             break
             
-            self.logger.info(f"Found {len(posted_ids)} already posted photos")
+            self.logger.info(f"Found {len(posted_ids)} already posted photos: {posted_ids}")
             return posted_ids
             
         except Exception as e:
@@ -47,11 +48,13 @@ class StateManager:
         """Create a GitHub issue to record the posted photo."""
         try:
             timestamp = datetime.now().isoformat()
+            position = photo_data.get('album_position', 'unknown')
             
-            title = f"Posted: {photo_data['title']} ({timestamp})"
+            title = f"Posted: {photo_data['title']} (#{position}) - {timestamp}"
             
             body_parts = [
                 f"**Photo ID:** {photo_data['id']}",
+                f"**Album Position:** {position}",
                 f"**Title:** {photo_data['title']}",
                 f"**Description:** {photo_data.get('description', 'N/A')}",
                 f"**Image URL:** {photo_data['url']}",
@@ -76,7 +79,7 @@ class StateManager:
                 labels=labels
             )
             
-            self.logger.info(f"Created issue #{issue.number} for photo {photo_data['id']}")
+            self.logger.info(f"Created issue #{issue.number} for photo {photo_data['id']} (position {position})")
             return str(issue.number)
             
         except Exception as e:
@@ -111,12 +114,16 @@ class StateManager:
             return False
     
     def get_next_photo_to_post(self, photos: List[Dict]) -> Optional[Dict]:
-        """Get the next photo that hasn't been posted yet."""
+        """Get the next photo that hasn't been posted yet, respecting album order."""
         posted_ids = self.get_posted_photo_ids()
         
-        for photo in photos:
+        # Sort photos by their album position to ensure correct order
+        sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
+        
+        for photo in sorted_photos:
             if photo['id'] not in posted_ids:
-                self.logger.info(f"Next photo to post: {photo['id']} - {photo['title']}")
+                position = photo.get('album_position', 'unknown')
+                self.logger.info(f"Next photo to post: {photo['id']} - {photo['title']} (position {position} in album)")
                 return photo
         
         self.logger.info("No unposted photos found - all photos have been posted!")
