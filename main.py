@@ -82,7 +82,8 @@ def post_next_photo(dry_run: bool = False) -> bool:
             state_manager.log_automation_run(True, "Album complete - all photos posted")
             return True
         
-        logger.info(f"📸 Processing photo: {next_photo['title']} (ID: {next_photo['id']})")
+        position = next_photo.get('album_position', 'unknown')
+        logger.info(f"📸 Processing photo #{position}: {next_photo['title']} (ID: {next_photo['id']})")
         
         # Validate image URL
         if not instagram_api.validate_image_url(next_photo['url']):
@@ -132,10 +133,10 @@ def post_next_photo(dry_run: bool = False) -> bool:
             # Log progress
             posted_count = len(state_manager.get_posted_photo_ids()) + 1  # +1 for current post
             total_count = len(photos)
-            progress_msg = f"Posted photo {next_photo['id']} ({posted_count}/{total_count}) - Instagram post {instagram_post_id}"
+            progress_msg = f"Posted photo #{position} ({next_photo['id']}) - {posted_count}/{total_count} - Instagram post {instagram_post_id}"
             
             state_manager.log_automation_run(True, progress_msg)
-            logger.info(f"📊 Progress: {posted_count}/{total_count} photos posted")
+            logger.info(f"📊 Progress: {posted_count}/{total_count} photos posted (just posted #{position})")
             
             if posted_count >= total_count:
                 logger.info("🎉 Album complete! All photos have been posted.")
