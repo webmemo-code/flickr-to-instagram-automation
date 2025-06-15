@@ -2,9 +2,9 @@
 
 Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
 
-**Instagram's API** requires photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/[your_username]/albums/.
+**Instagram's API** requires source photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
 
-The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/[your_username]/albums/72177720326826937) serves as the **source configuration key**.
+The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the **source configuration key**.
 
 ## Features
 
@@ -40,8 +40,8 @@ Add the following **variables** to your GitHub repository (`Settings > Secrets a
 ```
 FLICKR_USERNAME=your_flickr_username
 FLICKR_ALBUM_ID=your_flickr_album_id
-GRAPH_API_VERSION=v18.0 (optional)
-OPENAI_MODEL=gpt-4o-mini (optional)
+GRAPH_API_VERSION=v18.0 (current Facebook/Instagram API version)
+OPENAI_MODEL=gpt-4o-mini (current OpenAI vision model number. The mini version will do just fine at a lower cost)
 ```
 
 ### 3. First Run
@@ -267,11 +267,6 @@ curl "https://www.flickr.com/services/rest/?method=flickr.photosets.getPhotos&ap
 - Secure state management via GitHub Issues
 - No credentials stored in code
 
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Support
 
 For issues and questions:
@@ -281,6 +276,8 @@ For issues and questions:
 3. **Review Logs**: Check GitHub Actions logs and artifacts
 4. **Statistics**: Use `--stats` to check progress and identify issues
 5. **GitHub Issues**: Create an issue with detailed error information
+
+Use this repo for free. It comes as is, i.e. I don't offer support due to limited time.
 
 ## Example Workflow
 
@@ -301,8 +298,4 @@ I'm working on this repo in a very limited capacity. Therefore, I can't review P
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-Use this repo for free. It comes as is, i.e. I don't offer support due to limited time.
+This project is licensed under the MIT License.
