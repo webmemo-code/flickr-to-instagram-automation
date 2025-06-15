@@ -26,7 +26,9 @@ However, I don't take the time to post them on Instagram. This automation helps 
 ### 1. Repository Setup
 
 1. Fork or clone this repository
-2. No code changes needed - all configuration is done via environment variables
+2. In the file caption_generator.py, adapt the branding to reflect your own brand instead of my Travelmemo brand
+3. No other code changes are needed - all configuration is done via environment variables
+4. Optional: To change the publishing schedule, edit the workflow file social-media-automation.yml
 
 ### 2. Configure Secrets and Variables
 
