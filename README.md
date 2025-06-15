@@ -6,6 +6,11 @@ Automated social media posting system that posts one photo per day from a specif
 
 The *ID '72177720326826937'* of a **Flickr album** (found in the URL; for example, https://flickr.com/photos/schaerer/albums/72177720326826937) serves as the **source configuration key**.
 
+### The Why - The motivation behind this automation
+I take lots of photos that I edit in Adobe Lightroom and publish on my travel blogs, https://travelmemo.com in English and https://reisememo.ch in German.
+
+However, I don't take the time to post them on Instagram. This automation helps me repurpose my photos.
+
 ## Features
 
 - 📅 **Daily Posting**: Posts one photo per day until the album is complete
