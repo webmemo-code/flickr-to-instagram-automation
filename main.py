@@ -69,6 +69,12 @@ def post_next_photo(dry_run: bool = False) -> bool:
             state_manager.log_automation_run(False, "No photos found in album")
             return False
         
+        logger.info(f"Retrieved {len(photos)} photos from album")
+        
+        # Debug: Log all photos and their positions
+        for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
+            logger.debug(f"Album photo #{photo.get('album_position', '?')}: {photo['id']} - {photo['title']}")
+        
         # Check if album is complete
         if state_manager.is_album_complete(len(photos)):
             logger.info("🎉 Album complete! All photos have been posted to Instagram.")
@@ -129,6 +135,10 @@ def post_next_photo(dry_run: bool = False) -> bool:
             # Update record with Instagram post ID
             if issue_number:
                 state_manager.update_post_record(issue_number, instagram_post_id)
+            else:
+                # Fallback: create new record if the initial one failed
+                logger.warning("No issue number from initial record creation, creating new one")
+                state_manager.create_post_record(next_photo, instagram_post_id)
             
             # Log progress
             posted_count = len(state_manager.get_posted_photo_ids()) + 1  # +1 for current post
@@ -150,7 +160,8 @@ def post_next_photo(dry_run: bool = False) -> bool:
     except Exception as e:
         logger.error(f"💥 Automation failed: {e}")
         try:
-            state_manager.log_automation_run(False, f"Exception: {str(e)}")
+            if 'state_manager' in locals():
+                state_manager.log_automation_run(False, f"Exception: {str(e)}")
         except:
             pass  # Don't fail if logging fails
         return False
