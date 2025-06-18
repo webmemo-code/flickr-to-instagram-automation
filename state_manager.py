@@ -44,14 +44,45 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to get posted photo IDs: {e}")
             return []
+
+    def get_dry_run_photo_ids(self) -> List[str]:
+        """Get list of photo IDs that have been selected in dry runs."""
+        try:
+            issues = self.repo.get_issues(
+                state='all',
+                labels=['automated-post', 'dry-run', 'flickr-album']
+            )
+            
+            dry_run_ids = []
+            for issue in issues:
+                # Extract photo ID from issue body
+                if issue.body:
+                    lines = issue.body.split('\n')
+                    for line in lines:
+                        if line.startswith('**Photo ID:**'):
+                            photo_id = line.split(':', 1)[1].strip()
+                            if photo_id and photo_id not in dry_run_ids:
+                                dry_run_ids.append(photo_id)
+                                self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number}")
+                            break
+            
+            self.logger.info(f"Found {len(dry_run_ids)} dry run selections: {dry_run_ids}")
+            return dry_run_ids
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get dry run photo IDs: {e}")
+            return []
     
-    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None) -> Optional[str]:
+    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None, is_dry_run: bool = False) -> Optional[str]:
         """Create a GitHub issue to record the posted photo."""
         try:
             timestamp = datetime.now().isoformat()
             position = photo_data.get('album_position', 'unknown')
             
-            title = f"Posted: {photo_data['title']} (#{position}) - {timestamp}"
+            if is_dry_run:
+                title = f"Dry Run: {photo_data['title']} (#{position}) - {timestamp}"
+            else:
+                title = f"Posted: {photo_data['title']} (#{position}) - {timestamp}"
             
             body_parts = [
                 f"**Photo ID:** {photo_data['id']}",
@@ -64,15 +95,24 @@ class StateManager:
             
             if instagram_post_id:
                 body_parts.append(f"**Instagram Post ID:** {instagram_post_id}")
+            elif is_dry_run:
+                body_parts.append(f"**Status:** Dry run - not actually posted")
             
             body = '\n'.join(body_parts)
             
-            labels = [
-                'automated-post',
-                'instagram',
-                'flickr-album',
-                'posted' if instagram_post_id else 'failed'
-            ]
+            if is_dry_run:
+                labels = [
+                    'automated-post',
+                    'dry-run',
+                    'flickr-album'
+                ]
+            else:
+                labels = [
+                    'automated-post',
+                    'instagram',
+                    'flickr-album',
+                    'posted' if instagram_post_id else 'failed'
+                ]
             
             issue = self.repo.create_issue(
                 title=title,
@@ -80,7 +120,8 @@ class StateManager:
                 labels=labels
             )
             
-            self.logger.info(f"Created issue #{issue.number} for photo {photo_data['id']} (position {position})")
+            run_type = "dry run" if is_dry_run else "post"
+            self.logger.info(f"Created {run_type} issue #{issue.number} for photo {photo_data['id']} (position {position})")
             return str(issue.number)
             
         except Exception as e:
@@ -114,28 +155,56 @@ class StateManager:
             self.logger.error(f"Failed to update post record: {e}")
             return False
     
-    def get_next_photo_to_post(self, photos: List[Dict]) -> Optional[Dict]:
+    def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
         """Get the next photo that hasn't been posted yet, respecting album order."""
         posted_ids = self.get_posted_photo_ids()
+        excluded_ids = posted_ids.copy()
+        
+        # Optionally include dry run selections in exclusion list
+        if include_dry_runs:
+            dry_run_ids = self.get_dry_run_photo_ids()
+            excluded_ids.extend(dry_run_ids)
+            self.logger.info(f"Including {len(dry_run_ids)} dry run selections in exclusion list")
         
         # Sort photos by their album position to ensure correct order
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
-        self.logger.info(f"Checking {len(sorted_photos)} photos against {len(posted_ids)} posted IDs")
-        self.logger.debug(f"Posted IDs: {posted_ids}")
+        self.logger.info(f"Checking {len(sorted_photos)} photos against {len(excluded_ids)} excluded IDs")
+        self.logger.debug(f"Excluded IDs: {excluded_ids}")
         
         for photo in sorted_photos:
             photo_id = photo['id']
             position = photo.get('album_position', 'unknown')
             
-            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'POSTED' if photo_id in posted_ids else 'UNPOSTED'}")
+            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if photo_id in excluded_ids else 'AVAILABLE'}")
             
-            if photo_id not in posted_ids:
+            if photo_id not in excluded_ids:
                 self.logger.info(f"Next photo to post: {photo_id} - {photo['title']} (position {position} in album)")
                 return photo
         
         self.logger.info("No unposted photos found - all photos have been posted!")
         return None
+
+    def clear_dry_run_records(self) -> int:
+        """Clear all dry run records. Returns number of records cleared."""
+        try:
+            issues = self.repo.get_issues(
+                state='all',
+                labels=['automated-post', 'dry-run', 'flickr-album']
+            )
+            
+            cleared_count = 0
+            for issue in issues:
+                issue.edit(state='closed')
+                cleared_count += 1
+                self.logger.debug(f"Closed dry run issue #{issue.number}")
+            
+            self.logger.info(f"Cleared {cleared_count} dry run records")
+            return cleared_count
+            
+        except Exception as e:
+            self.logger.error(f"Failed to clear dry run records: {e}")
+            return 0
     
     def log_automation_run(self, success: bool, details: str = "") -> None:
         """Log an automation run."""
