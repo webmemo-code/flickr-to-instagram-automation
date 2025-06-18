@@ -17,6 +17,26 @@ class StateManager:
         self.repo = self.github.get_repo(repo_name)
         self.logger = logging.getLogger(__name__)
     
+    def _extract_photo_id(self, issue_body: str) -> Optional[str]:
+        """Extract photo ID from issue body, handling different formats."""
+        if not issue_body:
+            return None
+            
+        lines = issue_body.split('\n')
+        for line in lines:
+            if line.startswith('**Photo ID:**'):
+                photo_id = line.split(':', 1)[1].strip()
+                # Remove any prefix like "** " that might be present
+                if photo_id.startswith('** '):
+                    photo_id = photo_id[3:]
+                elif photo_id.startswith('**'):
+                    photo_id = photo_id[2:].strip()
+                
+                # Return only if we have a valid ID
+                if photo_id and photo_id.isdigit():
+                    return photo_id
+        return None
+    
     def get_posted_photo_ids(self) -> List[str]:
         """Get list of photo IDs that have already been posted."""
         try:
@@ -27,16 +47,10 @@ class StateManager:
             
             posted_ids = []
             for issue in issues:
-                # Extract photo ID from issue body
-                if issue.body:
-                    lines = issue.body.split('\n')
-                    for line in lines:
-                        if line.startswith('**Photo ID:**'):
-                            photo_id = line.split(':', 1)[1].strip()
-                            if photo_id and photo_id not in posted_ids:  # Avoid duplicates and empty IDs
-                                posted_ids.append(photo_id)
-                                self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number}")
-                            break
+                photo_id = self._extract_photo_id(issue.body)
+                if photo_id and photo_id not in posted_ids:  # Avoid duplicates
+                    posted_ids.append(photo_id)
+                    self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number}")
             
             self.logger.info(f"Found {len(posted_ids)} already posted photos: {posted_ids}")
             return posted_ids
@@ -55,16 +69,10 @@ class StateManager:
             
             dry_run_ids = []
             for issue in issues:
-                # Extract photo ID from issue body
-                if issue.body:
-                    lines = issue.body.split('\n')
-                    for line in lines:
-                        if line.startswith('**Photo ID:**'):
-                            photo_id = line.split(':', 1)[1].strip()
-                            if photo_id and photo_id not in dry_run_ids:
-                                dry_run_ids.append(photo_id)
-                                self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number}")
-                            break
+                photo_id = self._extract_photo_id(issue.body)
+                if photo_id and photo_id not in dry_run_ids:
+                    dry_run_ids.append(photo_id)
+                    self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number}")
             
             self.logger.info(f"Found {len(dry_run_ids)} dry run selections: {dry_run_ids}")
             return dry_run_ids
@@ -173,16 +181,18 @@ class StateManager:
         self.logger.debug(f"Excluded IDs: {excluded_ids}")
         
         for photo in sorted_photos:
-            photo_id = photo['id']
+            photo_id = str(photo['id'])  # Ensure photo ID is string for comparison
             position = photo.get('album_position', 'unknown')
             
-            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if photo_id in excluded_ids else 'AVAILABLE'}")
+            # Check if this photo ID is in the excluded list
+            is_excluded = photo_id in excluded_ids
+            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if is_excluded else 'AVAILABLE'}")
             
-            if photo_id not in excluded_ids:
+            if not is_excluded:
                 self.logger.info(f"Next photo to post: {photo_id} - {photo['title']} (position {position} in album)")
                 return photo
         
-        self.logger.info("No unposted photos found - all photos have been posted!")
+        self.logger.info("No unposted photos found - all photos have been posted or selected!")
         return None
 
     def clear_dry_run_records(self) -> int:
