@@ -33,8 +33,9 @@ class StateManager:
                     for line in lines:
                         if line.startswith('**Photo ID:**'):
                             photo_id = line.split(':', 1)[1].strip()
-                            if photo_id not in posted_ids:  # Avoid duplicates
+                            if photo_id and photo_id not in posted_ids:  # Avoid duplicates and empty IDs
                                 posted_ids.append(photo_id)
+                                self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number}")
                             break
             
             self.logger.info(f"Found {len(posted_ids)} already posted photos: {posted_ids}")
@@ -120,10 +121,17 @@ class StateManager:
         # Sort photos by their album position to ensure correct order
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
+        self.logger.info(f"Checking {len(sorted_photos)} photos against {len(posted_ids)} posted IDs")
+        self.logger.debug(f"Posted IDs: {posted_ids}")
+        
         for photo in sorted_photos:
-            if photo['id'] not in posted_ids:
-                position = photo.get('album_position', 'unknown')
-                self.logger.info(f"Next photo to post: {photo['id']} - {photo['title']} (position {position} in album)")
+            photo_id = photo['id']
+            position = photo.get('album_position', 'unknown')
+            
+            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'POSTED' if photo_id in posted_ids else 'UNPOSTED'}")
+            
+            if photo_id not in posted_ids:
+                self.logger.info(f"Next photo to post: {photo_id} - {photo['title']} (position {position} in album)")
                 return photo
         
         self.logger.info("No unposted photos found - all photos have been posted!")
