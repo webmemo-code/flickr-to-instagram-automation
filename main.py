@@ -41,7 +41,7 @@ def setup_logging(level: str = "INFO") -> None:
     root_logger.addHandler(file_handler)
 
 
-def post_next_photo(dry_run: bool = False) -> bool:
+def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> bool:
     """Post the next available photo from the configured album."""
     logger = logging.getLogger(__name__)
     
@@ -61,6 +61,10 @@ def post_next_photo(dry_run: bool = False) -> bool:
         
         logger.info(f"Starting automation for album: {config.album_name}")
         logger.info(f"Album URL: {config.album_url}")
+        if dry_run:
+            logger.info("🧪 Running in DRY RUN mode")
+            if include_dry_runs:
+                logger.info("📝 Including previous dry run selections in photo selection")
         
         # Get photos from Flickr
         photos = flickr_api.get_unposted_photos()
@@ -75,17 +79,20 @@ def post_next_photo(dry_run: bool = False) -> bool:
         for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
             logger.debug(f"Album photo #{photo.get('album_position', '?')}: {photo['id']} - {photo['title']}")
         
-        # Check if album is complete
+        # Check if album is complete (only count actual posts, not dry runs)
         if state_manager.is_album_complete(len(photos)):
             logger.info("🎉 Album complete! All photos have been posted to Instagram.")
             state_manager.log_automation_run(True, "Album complete - all photos posted")
             return True
         
         # Get next photo to post
-        next_photo = state_manager.get_next_photo_to_post(photos)
+        next_photo = state_manager.get_next_photo_to_post(photos, include_dry_runs=include_dry_runs and dry_run)
         if not next_photo:
-            logger.info("🎉 Album complete! All photos have been posted to Instagram.")
-            state_manager.log_automation_run(True, "Album complete - all photos posted")
+            if dry_run and include_dry_runs:
+                logger.info("🎉 All photos have been selected in dry runs! Use --reset-dry-runs to start over.")
+            else:
+                logger.info("🎉 Album complete! All photos have been posted to Instagram.")
+            state_manager.log_automation_run(True, "No more photos to process")
             return True
         
         position = next_photo.get('album_position', 'unknown')
@@ -94,7 +101,7 @@ def post_next_photo(dry_run: bool = False) -> bool:
         # Validate image URL
         if not instagram_api.validate_image_url(next_photo['url']):
             logger.error(f"❌ Invalid or inaccessible image URL: {next_photo['url']}")
-            state_manager.create_post_record(next_photo, None)
+            state_manager.create_post_record(next_photo, None, is_dry_run=dry_run)
             state_manager.log_automation_run(False, "Invalid image URL")
             return False
         
@@ -119,7 +126,10 @@ def post_next_photo(dry_run: bool = False) -> bool:
             logger.info("🧪 DRY RUN: Would post to Instagram")
             logger.info(f"Image URL: {next_photo['url']}")
             logger.info(f"Caption: {full_caption}")
-            state_manager.log_automation_run(True, "Dry run completed")
+            
+            # Create dry run record to track selection
+            state_manager.create_post_record(next_photo, None, is_dry_run=True)
+            state_manager.log_automation_run(True, f"Dry run completed for photo #{position}")
             return True
         
         # Create record before posting
@@ -165,6 +175,27 @@ def post_next_photo(dry_run: bool = False) -> bool:
         except:
             pass  # Don't fail if logging fails
         return False
+
+
+def reset_dry_runs() -> None:
+    """Reset all dry run records."""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        config = Config()
+        repo_name = os.getenv('GITHUB_REPOSITORY')
+        if not repo_name:
+            raise ValueError("GITHUB_REPOSITORY environment variable not set")
+        
+        state_manager = StateManager(config, repo_name)
+        cleared_count = state_manager.clear_dry_run_records()
+        
+        print(f"✅ Cleared {cleared_count} dry run records")
+        logger.info(f"Reset {cleared_count} dry run records")
+        
+    except Exception as e:
+        logger.error(f"Failed to reset dry runs: {e}")
+        print(f"❌ Failed to reset dry runs: {e}")
 
 
 def show_stats() -> None:
@@ -229,6 +260,16 @@ def main():
         help='Show automation statistics'
     )
     parser.add_argument(
+        '--reset-dry-runs',
+        action='store_true',
+        help='Clear all dry run records'
+    )
+    parser.add_argument(
+        '--ignore-dry-runs',
+        action='store_true',
+        help='Ignore previous dry run selections when choosing next photo'
+    )
+    parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
         default='INFO',
@@ -241,6 +282,11 @@ def main():
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
     
+    # Reset dry runs if requested
+    if args.reset_dry_runs:
+        reset_dry_runs()
+        return
+    
     # Show stats if requested
     if args.stats:
         show_stats()
@@ -248,7 +294,8 @@ def main():
     
     # Run automation
     logger.info("🚀 Starting Flickr to Instagram automation")
-    success = post_next_photo(args.dry_run)
+    include_dry_runs = not args.ignore_dry_runs
+    success = post_next_photo(args.dry_run, include_dry_runs)
     
     if success:
         logger.info("✅ Automation completed successfully")
