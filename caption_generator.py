@@ -20,8 +20,8 @@ class CaptionGenerator:
         """Generate an Instagram caption for the given image."""
         try:
             # Prepare the prompt
-            prompt = ("You are a social media influencer. Describe this image in short sentences "
-                     "that serve as Instagram captions. Do not number the sentences. "
+            prompt = ("You are a social media influencer. Describe this image in two short paragraphs "
+                     "that serve as Instagram captions. Do not number the paragraphs. "
                      "Do not use quotation marks. Keep it engaging and authentic.")
             
             response = self.client.chat.completions.create(
