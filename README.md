@@ -282,9 +282,10 @@ For issues and questions:
 2. **Test with Dry Run**: Use `--dry-run` flag to test without posting
 3. **Review Logs**: Check GitHub Actions logs and artifacts
 4. **Statistics**: Use `--stats` to check progress and identify issues
-5. **GitHub Issues**: Create an issue with detailed error information
+5. **GitHub Issues**: Don't create an issue because I don't have the resources to follow up
 
-Use this repo for free. It comes as is, i.e. I don't offer support due to limited time.
+Use this repo for free. It comes as is, i.e. without any warranty whatsoever. 
+I don't offer support due to limited time.
 
 ## Example Workflow
 
