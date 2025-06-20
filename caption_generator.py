@@ -20,9 +20,10 @@ class CaptionGenerator:
         """Generate an Instagram caption for the given image."""
         try:
             # Prepare the prompt
-            prompt = ("You are a social media influencer. Describe this image in two very short paragraphs "
+            prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                      "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                     "Do not use quotation marks. Keep it engaging and authentic.")
+                     "Do not use quotation marks. Keep it engaging and authentic. If a title or a caption "
+                      "is provided with the image, refer to it in your copy.")
             
             response = self.client.chat.completions.create(
                 model=self.config.openai_model,
