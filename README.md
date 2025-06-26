@@ -1,5 +1,17 @@
 # Flickr to Instagram Automation
 
+[![GitHub Actions](https://github.com/webmemo-code/flickr-to-instagram-automation/workflows/Flickr%20to%20Instagram%20Automation/badge.svg)](https://github.com/yourusername/your-repo-name/actions)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[![Flickr API](https://img.shields.io/badge/Flickr-API-ff69b4.svg)](https://www.flickr.com/services/api/)
+[![Instagram Graph API](https://img.shields.io/badge/Instagram-Graph%20API-E4405F.svg)](https://developers.facebook.com/docs/instagram-api/)
+[![OpenAI GPT-4](https://img.shields.io/badge/OpenAI-GPT--4%20Vision-412991.svg)](https://openai.com/)
+
+[![Automation](https://img.shields.io/badge/automation-daily-green.svg)]()
+[![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF.svg)](https://github.com/features/actions)
+[![Issues for State](https://img.shields.io/badge/state%20management-GitHub%20Issues-238636.svg)]()
+
 Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
 
 **Instagram's API** requires source photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
