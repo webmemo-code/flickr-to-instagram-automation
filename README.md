@@ -92,6 +92,81 @@ https://flickr.com/photos/[your_username]/albums/72177720326826937
 
 The album ID is the number at the end: `72177720326826937`
 
+## Architecture Overview
+
+graph TB
+    %% External Services
+    subgraph "External APIs"
+        FA[📷 Flickr API<br/>Photo Retrieval]
+        IA[📱 Instagram Graph API<br/>Photo Posting]
+        OA[🤖 OpenAI GPT-4 Vision<br/>Caption Generation]
+    end
+
+    %% GitHub Infrastructure
+    subgraph "GitHub Infrastructure"
+        GR[📁 GitHub Repository<br/>Code & Configuration]
+        GA[⚙️ GitHub Actions<br/>Workflow Engine]
+        GI[📋 GitHub Issues<br/>State Management]
+        GS[🔐 GitHub Secrets<br/>Credential Storage]
+    end
+
+    %% Core Application
+    subgraph "Application Core"
+        MC[🎮 main.py<br/>Orchestration]
+        CF[⚙️ config.py<br/>Configuration]
+        
+        subgraph "API Integrations"
+            FL[📷 flickr_api.py<br/>Photo Fetching]
+            CG[🤖 caption_generator.py<br/>AI Caption Creation]
+            IG[📱 instagram_api.py<br/>Social Media Posting]
+        end
+        
+        SM[📊 state_manager.py<br/>Progress Tracking]
+    end
+
+    %% Triggers
+    subgraph "Triggers"
+        CR[⏰ Cron Schedule<br/>Daily at 9 AM UTC]
+        MN[👤 Manual Trigger<br/>Workflow Dispatch]
+    end
+
+    %% Data Flow
+    CR --> GA
+    MN --> GA
+    GA --> MC
+    
+    MC --> CF
+    CF --> GS
+    
+    MC --> FL
+    FL --> FA
+    FA --> FL
+    
+    FL --> CG
+    CG --> OA
+    OA --> CG
+    
+    CG --> IG
+    IG --> IA
+    IA --> IG
+    
+    MC --> SM
+    SM --> GI
+    GI --> SM
+    
+    SM --> MC
+
+    %% Styling
+    classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef github fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef core fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef trigger fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class FA,IA,OA external
+    class GR,GA,GI,GS github
+    class MC,CF,FL,CG,IG,SM core
+    class CR,MN trigger
+
 ## API Setup
 
 ### Flickr API
