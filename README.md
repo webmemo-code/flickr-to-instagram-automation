@@ -94,6 +94,9 @@ The album ID is the number at the end: `72177720326826937`
 
 ## Architecture Overview
 
+The automation system follows a modular architecture with clear separation of concerns, robust error handling, and comprehensive state management.
+
+```mermaid
 graph TB
     %% External Services
     subgraph "External APIs"
@@ -101,7 +104,7 @@ graph TB
         IA[📱 Instagram Graph API<br/>Photo Posting]
         OA[🤖 OpenAI GPT-4 Vision<br/>Caption Generation]
     end
-
+    
     %% GitHub Infrastructure
     subgraph "GitHub Infrastructure"
         GR[📁 GitHub Repository<br/>Code & Configuration]
@@ -166,6 +169,155 @@ graph TB
     class GR,GA,GI,GS github
     class MC,CF,FL,CG,IG,SM core
     class CR,MN trigger
+```
+
+### Data Flow Process
+
+```mermaid
+sequenceDiagram
+    participant GA as GitHub Actions
+    participant MC as main.py
+    participant FL as flickr_api.py
+    participant FA as Flickr API
+    participant SM as state_manager.py
+    participant GI as GitHub Issues
+    participant CG as caption_generator.py
+    participant OA as OpenAI API
+    participant IG as instagram_api.py
+    participant IA as Instagram API
+
+    Note over GA: Daily Trigger (9 AM UTC)
+    GA->>MC: Execute automation
+    
+    MC->>SM: Check if album complete
+    SM->>GI: Query posted photos
+    GI-->>SM: Return posted photo IDs
+    SM-->>MC: Album status
+    
+    alt Album not complete
+        MC->>FL: Get unposted photos
+        FL->>FA: Fetch album photos
+        FA-->>FL: Return photo metadata
+        FL-->>MC: Processed photo list
+        
+        MC->>SM: Get next photo to post
+        SM-->>MC: Next unposted photo
+        
+        MC->>CG: Generate caption
+        CG->>OA: Analyze image with GPT-4 Vision
+        OA-->>CG: Generated caption text
+        CG-->>MC: Complete Instagram caption
+        
+        MC->>IG: Validate image URL
+        IG-->>MC: Validation result
+        
+        MC->>IG: Post to Instagram
+        IG->>IA: Create media container
+        IA-->>IG: Container ID
+        IG->>IA: Publish container
+        IA-->>IG: Post ID
+        IG-->>MC: Success/failure
+        
+        MC->>SM: Record post result
+        SM->>GI: Create tracking issue
+        GI-->>SM: Issue created
+        
+        MC->>GA: Report completion
+    else Album complete
+        MC->>GA: Skip - all photos posted
+    end
+```
+
+### Component Architecture
+
+```mermaid
+graph LR
+    subgraph "Configuration Layer"
+        ENV[🔐 Environment Variables<br/>- API Keys<br/>- Album Settings<br/>- Credentials]
+        CFG[⚙️ Config Manager<br/>- Validation<br/>- API Endpoints<br/>- Settings]
+    end
+    
+    subgraph "Service Layer"
+        FLS[📷 Flickr Service<br/>- Photo Retrieval<br/>- Metadata Extraction<br/>- URL Generation]
+        IGS[📱 Instagram Service<br/>- Media Upload<br/>- Publishing<br/>- Validation]
+        CPS[🤖 Caption Service<br/>- AI Generation<br/>- Text Processing<br/>- Retry Logic]
+        STS[📊 State Service<br/>- Progress Tracking<br/>- Issue Management<br/>- Completion Detection]
+    end
+    
+    subgraph "Orchestration Layer"
+        MAIN[🎮 Main Controller<br/>- Workflow Coordination<br/>- Error Handling<br/>- Logging]
+    end
+    
+    ENV --> CFG
+    CFG --> FLS
+    CFG --> IGS
+    CFG --> CPS
+    CFG --> STS
+    
+    FLS --> MAIN
+    IGS --> MAIN
+    CPS --> MAIN
+    STS --> MAIN
+    
+    classDef config fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef service fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef orchestration fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    
+    class ENV,CFG config
+    class FLS,IGS,CPS,STS service
+    class MAIN orchestration
+```
+
+### Deployment Architecture
+```mermaid
+graph TB
+    subgraph "Development"
+        DEV[👨‍💻 Local Development<br/>- .env files<br/>- Dry run testing<br/>- Debug logging]
+    end
+    
+    subgraph "Repository"
+        REPO[📁 GitHub Repository<br/>- Source code<br/>- Configuration<br/>- Documentation]
+    end
+    
+    subgraph "Production"
+        PROD[🏭 GitHub Actions<br/>- Automated execution<br/>- Secure credentials<br/>- Error handling]
+    end
+    
+    subgraph "Monitoring"
+        LOGS[📊 Monitoring<br/>- GitHub Issues<br/>- Workflow logs<br/>- Artifacts]
+    end
+    
+    DEV --> REPO
+    REPO --> PROD
+    PROD --> LOGS
+    LOGS --> DEV
+    
+    classDef dev fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef repo fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef prod fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef monitor fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class DEV dev
+    class REPO repo
+    class PROD prod
+    class LOGS monitor
+```
+
+## Technology Stack
+
+| Category | Component | Technology | Purpose |
+|:---------|:----------|:-----------|:--------|
+| **Infrastructure** | Orchestration | GitHub Actions | Workflow automation, scheduling |
+| | Runtime | Python 3.11 | Core application logic |
+| | State Storage | GitHub Issues API | Progress tracking, audit trail |
+| **Configuration** | Credentials | GitHub Secrets | Encrypted credential storage |
+| | Settings | Environment Variables | Secure configuration management |
+| **External APIs** | Photo Source | Flickr API | Photo metadata and URLs |
+| | Social Media | Instagram Graph API | Photo posting and publishing |
+| | AI Services | OpenAI GPT-4 Vision | AI-powered caption generation |
+| **Reliability** | Error Handling | Exponential Backoff | Retry logic for API failures |
+| | Monitoring | Python Logging | Comprehensive audit trails |
+| | Validation | URL Checking | Image accessibility verification |
 
 ## API Setup
 
