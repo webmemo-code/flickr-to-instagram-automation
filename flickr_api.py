@@ -96,9 +96,63 @@ class FlickrAPI:
             self.logger.warning(f"Failed to get location for photo {photo_id}: {e}")
             return None
     
+    def get_photo_exif(self, photo_id: str) -> Optional[Dict]:
+        """Get EXIF data for a photo."""
+        params = {
+            'method': 'flickr.photos.getExif',
+            'api_key': self.config.flickr_api_key,
+            'photo_id': photo_id,
+            'format': 'json',
+            'nojsoncallback': '1'
+        }
+        
+        try:
+            response = requests.get(self.config.flickr_api_url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get('stat') == 'ok':
+                self.logger.debug(f"Retrieved EXIF data for photo {photo_id}")
+                return data
+            else:
+                self.logger.debug(f"No EXIF data available for photo {photo_id}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"Failed to get EXIF data for photo {photo_id}: {e}")
+            return None
+    
     def build_photo_url(self, photo: Dict) -> str:
         """Build the Flickr photo URL."""
         return f"https://live.staticflickr.com/{photo['server']}/{photo['id']}_{photo['secret']}_c.jpg"
+    
+    def get_photo_page_url(self, photo_info: Dict) -> Optional[str]:
+        """Extract the Flickr photo page URL from photo info."""
+        if photo_info and 'photo' in photo_info and 'urls' in photo_info['photo']:
+            for url_entry in photo_info['photo']['urls']['url']:
+                if url_entry.get('type') == 'photopage':
+                    return url_entry['_content']
+        return None
+    
+    def extract_source_url(self, description: str, photo_info: Dict) -> Optional[str]:
+        """Extract blog post URL from description or photo metadata."""
+        import re
+        
+        # Look for URLs in description
+        if description:
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\],.]'
+            urls = re.findall(url_pattern, description)
+            
+            # Filter for blog URLs (travelmemo.com, reisememo.ch, etc.)
+            for url in urls:
+                if any(domain in url.lower() for domain in ['travelmemo.com', 'reisememo.ch', 'blog']):
+                    return url
+            
+            # Return first URL if no blog-specific URL found
+            if urls:
+                return urls[0]
+        
+        return None
     
     def extract_hashtags(self, photo_info: Dict, location_data: Optional[Dict] = None) -> str:
         """Extract and format hashtags from photo tags and location data."""
@@ -135,9 +189,14 @@ class FlickrAPI:
             # Get additional photo information
             photo_info, description = self.get_photo_info(photo['id'])
             location_data = self.get_photo_location(photo['id'])
+            exif_data = self.get_photo_exif(photo['id'])
             
             # Build photo URL
             photo_url = self.build_photo_url(photo)
+            
+            # Extract additional URLs and context
+            photo_page_url = self.get_photo_page_url(photo_info)
+            source_url = self.extract_source_url(description, photo_info)
             
             # Extract hashtags
             hashtags = self.extract_hashtags(photo_info, location_data)
@@ -150,7 +209,11 @@ class FlickrAPI:
                 'hashtags': hashtags,
                 'server': photo['server'],
                 'secret': photo['secret'],
-                'album_position': index + 1  # Add position in album (1-based)
+                'album_position': index + 1,  # Add position in album (1-based)
+                'photo_page_url': photo_page_url,
+                'source_url': source_url,
+                'exif_data': exif_data,
+                'location_data': location_data
             }
             photos.append(photo_data)
         

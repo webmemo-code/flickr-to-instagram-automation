@@ -106,12 +106,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
             return False
         
         # Generate caption with GPT-4 Vision
-        logger.info("🤖 Generating caption with GPT-4 Vision...")
-        generated_caption = caption_generator.generate_with_retry(
-            next_photo['url'], 
-            next_photo['title'], 
-            next_photo['description']
-        )
+        logger.info("🤖 Generating enhanced caption with GPT-4 Vision...")
+        generated_caption = caption_generator.generate_with_retry(next_photo)
         
         if not generated_caption:
             logger.warning("⚠️ Failed to generate caption, using fallback")

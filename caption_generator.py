@@ -16,14 +16,59 @@ class CaptionGenerator:
         self.client = OpenAI(api_key=config.openai_api_key)
         self.logger = logging.getLogger(__name__)
     
-    def generate_caption(self, image_url: str, title: str = "", description: str = "") -> Optional[str]:
-        """Generate an Instagram caption for the given image."""
+    def generate_caption(self, photo_data: dict) -> Optional[str]:
+        """Generate an Instagram caption for the given image with enhanced context."""
         try:
-            # Prepare the prompt
-            prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
-                     "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                     "Do not use quotation marks. Keep it engaging and authentic. If a title or a caption "
-                      "is provided with the image, refer to it in your copy.")
+            # Build enhanced context from available data
+            context_parts = []
+            
+            # Add title and description
+            if photo_data.get('title'):
+                context_parts.append(f"Photo title: {photo_data['title']}")
+            if photo_data.get('description'):
+                context_parts.append(f"Photo description: {photo_data['description']}")
+            
+            # Add source/blog URL context
+            if photo_data.get('source_url'):
+                context_parts.append(f"This photo appears in a blog post at: {photo_data['source_url']}")
+            
+            # Add location context
+            if photo_data.get('location_data'):
+                location = photo_data['location_data'].get('photo', {}).get('location', {})
+                location_parts = []
+                for field in ['locality', 'region', 'country']:
+                    if field in location and '_content' in location[field]:
+                        location_parts.append(location[field]['_content'])
+                if location_parts:
+                    context_parts.append(f"Location: {', '.join(location_parts)}")
+            
+            # Add EXIF context (camera info)
+            if photo_data.get('exif_data'):
+                exif = photo_data['exif_data'].get('photo', {}).get('exif', [])
+                camera_info = []
+                for tag in exif:
+                    if tag.get('tag') in ['Make', 'Model']:
+                        camera_info.append(tag.get('raw', {}).get('_content', ''))
+                if camera_info:
+                    context_parts.append(f"Camera: {' '.join(camera_info)}")
+            
+            # Build the enhanced prompt
+            context_text = "\n".join(context_parts) if context_parts else ""
+            
+            if context_text:
+                # Enhanced prompt with context
+                prompt = ("You are an Instagram influencer for travel content. Create an engaging Instagram caption "
+                         "in two short paragraphs (2 sentences each). Do not number paragraphs or use quotation marks. "
+                         "Make it authentic and personal. Use the provided context to create a more specific and "
+                         "engaging caption that references the location, story, or context when available.")
+                prompt += f"\n\nContext about this photo:\n{context_text}"
+                self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')}")
+            else:
+                # Fallback to original prompt style when no context available
+                prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
+                         "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
+                         "Do not use quotation marks. Keep it engaging and authentic.")
+                self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')}")
             
             response = self.client.chat.completions.create(
                 model=self.config.openai_model,
@@ -34,22 +79,22 @@ class CaptionGenerator:
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {"url": image_url}
+                                "image_url": {"url": photo_data['url']}
                             }
                         ]
                     }
                 ],
-                max_tokens=80,
+                max_tokens=120,
                 temperature=0.7
             )
             
             generated_text = response.choices[0].message.content
-            self.logger.info(f"Generated caption for image: {image_url[:50]}...")
+            self.logger.info(f"Generated enhanced caption for photo {photo_data['id']}")
             
             return generated_text
             
         except Exception as e:
-            self.logger.error(f"Failed to generate caption for {image_url}: {e}")
+            self.logger.error(f"Failed to generate caption for photo {photo_data.get('id', 'unknown')}: {e}")
             return None
     
     def build_full_caption(self, photo_data: dict, generated_caption: str) -> str:
@@ -76,11 +121,11 @@ class CaptionGenerator:
         
         return "\n\n".join(caption_parts)
     
-    def generate_with_retry(self, image_url: str, title: str = "", description: str = "", max_retries: int = 3) -> Optional[str]:
+    def generate_with_retry(self, photo_data: dict, max_retries: int = 3) -> Optional[str]:
         """Generate caption with retry logic for rate limiting."""
         for attempt in range(max_retries):
             try:
-                caption = self.generate_caption(image_url, title, description)
+                caption = self.generate_caption(photo_data)
                 if caption:
                     return caption
                     
