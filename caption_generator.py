@@ -59,7 +59,7 @@ class CaptionGenerator:
                 # Enhanced prompt with context
                 prompt = ("You are an Instagram influencer for travel content. Create an engaging Instagram caption "
                          "in two short paragraphs (2 sentences each). Do not number paragraphs or use quotation marks. "
-                         "Make it authentic and personal. Use the provided context to create a more specific and "
+                         "Make it engaging, authentic and personal. Use the provided context to create a more specific and "
                          "engaging caption that references the location, story, or context when available.")
                 prompt += f"\n\nContext about this photo:\n{context_text}"
                 self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')}")
@@ -67,7 +67,7 @@ class CaptionGenerator:
                 # Fallback to original prompt style when no context available
                 prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                          "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                         "Do not use quotation marks. Keep it engaging and authentic.")
+                         "Do not use quotation marks. Keep it engaging, personal and authentic.")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')}")
             
             response = self.client.chat.completions.create(
