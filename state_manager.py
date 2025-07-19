@@ -33,7 +33,7 @@ class StateManager:
                     photo_id = photo_id[2:].strip()
                 
                 # Return only if we have a valid ID
-                if photo_id and photo_id.isdigit():
+                if photo_id:
                     return photo_id
         return None
     

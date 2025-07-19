@@ -51,10 +51,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Translations
-*.mo
-*.pot
-
 # Django stuff:
 *.log
 local_settings.py
@@ -133,6 +129,8 @@ dmypy.json
 .idea/
 *.swp
 *.swo
+.mcp.json
+.claude/
 
 # OS
 .DS_Store
