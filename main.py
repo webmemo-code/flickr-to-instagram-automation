@@ -101,9 +101,10 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         # Validate image URL
         if not instagram_api.validate_image_url(next_photo['url']):
             logger.error(f"❌ Invalid or inaccessible image URL: {next_photo['url']}")
+            logger.info(f"⏭️ Skipping photo #{position} and marking as failed to continue with next photo")
             state_manager.create_post_record(next_photo, None, is_dry_run=dry_run)
-            state_manager.log_automation_run(False, "Invalid image URL")
-            return False
+            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL")
+            return True  # Return True to continue with next photo
         
         # Generate caption with GPT-4 Vision
         logger.info("🤖 Generating enhanced caption with GPT-4 Vision...")
@@ -160,8 +161,9 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
             return True
         else:
             logger.error("❌ Failed to post to Instagram")
-            state_manager.log_automation_run(False, "Instagram posting failed")
-            return False
+            logger.info(f"⏭️ Marking photo #{position} as failed and continuing with next photo")
+            state_manager.log_automation_run(True, f"Photo #{position} failed to post to Instagram, continuing")
+            return True  # Return True to continue with next photo
     
     except Exception as e:
         logger.error(f"💥 Automation failed: {e}")
