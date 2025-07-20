@@ -197,9 +197,10 @@ jobs:
         with:
           name: automation-logs-${{ github.run_id }}
           path: |
-            *.log
+            automation_*.log
           retention-days: 30
           compression-level: 6
+          if-no-files-found: warn
       
       - name: Create summary
         if: always()
@@ -324,5 +325,6 @@ jobs:
         with:
           name: retry-automation-logs-${{ github.run_id }}
           path: |
-            *.log
+            automation_*.log
           retention-days: 30
+          if-no-files-found: warn
