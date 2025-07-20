@@ -38,11 +38,11 @@ class StateManager:
         return None
     
     def get_posted_photo_ids(self) -> List[str]:
-        """Get list of photo IDs that have already been posted."""
+        """Get list of photo IDs that have already been posted successfully."""
         try:
             issues = self.repo.get_issues(
                 state='all',
-                labels=['automated-post', 'instagram', 'flickr-album']
+                labels=['automated-post', 'instagram', 'flickr-album', 'posted']
             )
             
             posted_ids = []
@@ -52,7 +52,7 @@ class StateManager:
                     posted_ids.append(photo_id)
                     self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number}")
             
-            self.logger.info(f"Found {len(posted_ids)} already posted photos: {posted_ids}")
+            self.logger.info(f"Found {len(posted_ids)} successfully posted photos: {posted_ids}")
             return posted_ids
             
         except Exception as e:
