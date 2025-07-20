@@ -80,6 +80,28 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to get dry run photo IDs: {e}")
             return []
+
+    def get_failed_photo_ids(self) -> List[str]:
+        """Get list of photo IDs that have failed to post."""
+        try:
+            issues = self.repo.get_issues(
+                state='all',
+                labels=['automated-post', 'instagram', 'flickr-album', 'failed']
+            )
+            
+            failed_ids = []
+            for issue in issues:
+                photo_id = self._extract_photo_id(issue.body)
+                if photo_id and photo_id not in failed_ids:
+                    failed_ids.append(photo_id)
+                    self.logger.debug(f"Found failed photo ID: {photo_id} from issue #{issue.number}")
+            
+            self.logger.info(f"Found {len(failed_ids)} failed photos: {failed_ids}")
+            return failed_ids
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get failed photo IDs: {e}")
+            return []
     
     def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None, is_dry_run: bool = False) -> Optional[str]:
         """Create a GitHub issue to record the posted photo."""
@@ -166,13 +188,17 @@ class StateManager:
     def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
         """Get the next photo that hasn't been posted yet, respecting album order."""
         posted_ids = self.get_posted_photo_ids()
+        failed_ids = self.get_failed_photo_ids()
         excluded_ids = posted_ids.copy()
+        excluded_ids.extend(failed_ids)
         
         # Optionally include dry run selections in exclusion list
         if include_dry_runs:
             dry_run_ids = self.get_dry_run_photo_ids()
             excluded_ids.extend(dry_run_ids)
             self.logger.info(f"Including {len(dry_run_ids)} dry run selections in exclusion list")
+        
+        self.logger.info(f"Excluding {len(posted_ids)} posted photos and {len(failed_ids)} failed photos")
         
         # Sort photos by their album position to ensure correct order
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
@@ -295,13 +321,16 @@ class StateManager:
             return {}
     
     def is_album_complete(self, total_photos: int) -> bool:
-        """Check if all photos in the album have been posted."""
+        """Check if all photos in the album have been processed (posted or failed)."""
         posted_count = len(self.get_posted_photo_ids())
-        is_complete = posted_count >= total_photos
+        failed_count = len(self.get_failed_photo_ids())
+        processed_count = posted_count + failed_count
+        is_complete = processed_count >= total_photos
         
         if is_complete:
-            self.logger.info(f"Album complete! Posted {posted_count} of {total_photos} photos")
+            self.logger.info(f"Album complete! Processed {processed_count} of {total_photos} photos ({posted_count} posted, {failed_count} failed)")
         else:
-            self.logger.info(f"Album progress: {posted_count} of {total_photos} photos posted")
+            remaining = total_photos - processed_count
+            self.logger.info(f"Album progress: {processed_count} of {total_photos} photos processed ({posted_count} posted, {failed_count} failed, {remaining} remaining)")
         
         return is_complete
