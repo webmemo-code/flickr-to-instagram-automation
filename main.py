@@ -147,8 +147,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
                 logger.warning("No issue number from initial record creation, creating new one")
                 state_manager.create_post_record(next_photo, instagram_post_id)
             
-            # Log progress
-            posted_count = len(state_manager.get_posted_photo_ids()) + 1  # +1 for current post
+            # Log progress - get actual posted count after updating record
+            posted_count = len(state_manager.get_posted_photo_ids())
             total_count = len(photos)
             progress_msg = f"Posted photo #{position} ({next_photo['id']}) - {posted_count}/{total_count} - Instagram post {instagram_post_id}"
             
