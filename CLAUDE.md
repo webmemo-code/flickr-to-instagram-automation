@@ -93,4 +93,33 @@ The system now collects rich context for better captions:
 - Updated caption generator to use rich context for more specific Instagram captions
 
 ## Current Status
-Repository is clean with recent commits focused on README documentation improvements. Enhanced caption generation system implemented and ready for testing.
+**ACTIVE ISSUE**: Working on Linear issue WEB-5 - "Image publication not working anymore"
+
+### WEB-5 Progress (In Progress)
+**Problem**: Automation incorrectly reports album as complete when photos remain unpublished. Last working run was #56.
+
+**Root Causes Identified**:
+1. `state_manager.py` was counting failed posts as successful (fixed)
+2. Log file upload pattern mismatch in GitHub workflow (fixed)
+3. Missing error handling for inaccessible Flickr photos (fixed)
+
+**Fixes Applied**:
+1. **Fixed state management logic**: Updated `get_posted_photo_ids()` to only count photos with `'posted'` label
+2. **Enhanced error handling**: Modified `main.py` to skip and mark failed photos instead of stopping automation
+3. **Added failed photo tracking**: New `get_failed_photo_ids()` method to exclude failed photos from future attempts
+4. **Updated album completion logic**: Now considers album complete when all photos are either posted OR failed
+5. **Fixed log upload pattern**: Changed from `*.log` to `automation_*.log` in GitHub workflow
+
+**Next Steps for Future Session**:
+1. User needs to restart terminal and run `python3 check_github_issues.py` to check current album state
+2. Verify the 12 remaining photos can now be detected correctly
+3. Test automation with fixes applied
+4. Monitor if album completion status is now accurate
+
+**Files Modified**:
+- `state_manager.py` (lines 45, 55, 84-104, 188-201, 323-336)
+- `main.py` (lines 102-107, 163-166)
+- `.github/workflows/flickr-to-instagram-automation.yml` (lines 200, 328)
+- Created diagnostic scripts: `check_status.py`, `check_github_issues.py`
+
+Repository has pending changes that need to be committed and tested.
