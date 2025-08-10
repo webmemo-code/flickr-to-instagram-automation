@@ -41,7 +41,7 @@ class Config:
             'FLICKR_ALBUM_ID': self.flickr_album_id,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
             'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
-            'INSTAGRAM_APP_ID': self.instagram_app_id,
+            # 'INSTAGRAM_APP_ID': self.instagram_app_id,  # Optional for now
             'OPENAI_API_KEY': self.openai_api_key,
             'GITHUB_TOKEN': self.github_token,
         }
