@@ -128,3 +128,14 @@ The system now collects rich context for better captions:
 - Created diagnostic scripts: `check_status.py`, `check_github_issues.py`, `verify_instagram_posts.py`
 
 **Automation Ready**: GitHub Actions will now resume daily posting of remaining 12 photos.
+
+## Commit Message Convention
+Always use these prefixes for commit messages (capitalized for visibility):
+- **UPDATE** | When adding functionality
+- **FIXING** | For intermediate fixes  
+- **FIXED** | When fixing is complete
+- **SECURITY** | For security fixes
+- **INIT** | For initial file uploads
+
+Format: `[PREFIX] | [Description]`
+Example: `UPDATE | Add image retry mechanism for Flickr URL validation`
