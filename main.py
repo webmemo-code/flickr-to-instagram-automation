@@ -98,12 +98,13 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         position = next_photo.get('album_position', 'unknown')
         logger.info(f"📸 Processing photo #{position}: {next_photo['title']} (ID: {next_photo['id']})")
         
-        # Validate image URL
+        # Validate image URL (includes retry logic with 1-minute delay)
+        logger.info(f"🔍 Validating image URL (includes retry if needed)...")
         if not instagram_api.validate_image_url(next_photo['url']):
-            logger.error(f"❌ Invalid or inaccessible image URL: {next_photo['url']}")
+            logger.error(f"❌ Invalid or inaccessible image URL after retries: {next_photo['url']}")
             logger.info(f"⏭️ Skipping photo #{position} and marking as failed to continue with next photo")
             state_manager.create_post_record(next_photo, None, is_dry_run=dry_run)
-            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL")
+            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL (after retries)")
             return True  # Return True to continue with next photo
         
         # Generate caption with GPT-4 Vision
