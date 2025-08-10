@@ -16,6 +16,7 @@ class StateManager:
         self.github = Github(config.github_token)
         self.repo = self.github.get_repo(repo_name)
         self.logger = logging.getLogger(__name__)
+        self.current_album_id = config.flickr_album_id  # Track current album ID
     
     def _extract_photo_id(self, issue_body: str) -> Optional[str]:
         """Extract photo ID from issue body, handling different formats."""
@@ -37,8 +38,43 @@ class StateManager:
                     return photo_id
         return None
     
+    def _extract_album_id(self, issue_body: str) -> Optional[str]:
+        """Extract album ID from issue body."""
+        if not issue_body:
+            return None
+            
+        lines = issue_body.split('\n')
+        for line in lines:
+            if line.startswith('**Album ID:**'):
+                album_id = line.split(':', 1)[1].strip()
+                if album_id:
+                    return album_id
+        return None
+    
+    def _is_from_current_album(self, issue_body: str, issue_number: int = None) -> bool:
+        """Check if an issue is from the current album."""
+        album_id = self._extract_album_id(issue_body)
+        
+        # If album ID is explicitly set and matches current album, it's from current album
+        if album_id == self.current_album_id:
+            return True
+        
+        # If album ID is explicitly set but doesn't match, exclude it
+        if album_id is not None and album_id != self.current_album_id:
+            return False
+        
+        # For issues without album ID (legacy), use issue number heuristic
+        # Based on user info: Issues #65-#101 are from current "Istrien" album
+        # Issues #61 and below are from previous album
+        if album_id is None and issue_number is not None:
+            # Current Istrien album issues are #65 and above
+            return issue_number >= 65
+        
+        # Default fallback: assume it's from current album (conservative approach)
+        return True
+    
     def get_posted_photo_ids(self) -> List[str]:
-        """Get list of photo IDs that have already been posted successfully."""
+        """Get list of photo IDs that have already been posted successfully from the current album."""
         try:
             issues = self.repo.get_issues(
                 state='all',
@@ -47,12 +83,14 @@ class StateManager:
             
             posted_ids = []
             for issue in issues:
-                photo_id = self._extract_photo_id(issue.body)
-                if photo_id and photo_id not in posted_ids:  # Avoid duplicates
-                    posted_ids.append(photo_id)
-                    self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number}")
+                # Only include photos from the current album
+                if self._is_from_current_album(issue.body, issue.number):
+                    photo_id = self._extract_photo_id(issue.body)
+                    if photo_id and photo_id not in posted_ids:  # Avoid duplicates
+                        posted_ids.append(photo_id)
+                        self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number} (current album)")
             
-            self.logger.info(f"Found {len(posted_ids)} successfully posted photos: {posted_ids}")
+            self.logger.info(f"Found {len(posted_ids)} successfully posted photos from current album: {posted_ids}")
             return posted_ids
             
         except Exception as e:
@@ -60,7 +98,7 @@ class StateManager:
             return []
 
     def get_dry_run_photo_ids(self) -> List[str]:
-        """Get list of photo IDs that have been selected in dry runs."""
+        """Get list of photo IDs that have been selected in dry runs from the current album."""
         try:
             issues = self.repo.get_issues(
                 state='all',
@@ -69,12 +107,14 @@ class StateManager:
             
             dry_run_ids = []
             for issue in issues:
-                photo_id = self._extract_photo_id(issue.body)
-                if photo_id and photo_id not in dry_run_ids:
-                    dry_run_ids.append(photo_id)
-                    self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number}")
+                # Only include photos from the current album
+                if self._is_from_current_album(issue.body, issue.number):
+                    photo_id = self._extract_photo_id(issue.body)
+                    if photo_id and photo_id not in dry_run_ids:
+                        dry_run_ids.append(photo_id)
+                        self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number} (current album)")
             
-            self.logger.info(f"Found {len(dry_run_ids)} dry run selections: {dry_run_ids}")
+            self.logger.info(f"Found {len(dry_run_ids)} dry run selections from current album: {dry_run_ids}")
             return dry_run_ids
             
         except Exception as e:
@@ -82,7 +122,7 @@ class StateManager:
             return []
 
     def get_failed_photo_ids(self) -> List[str]:
-        """Get list of photo IDs that have failed to post."""
+        """Get list of photo IDs that have failed to post from the current album."""
         try:
             issues = self.repo.get_issues(
                 state='all',
@@ -91,12 +131,14 @@ class StateManager:
             
             failed_ids = []
             for issue in issues:
-                photo_id = self._extract_photo_id(issue.body)
-                if photo_id and photo_id not in failed_ids:
-                    failed_ids.append(photo_id)
-                    self.logger.debug(f"Found failed photo ID: {photo_id} from issue #{issue.number}")
+                # Only include photos from the current album
+                if self._is_from_current_album(issue.body, issue.number):
+                    photo_id = self._extract_photo_id(issue.body)
+                    if photo_id and photo_id not in failed_ids:
+                        failed_ids.append(photo_id)
+                        self.logger.debug(f"Found failed photo ID: {photo_id} from issue #{issue.number} (current album)")
             
-            self.logger.info(f"Found {len(failed_ids)} failed photos: {failed_ids}")
+            self.logger.info(f"Found {len(failed_ids)} failed photos from current album: {failed_ids}")
             return failed_ids
             
         except Exception as e:
@@ -116,6 +158,7 @@ class StateManager:
             
             body_parts = [
                 f"**Photo ID:** {photo_data['id']}",
+                f"**Album ID:** {self.current_album_id}",
                 f"**Album Position:** {position}",
                 f"**Title:** {photo_data['title']}",
                 f"**Description:** {photo_data.get('description', 'N/A')}",
