@@ -130,21 +130,31 @@ class InstagramAPI:
             self.logger.error(f"Failed to check API limits: {e}")
             return {}
     
-    def validate_image_url(self, image_url: str) -> bool:
-        """Validate that the image URL is accessible."""
-        try:
-            response = requests.head(image_url, timeout=10)
-            if response.status_code == 200:
-                content_type = response.headers.get('content-type', '')
-                if content_type.startswith('image/'):
-                    return True
+    def validate_image_url(self, image_url: str, max_retries: int = 2, retry_delay: int = 60) -> bool:
+        """Validate that the image URL is accessible, with retry logic for temporary failures."""
+        for attempt in range(max_retries):
+            try:
+                response = requests.head(image_url, timeout=10)
+                if response.status_code == 200:
+                    content_type = response.headers.get('content-type', '')
+                    if content_type.startswith('image/'):
+                        if attempt > 0:
+                            self.logger.info(f"✅ Image URL became accessible on retry #{attempt}")
+                        return True
+                    else:
+                        self.logger.warning(f"URL does not point to an image: {content_type}")
+                        return False
                 else:
-                    self.logger.warning(f"URL does not point to an image: {content_type}")
-                    return False
-            else:
-                self.logger.warning(f"Image URL not accessible: {response.status_code}")
-                return False
+                    self.logger.warning(f"Image URL not accessible: {response.status_code}")
+                    
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"Failed to validate image URL (attempt {attempt + 1}): {e}")
+            
+            # If this wasn't the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                self.logger.info(f"⏳ Waiting {retry_delay} seconds before retrying image URL validation...")
+                time.sleep(retry_delay)
+                continue
                 
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Failed to validate image URL: {e}")
-            return False
+        self.logger.error(f"❌ Image URL validation failed after {max_retries} attempts")
+        return False
