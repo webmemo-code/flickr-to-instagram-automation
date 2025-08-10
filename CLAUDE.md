@@ -93,15 +93,16 @@ The system now collects rich context for better captions:
 - Updated caption generator to use rich context for more specific Instagram captions
 
 ## Current Status
-**ACTIVE ISSUE**: Working on Linear issue WEB-5 - "Image publication not working anymore"
+**RESOLVED**: Linear issue WEB-5 - "Image publication not working anymore" ✅
 
-### WEB-5 Progress (In Progress)
+### WEB-5 Progress (COMPLETED)
 **Problem**: Automation incorrectly reports album as complete when photos remain unpublished. Last working run was #56.
 
 **Root Causes Identified**:
 1. `state_manager.py` was counting failed posts as successful (fixed)
 2. Log file upload pattern mismatch in GitHub workflow (fixed)
 3. Missing error handling for inaccessible Flickr photos (fixed)
+4. **NEW**: Cross-album photo counting causing incorrect completion status (fixed)
 
 **Fixes Applied**:
 1. **Fixed state management logic**: Updated `get_posted_photo_ids()` to only count photos with `'posted'` label
@@ -109,17 +110,21 @@ The system now collects rich context for better captions:
 3. **Added failed photo tracking**: New `get_failed_photo_ids()` method to exclude failed photos from future attempts
 4. **Updated album completion logic**: Now considers album complete when all photos are either posted OR failed
 5. **Fixed log upload pattern**: Changed from `*.log` to `automation_*.log` in GitHub workflow
+6. **Added album-specific filtering**: Modified state manager to only count photos from current album ID
+7. **Implemented issue number heuristics**: For legacy issues without album IDs, use issue numbers to distinguish albums
 
-**Next Steps for Future Session**:
-1. User needs to restart terminal and run `python3 check_github_issues.py` to check current album state
-2. Verify the 12 remaining photos can now be detected correctly
-3. Test automation with fixes applied
-4. Monitor if album completion status is now accurate
+**RESOLUTION SUMMARY**:
+- Current "Istrien" album (ID: 72177720326837749) status: 19 of 31 photos processed
+- Successfully posted: 9 photos (Issues #65-#101, excluding failed ones)
+- Failed attempts: 10 photos (correctly excluded from future posting)  
+- Remaining to post: 12 photos
+- Next photo ready: #20 "Muggia, Triest" (ID: 54585395380)
+- Automation status: READY TO RESUME ✅
 
 **Files Modified**:
-- `state_manager.py` (lines 45, 55, 84-104, 188-201, 323-336)
+- `state_manager.py` (lines 45, 55, 84-104, 188-201, 323-336, plus new album filtering)
 - `main.py` (lines 102-107, 163-166)
 - `.github/workflows/flickr-to-instagram-automation.yml` (lines 200, 328)
-- Created diagnostic scripts: `check_status.py`, `check_github_issues.py`
+- Created diagnostic scripts: `check_status.py`, `check_github_issues.py`, `verify_instagram_posts.py`
 
-Repository has pending changes that need to be committed and tested.
+**Automation Ready**: GitHub Actions will now resume daily posting of remaining 12 photos.
