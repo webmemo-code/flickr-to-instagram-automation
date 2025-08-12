@@ -26,36 +26,27 @@ class FlickrAPI:
             'nojsoncallback': '1'
         }
         
+        # Log the request details for debugging
+        self.logger.debug(f"Flickr API request: {params['method']} for photoset {photoset_id}")
+        
         try:
             response = requests.get(self.config.flickr_api_url, params=params, timeout=30)
             response.raise_for_status()
             
-            # Debug the response
-            self.logger.debug(f"Flickr API response status: {response.status_code}")
-            self.logger.debug(f"Flickr API response headers: {response.headers}")
-            self.logger.debug(f"Flickr API response content (first 200 chars): {response.text[:200]}")
-            
-            if not response.text.strip():
-                self.logger.error(f"Empty response from Flickr API for photoset {photoset_id}")
-                return None
-            
-            try:
-                data = response.json()
-            except ValueError as json_error:
-                self.logger.error(f"Invalid JSON response from Flickr API: {json_error}")
-                self.logger.error(f"Response content: {response.text}")
-                return None
-            
+            data = response.json()
             if data.get('stat') == 'ok':
                 self.logger.info(f"Retrieved {len(data['photoset']['photo'])} photos from photoset {photoset_id}")
                 return data
             else:
                 self.logger.error(f"Flickr API error: {data.get('message', 'Unknown error')}")
-                self.logger.error(f"Full response: {data}")
                 return None
                 
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to retrieve photos from photoset {photoset_id}: {e}")
+            return None
+        except (KeyError, TypeError) as e:
+            self.logger.error(f"Unexpected Flickr API response structure: {e}")
+            self.logger.error(f"Response data: {data if 'data' in locals() else 'No data'}")
             return None
     
     def get_photo_info(self, photo_id: str) -> Tuple[Optional[Dict], str]:
