@@ -27,15 +27,20 @@ class StateManager:
         for line in lines:
             if line.startswith('**Photo ID:**'):
                 photo_id = line.split(':', 1)[1].strip()
-                # Remove any prefix like "** " that might be present
-                if photo_id.startswith('** '):
-                    photo_id = photo_id[3:]
-                elif photo_id.startswith('**'):
-                    photo_id = photo_id[2:].strip()
                 
-                # Return only if we have a valid ID
+                # Clean up any markdown formatting that might be present
+                while photo_id.startswith('**'):
+                    photo_id = photo_id[2:].strip()
+                while photo_id.startswith('*'):
+                    photo_id = photo_id[1:].strip()
+                while photo_id.endswith('**'):
+                    photo_id = photo_id[:-2].strip()
+                while photo_id.endswith('*'):
+                    photo_id = photo_id[:-1].strip()
+                
+                # Return only if we have a valid non-empty ID
                 if photo_id:
-                    return photo_id
+                    return str(photo_id).strip()
         return None
     
     def _extract_album_id(self, issue_body: str) -> Optional[str]:
@@ -256,18 +261,33 @@ class StateManager:
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
         self.logger.info(f"Checking {len(sorted_photos)} photos against {len(excluded_ids)} excluded IDs")
-        self.logger.info(f"Excluded IDs: {excluded_ids}")
+        self.logger.info(f"Posted IDs: {posted_ids}")
+        self.logger.info(f"Failed IDs: {failed_ids}")
+        self.logger.info(f"All excluded IDs: {excluded_ids}")
         
         for photo in sorted_photos:
             photo_id = str(photo['id']).strip()  # Ensure photo ID is string for comparison
             position = photo.get('album_position', 'unknown')
+            title = photo.get('title', 'Unknown')
             
-            # Check if this photo ID is in the excluded list
+            # Check if this photo ID is in the excluded list with detailed debugging
             is_excluded = photo_id in excluded_ids
-            self.logger.info(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if is_excluded else 'AVAILABLE'}")
+            is_posted = photo_id in posted_ids
+            is_failed = photo_id in failed_ids
+            
+            status_details = []
+            if is_posted:
+                status_details.append("POSTED")
+            if is_failed:
+                status_details.append("FAILED")
+            if not is_excluded:
+                status_details.append("AVAILABLE")
+            
+            status_text = " | ".join(status_details) if status_details else "EXCLUDED"
+            self.logger.info(f"Photo #{position}: {photo_id} '{title}' -> {status_text}")
             
             if not is_excluded:
-                self.logger.info(f"Next photo to post: {photo_id} - {photo['title']} (position {position} in album)")
+                self.logger.info(f"✅ SELECTED: Next photo to post is #{position} - {title} (ID: {photo_id})")
                 return photo
         
         self.logger.info("No unposted photos found - all photos have been posted or selected!")
