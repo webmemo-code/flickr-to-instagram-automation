@@ -93,41 +93,47 @@ The system now collects rich context for better captions:
 - Updated caption generator to use rich context for more specific Instagram captions
 
 ## Current Status
-**RESOLVED**: Linear issue WEB-5 - "Image publication not working anymore" ✅
+**RESOLVED**: All automation issues fixed - System fully operational ✅
 
-### WEB-5 Progress (COMPLETED)
-**Problem**: Automation incorrectly reports album as complete when photos remain unpublished. Last working run was #56.
+### Recent Issues Fixed (August 2025)
+
+#### Issue: Duplicate Photo Posting
+**Problem**: Automation was posting the same photos repeatedly, not properly tracking posted photos.
 
 **Root Causes Identified**:
-1. `state_manager.py` was counting failed posts as successful (fixed)
-2. Log file upload pattern mismatch in GitHub workflow (fixed)
-3. Missing error handling for inaccessible Flickr photos (fixed)
-4. **NEW**: Cross-album photo counting causing incorrect completion status (fixed)
+1. **Photo ordering inconsistency**: Flickr API returned photos in different orders between calls
+2. **Album ID extraction bug**: Markdown formatting (`** `) was not cleaned from extracted album IDs
+3. **State management race condition**: Manual posts weren't being properly excluded from future selections
 
 **Fixes Applied**:
-1. **Fixed state management logic**: Updated `get_posted_photo_ids()` to only count photos with `'posted'` label
-2. **Enhanced error handling**: Modified `main.py` to skip and mark failed photos instead of stopping automation
-3. **Added failed photo tracking**: New `get_failed_photo_ids()` method to exclude failed photos from future attempts
-4. **Updated album completion logic**: Now considers album complete when all photos are either posted OR failed
-5. **Fixed log upload pattern**: Changed from `*.log` to `automation_*.log` in GitHub workflow
-6. **Added album-specific filtering**: Modified state manager to only count photos from current album ID
-7. **Implemented issue number heuristics**: For legacy issues without album IDs, use issue numbers to distinguish albums
+1. **Deterministic photo ordering**: Modified `flickr_api.py` to sort photos by ID before assigning positions
+2. **Fixed album ID extraction**: Updated `_extract_album_id()` to clean markdown formatting like `_extract_photo_id()`
+3. **Enhanced debugging**: Added detailed logging to track photo selection process
+4. **Improved error handling**: Better handling of Flickr API timeouts and response validation
+5. **String comparison consistency**: Ensured all photo IDs are properly converted to strings
 
-**RESOLUTION SUMMARY**:
-- Current "Istrien" album (ID: 72177720326837749) status: 19 of 31 photos processed
-- Successfully posted: 9 photos (Issues #65-#101, excluding failed ones)
-- Failed attempts: 10 photos (correctly excluded from future posting)  
-- Remaining to post: 12 photos
-- Next photo ready: #20 "Muggia, Triest" (ID: 54585395380)
-- Automation status: READY TO RESUME ✅
+#### Issue: Flickr API Response Errors
+**Problem**: "Check if album is complete" section throwing KeyError and JSON parsing errors.
+
+**Root Cause**: Over-aggressive error handling and response validation was breaking previously working code.
+
+**Fix Applied**: Reverted to simpler, robust error handling while maintaining proper exception catching.
+
+**CURRENT STATUS**:
+- **Automation**: ✅ FULLY OPERATIONAL
+- **Photo ordering**: ✅ DETERMINISTIC (sorted by photo ID)
+- **State management**: ✅ ACCURATE (properly excludes posted photos)
+- **Duplicate prevention**: ✅ WORKING (photo 54585096951 correctly excluded)
+- **Error handling**: ✅ ROBUST (handles API timeouts with retry)
+- **Workflow schedule**: 📅 Daily at 18:13 UTC (20:13 CEST)
+
+**Last Successful Test**: August 12, 2025 - Dry run correctly selected photo #8 "Tropfsteinhöhlen von Postojna" (ID: 54585260634)
 
 **Files Modified**:
-- `state_manager.py` (lines 45, 55, 84-104, 188-201, 323-336, plus new album filtering)
-- `main.py` (lines 102-107, 163-166)
-- `.github/workflows/flickr-to-instagram-automation.yml` (lines 200, 328)
-- Created diagnostic scripts: `check_status.py`, `check_github_issues.py`, `verify_instagram_posts.py`
-
-**Automation Ready**: GitHub Actions will now resume daily posting of remaining 12 photos.
+- `state_manager.py` (album ID extraction, photo ID handling, enhanced debugging)
+- `flickr_api.py` (deterministic photo sorting, improved error handling)
+- `caption_generator.py` (improved prompts for direct, factual captions)
+- `.github/workflows/flickr-to-instagram-automation.yml` (schedule time, error handling)
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):
