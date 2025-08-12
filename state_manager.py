@@ -52,8 +52,20 @@ class StateManager:
         for line in lines:
             if line.startswith('**Album ID:**'):
                 album_id = line.split(':', 1)[1].strip()
+                
+                # Clean up any markdown formatting that might be present
+                while album_id.startswith('**'):
+                    album_id = album_id[2:].strip()
+                while album_id.startswith('*'):
+                    album_id = album_id[1:].strip()
+                while album_id.endswith('**'):
+                    album_id = album_id[:-2].strip()
+                while album_id.endswith('*'):
+                    album_id = album_id[:-1].strip()
+                
+                # Return only if we have a valid non-empty ID
                 if album_id:
-                    return album_id
+                    return str(album_id).strip()
         return None
     
     def _is_from_current_album(self, issue_body: str, issue_number: int = None) -> bool:
@@ -88,15 +100,28 @@ class StateManager:
             
             posted_ids = []
             for issue in issues:
+                self.logger.debug(f"Checking issue #{issue.number} for posted photos")
+                
                 # Only include photos from the current album
-                if self._is_from_current_album(issue.body, issue.number):
+                is_current_album = self._is_from_current_album(issue.body, issue.number)
+                self.logger.debug(f"Issue #{issue.number} is from current album: {is_current_album}")
+                
+                if is_current_album:
                     photo_id = self._extract_photo_id(issue.body)
+                    self.logger.debug(f"Extracted photo ID from issue #{issue.number}: {photo_id}")
+                    
                     if photo_id:
                         # Ensure photo ID is a string and not already in list
                         photo_id_str = str(photo_id).strip()
                         if photo_id_str and photo_id_str not in posted_ids:
                             posted_ids.append(photo_id_str)
-                            self.logger.debug(f"Found posted photo ID: {photo_id_str} from issue #{issue.number} (current album)")
+                            self.logger.info(f"Found posted photo ID: {photo_id_str} from issue #{issue.number} (current album)")
+                        else:
+                            self.logger.debug(f"Photo ID {photo_id_str} already in list or empty")
+                    else:
+                        self.logger.debug(f"No photo ID found in issue #{issue.number}")
+                else:
+                    self.logger.debug(f"Issue #{issue.number} not from current album, skipping")
             
             self.logger.info(f"Found {len(posted_ids)} successfully posted photos from current album: {posted_ids}")
             return posted_ids
