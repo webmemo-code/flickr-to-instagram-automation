@@ -30,12 +30,28 @@ class FlickrAPI:
             response = requests.get(self.config.flickr_api_url, params=params, timeout=30)
             response.raise_for_status()
             
-            data = response.json()
+            # Debug the response
+            self.logger.debug(f"Flickr API response status: {response.status_code}")
+            self.logger.debug(f"Flickr API response headers: {response.headers}")
+            self.logger.debug(f"Flickr API response content (first 200 chars): {response.text[:200]}")
+            
+            if not response.text.strip():
+                self.logger.error(f"Empty response from Flickr API for photoset {photoset_id}")
+                return None
+            
+            try:
+                data = response.json()
+            except ValueError as json_error:
+                self.logger.error(f"Invalid JSON response from Flickr API: {json_error}")
+                self.logger.error(f"Response content: {response.text}")
+                return None
+            
             if data.get('stat') == 'ok':
                 self.logger.info(f"Retrieved {len(data['photoset']['photo'])} photos from photoset {photoset_id}")
                 return data
             else:
                 self.logger.error(f"Flickr API error: {data.get('message', 'Unknown error')}")
+                self.logger.error(f"Full response: {data}")
                 return None
                 
         except requests.exceptions.RequestException as e:
