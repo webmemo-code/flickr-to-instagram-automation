@@ -111,28 +111,48 @@ jobs:
           python -c "
           import sys
           import os
-          sys.path.append('.')
-          from config import Config
-          from state_manager import StateManager
-          from flickr_api import FlickrAPI
+          import traceback
           
-          config = Config()
-          repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name)
-          flickr_api = FlickrAPI(config)
-          
-          photos = flickr_api.get_unposted_photos()
-          total_photos = len(photos) if photos else 0
-          
-          github_env = os.environ.get('GITHUB_ENV', '/dev/null')
-          if state_manager.is_album_complete(total_photos):
-              print('Album is complete!')
+          try:
+              sys.path.append('.')
+              from config import Config
+              from state_manager import StateManager
+              from flickr_api import FlickrAPI
+              
+              print('Initializing components...')
+              config = Config()
+              repo_name = os.getenv('GITHUB_REPOSITORY')
+              if not repo_name:
+                  raise ValueError('GITHUB_REPOSITORY environment variable not set')
+              
+              state_manager = StateManager(config, repo_name)
+              flickr_api = FlickrAPI(config)
+              
+              print('Getting photos from Flickr...')
+              photos = flickr_api.get_unposted_photos()
+              total_photos = len(photos) if photos else 0
+              print(f'Found {total_photos} photos in album')
+              
+              print('Checking album completion status...')
+              is_complete = state_manager.is_album_complete(total_photos)
+              
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              if is_complete:
+                  print('Album is complete!')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=true\\n')
+              else:
+                  print('Album has remaining photos to post')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=false\\n')
+          except Exception as e:
+              print(f'Error checking album completion: {e}')
+              traceback.print_exc()
+              # Default to not complete on error to allow automation to run
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
               with open(github_env, 'a') as f:
-                  f.write('ALBUM_COMPLETE=true\n')
-          else:
-              print('Album has remaining photos to post')
-              with open(github_env, 'a') as f:
-                  f.write('ALBUM_COMPLETE=false\n')
+                  f.write('ALBUM_COMPLETE=false\\n')
+              sys.exit(1)
           "
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}

@@ -394,6 +394,10 @@ class StateManager:
     
     def is_album_complete(self, total_photos: int) -> bool:
         """Check if all photos in the album have been processed (posted or failed)."""
+        if total_photos <= 0:
+            self.logger.warning(f"No photos found in album (total_photos: {total_photos}). This might indicate a Flickr API issue.")
+            return False  # If we can't get photos, assume not complete to allow retry
+        
         posted_count = len(self.get_posted_photo_ids())
         failed_count = len(self.get_failed_photo_ids())
         processed_count = posted_count + failed_count
