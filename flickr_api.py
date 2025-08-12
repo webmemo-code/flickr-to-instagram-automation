@@ -185,7 +185,7 @@ class FlickrAPI:
             return []
         
         photos = []
-        for index, photo in enumerate(photos_data['photoset']['photo']):
+        for photo in photos_data['photoset']['photo']:
             # Get additional photo information
             photo_info, description = self.get_photo_info(photo['id'])
             location_data = self.get_photo_location(photo['id'])
@@ -209,7 +209,6 @@ class FlickrAPI:
                 'hashtags': hashtags,
                 'server': photo['server'],
                 'secret': photo['secret'],
-                'album_position': index + 1,  # Add position in album (1-based)
                 'photo_page_url': photo_page_url,
                 'source_url': source_url,
                 'exif_data': exif_data,
@@ -217,5 +216,12 @@ class FlickrAPI:
             }
             photos.append(photo_data)
         
-        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} in order")
+        # Sort photos by ID to ensure consistent ordering across API calls
+        photos.sort(key=lambda x: x['id'])
+        
+        # Assign album positions after sorting to ensure consistency
+        for index, photo in enumerate(photos):
+            photo['album_position'] = index + 1
+        
+        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} in deterministic order")
         return photos
