@@ -86,9 +86,12 @@ class StateManager:
                 # Only include photos from the current album
                 if self._is_from_current_album(issue.body, issue.number):
                     photo_id = self._extract_photo_id(issue.body)
-                    if photo_id and photo_id not in posted_ids:  # Avoid duplicates
-                        posted_ids.append(photo_id)
-                        self.logger.debug(f"Found posted photo ID: {photo_id} from issue #{issue.number} (current album)")
+                    if photo_id:
+                        # Ensure photo ID is a string and not already in list
+                        photo_id_str = str(photo_id).strip()
+                        if photo_id_str and photo_id_str not in posted_ids:
+                            posted_ids.append(photo_id_str)
+                            self.logger.debug(f"Found posted photo ID: {photo_id_str} from issue #{issue.number} (current album)")
             
             self.logger.info(f"Found {len(posted_ids)} successfully posted photos from current album: {posted_ids}")
             return posted_ids
@@ -110,9 +113,12 @@ class StateManager:
                 # Only include photos from the current album
                 if self._is_from_current_album(issue.body, issue.number):
                     photo_id = self._extract_photo_id(issue.body)
-                    if photo_id and photo_id not in dry_run_ids:
-                        dry_run_ids.append(photo_id)
-                        self.logger.debug(f"Found dry run photo ID: {photo_id} from issue #{issue.number} (current album)")
+                    if photo_id:
+                        # Ensure photo ID is a string and not already in list
+                        photo_id_str = str(photo_id).strip()
+                        if photo_id_str and photo_id_str not in dry_run_ids:
+                            dry_run_ids.append(photo_id_str)
+                            self.logger.debug(f"Found dry run photo ID: {photo_id_str} from issue #{issue.number} (current album)")
             
             self.logger.info(f"Found {len(dry_run_ids)} dry run selections from current album: {dry_run_ids}")
             return dry_run_ids
@@ -134,9 +140,12 @@ class StateManager:
                 # Only include photos from the current album
                 if self._is_from_current_album(issue.body, issue.number):
                     photo_id = self._extract_photo_id(issue.body)
-                    if photo_id and photo_id not in failed_ids:
-                        failed_ids.append(photo_id)
-                        self.logger.debug(f"Found failed photo ID: {photo_id} from issue #{issue.number} (current album)")
+                    if photo_id:
+                        # Ensure photo ID is a string and not already in list
+                        photo_id_str = str(photo_id).strip()
+                        if photo_id_str and photo_id_str not in failed_ids:
+                            failed_ids.append(photo_id_str)
+                            self.logger.debug(f"Found failed photo ID: {photo_id_str} from issue #{issue.number} (current album)")
             
             self.logger.info(f"Found {len(failed_ids)} failed photos from current album: {failed_ids}")
             return failed_ids
@@ -247,15 +256,15 @@ class StateManager:
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
         self.logger.info(f"Checking {len(sorted_photos)} photos against {len(excluded_ids)} excluded IDs")
-        self.logger.debug(f"Excluded IDs: {excluded_ids}")
+        self.logger.info(f"Excluded IDs: {excluded_ids}")
         
         for photo in sorted_photos:
-            photo_id = str(photo['id'])  # Ensure photo ID is string for comparison
+            photo_id = str(photo['id']).strip()  # Ensure photo ID is string for comparison
             position = photo.get('album_position', 'unknown')
             
             # Check if this photo ID is in the excluded list
             is_excluded = photo_id in excluded_ids
-            self.logger.debug(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if is_excluded else 'AVAILABLE'}")
+            self.logger.info(f"Checking photo {photo_id} (position {position}): {'EXCLUDED' if is_excluded else 'AVAILABLE'}")
             
             if not is_excluded:
                 self.logger.info(f"Next photo to post: {photo_id} - {photo['title']} (position {position} in album)")
