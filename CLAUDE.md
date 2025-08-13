@@ -15,7 +15,7 @@ This is a Python automation system that posts one photo per day from a specific 
 - `requirements.txt` - Python dependencies
 
 ### Dependencies
-- `requests>=2.31.0` - HTTP requests
+- `requests>=2.32.4` - HTTP requests
 - `openai>=1.3.0` - OpenAI API integration
 - `PyGithub>=1.59.0` - GitHub API integration
 - `python-dotenv>=1.0.0` - Environment variable management

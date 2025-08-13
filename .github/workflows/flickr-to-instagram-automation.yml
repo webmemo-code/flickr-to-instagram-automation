@@ -1,9 +1,9 @@
 name: Flickr to Instagram Automation
 
 on:
-  # Daily posting at 9 AM UTC
+  # Daily posting at 18:13 UTC (20:13 CEST)
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '13 18 * * *'
   
   # Manual trigger with options
   workflow_dispatch:
