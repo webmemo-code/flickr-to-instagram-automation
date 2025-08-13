@@ -45,11 +45,37 @@ def cleanup_legacy_issues(dry_run=True):
         logger.info(f"Starting cleanup of legacy issues in {repo_name}")
         logger.info(f"DRY RUN: {dry_run}")
         
-        # Get all automation-related issues
-        all_issues = repo.get_issues(
-            state='all',
-            labels=['automated-post']
-        )
+        # Get all issues (not just labeled ones) to find automation issues
+        all_issues = repo.get_issues(state='all')
+        
+        # Filter for automation-related issues
+        automation_issues = []
+        automation_keywords = ['automated', 'flickr', 'instagram', 'dry-run', 'posted', 'failed', 'automation', 'album']
+        
+        for issue in all_issues:
+            labels = [label.name.lower() for label in issue.labels]
+            title_lower = issue.title.lower()
+            
+            # Check if this is an automation issue
+            is_automation = (
+                any(keyword in ' '.join(labels) for keyword in automation_keywords) or
+                any(keyword in title_lower for keyword in automation_keywords) or
+                'photo' in title_lower
+            )
+            
+            if is_automation:
+                automation_issues.append(issue)
+        
+        # Convert back to the format the rest of the script expects
+        class MockPaginatedList:
+            def __init__(self, items):
+                self.items = items
+                self.totalCount = len(items)
+            
+            def __iter__(self):
+                return iter(self.items)
+        
+        all_issues = MockPaginatedList(automation_issues)
         
         total_issues = all_issues.totalCount
         logger.info(f"Found {total_issues} automation-related issues")

@@ -139,8 +139,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         if instagram_post_id:
             logger.info(f"✅ Successfully posted to Instagram: {instagram_post_id}")
             
-            # Record successful post (updates position tracking and creates audit issue)
-            state_manager.create_post_record(next_photo, instagram_post_id)
+            # Record successful post (updates position tracking, optionally creates audit issue)
+            state_manager.create_post_record(next_photo, instagram_post_id, create_audit_issue=config.create_audit_issues)
             
             # Log progress
             last_position = state_manager.get_last_posted_position()
@@ -213,10 +213,12 @@ def show_stats() -> None:
         # Get position-based stats
         last_position = state_manager.get_last_posted_position()
         failed_positions = state_manager.get_failed_positions()
+        instagram_posts = state_manager.get_instagram_posts()
         
         print(f"\n📈 Progress:")
         print(f"  Total Photos in Album: {total_photos}")
         print(f"  Posted Photos (by position): {last_position}")
+        print(f"  Instagram Posts Recorded: {len(instagram_posts)}")
         print(f"  Failed Photos: {len(failed_positions)}")
         print(f"  Remaining Photos: {total_photos - last_position}")
         
@@ -226,6 +228,14 @@ def show_stats() -> None:
         
         if failed_positions:
             print(f"  Failed Positions for Retry: {sorted(failed_positions)}")
+        
+        print(f"\n⚙️  Configuration:")
+        print(f"  Audit Issues Creation: {'Enabled' if config.create_audit_issues else 'Disabled (recommended for scale)'}")
+        
+        if instagram_posts:
+            print(f"\n📱 Recent Instagram Posts:")
+            for post in sorted(instagram_posts, key=lambda x: x.get('position', 0))[-5:]:
+                print(f"  #{post.get('position', '?')}: {post.get('title', 'Unknown')} -> {post.get('instagram_post_id', 'Unknown')}")
         
         print(f"\n🤖 Automation Runs:")
         print(f"  Successful Runs: {stats.get('successful_runs', 0)}")

@@ -29,6 +29,9 @@ class Config:
         self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
         self.openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')  # Default to gpt-4o-mini
         
+        # State management options
+        self.create_audit_issues = os.getenv('CREATE_AUDIT_ISSUES', 'false').lower() == 'true'  # Default: disabled for scale
+        
         # Validate required environment variables
         self._validate_config()
     
