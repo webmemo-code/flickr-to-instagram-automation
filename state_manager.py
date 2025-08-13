@@ -188,6 +188,10 @@ class StateManager:
         """Set the total number of photos in the current album."""
         return self._set_variable(f"TOTAL_ALBUM_PHOTOS_{self.current_album_id}", str(total))
     
+    def get_instagram_posts(self) -> List[Dict]:
+        """Get all Instagram post records for the current album."""
+        return self._get_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", [])
+    
     def get_posted_photo_ids(self) -> List[str]:
         """Legacy method for compatibility - returns empty list since we track by position now."""
         self.logger.warning("get_posted_photo_ids() is deprecated - use position-based tracking instead")
@@ -247,7 +251,7 @@ class StateManager:
             self.logger.error(f"Failed to get failed photo IDs: {e}")
             return []
     
-    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None, is_dry_run: bool = False) -> Optional[str]:
+    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None, is_dry_run: bool = False, create_audit_issue: bool = False) -> Optional[str]:
         """Record a successful post using position-based tracking."""
         try:
             position = photo_data.get('album_position', 0)
@@ -266,31 +270,48 @@ class StateManager:
                 # Remove from failed positions if it was there
                 self.remove_failed_position(position)
                 
-                # Create audit trail issue for successful posts only
-                timestamp = datetime.now().isoformat()
-                title_text = f"Posted: {title} (#{position}) - {timestamp}"
+                # Store Instagram post ID in repository variable for reference
+                instagram_posts = self._get_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", [])
+                post_record = {
+                    "position": position,
+                    "photo_id": photo_data['id'],
+                    "instagram_post_id": instagram_post_id,
+                    "posted_at": datetime.now().isoformat(),
+                    "title": title
+                }
+                instagram_posts.append(post_record)
+                self._set_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", instagram_posts)
                 
-                body_parts = [
-                    f"**Photo ID:** {photo_data['id']}",
-                    f"**Album ID:** {self.current_album_id}",
-                    f"**Album Position:** {position}",
-                    f"**Title:** {title}",
-                    f"**Description:** {photo_data.get('description', 'N/A')}",
-                    f"**Image URL:** {photo_data['url']}",
-                    f"**Posted At:** {timestamp}",
-                    f"**Instagram Post ID:** {instagram_post_id}"
-                ]
+                # Optionally create audit trail issue (disabled by default for scale)
+                issue_number = None
+                if create_audit_issue:
+                    timestamp = datetime.now().isoformat()
+                    title_text = f"Posted: {title} (#{position}) - {timestamp}"
+                    
+                    body_parts = [
+                        f"**Photo ID:** {photo_data['id']}",
+                        f"**Album ID:** {self.current_album_id}",
+                        f"**Album Position:** {position}",
+                        f"**Title:** {title}",
+                        f"**Description:** {photo_data.get('description', 'N/A')}",
+                        f"**Image URL:** {photo_data['url']}",
+                        f"**Posted At:** {timestamp}",
+                        f"**Instagram Post ID:** {instagram_post_id}"
+                    ]
+                    
+                    body = '\n'.join(body_parts)
+                    
+                    issue = self.repo.create_issue(
+                        title=title_text,
+                        body=body,
+                        labels=['automated-post', 'instagram', 'flickr-album', 'posted']
+                    )
+                    issue_number = str(issue.number)
+                    self.logger.info(f"✅ POSTED: Photo #{position} successfully posted to Instagram (issue #{issue.number})")
+                else:
+                    self.logger.info(f"✅ POSTED: Photo #{position} successfully posted to Instagram (ID: {instagram_post_id})")
                 
-                body = '\n'.join(body_parts)
-                
-                issue = self.repo.create_issue(
-                    title=title_text,
-                    body=body,
-                    labels=['automated-post', 'instagram', 'flickr-album', 'posted']
-                )
-                
-                self.logger.info(f"✅ POSTED: Photo #{position} successfully posted to Instagram (issue #{issue.number})")
-                return str(issue.number)
+                return issue_number or "success"
             else:
                 # For failed posts, add to failed positions
                 self.add_failed_position(position)
