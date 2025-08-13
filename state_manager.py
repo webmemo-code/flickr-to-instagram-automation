@@ -1,5 +1,5 @@
 """
-State management using GitHub Issues for tracking posted content.
+State management using GitHub Repository Variables for scalable tracking.
 """
 import json
 import logging
@@ -9,7 +9,7 @@ from github import Github
 from config import Config
 
 class StateManager:
-    """Manage posting state using GitHub Issues."""
+    """Manage posting state using GitHub Repository Variables for scalability."""
     
     def __init__(self, config: Config, repo_name: str):
         self.config = config
@@ -17,6 +17,53 @@ class StateManager:
         self.repo = self.github.get_repo(repo_name)
         self.logger = logging.getLogger(__name__)
         self.current_album_id = config.flickr_album_id  # Track current album ID
+    
+    def _get_variable(self, name: str, default: str = "") -> str:
+        """Get a repository variable value."""
+        try:
+            variable = self.repo.get_variable(name)
+            return variable.value
+        except Exception as e:
+            self.logger.debug(f"Variable {name} not found, using default: {default}")
+            return default
+    
+    def _set_variable(self, name: str, value: str) -> bool:
+        """Set a repository variable value."""
+        try:
+            # Try to update existing variable
+            try:
+                variable = self.repo.get_variable(name)
+                variable.edit(value)
+                self.logger.debug(f"Updated variable {name} = {value}")
+                return True
+            except Exception:
+                # Variable doesn't exist, create it
+                self.repo.create_variable(name, value)
+                self.logger.debug(f"Created variable {name} = {value}")
+                return True
+        except Exception as e:
+            self.logger.error(f"Failed to set variable {name}: {e}")
+            return False
+    
+    def _get_json_variable(self, name: str, default: list = None) -> list:
+        """Get a JSON array from repository variable."""
+        if default is None:
+            default = []
+        try:
+            value = self._get_variable(name, "[]")
+            return json.loads(value) if value else default
+        except json.JSONDecodeError:
+            self.logger.warning(f"Invalid JSON in variable {name}, using default")
+            return default
+    
+    def _set_json_variable(self, name: str, value: list) -> bool:
+        """Set a JSON array to repository variable."""
+        try:
+            json_str = json.dumps(value)
+            return self._set_variable(name, json_str)
+        except Exception as e:
+            self.logger.error(f"Failed to set JSON variable {name}: {e}")
+            return False
     
     def _extract_photo_id(self, issue_body: str) -> Optional[str]:
         """Extract photo ID from issue body, handling different formats."""
@@ -90,45 +137,61 @@ class StateManager:
         # Default fallback: assume it's from current album (conservative approach)
         return True
     
-    def get_posted_photo_ids(self) -> List[str]:
-        """Get list of photo IDs that have already been posted successfully from the current album."""
+    def get_last_posted_position(self) -> int:
+        """Get the position of the last successfully posted photo."""
         try:
-            issues = self.repo.get_issues(
-                state='all',
-                labels=['automated-post', 'instagram', 'flickr-album', 'posted']
-            )
-            
-            posted_ids = []
-            for issue in issues:
-                self.logger.debug(f"Checking issue #{issue.number} for posted photos")
-                
-                # Only include photos from the current album
-                is_current_album = self._is_from_current_album(issue.body, issue.number)
-                self.logger.debug(f"Issue #{issue.number} is from current album: {is_current_album}")
-                
-                if is_current_album:
-                    photo_id = self._extract_photo_id(issue.body)
-                    self.logger.debug(f"Extracted photo ID from issue #{issue.number}: {photo_id}")
-                    
-                    if photo_id:
-                        # Ensure photo ID is a string and not already in list
-                        photo_id_str = str(photo_id).strip()
-                        if photo_id_str and photo_id_str not in posted_ids:
-                            posted_ids.append(photo_id_str)
-                            self.logger.info(f"Found posted photo ID: {photo_id_str} from issue #{issue.number} (current album)")
-                        else:
-                            self.logger.debug(f"Photo ID {photo_id_str} already in list or empty")
-                    else:
-                        self.logger.debug(f"No photo ID found in issue #{issue.number}")
-                else:
-                    self.logger.debug(f"Issue #{issue.number} not from current album, skipping")
-            
-            self.logger.info(f"Found {len(posted_ids)} successfully posted photos from current album: {posted_ids}")
-            return posted_ids
-            
-        except Exception as e:
-            self.logger.error(f"Failed to get posted photo IDs: {e}")
+            position_str = self._get_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", "0")
+            return int(position_str)
+        except (ValueError, TypeError):
+            self.logger.warning(f"Invalid last posted position, defaulting to 0")
+            return 0
+    
+    def set_last_posted_position(self, position: int) -> bool:
+        """Set the position of the last successfully posted photo."""
+        return self._set_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", str(position))
+    
+    def get_failed_positions(self) -> List[int]:
+        """Get list of photo positions that have failed to post."""
+        try:
+            failed_data = self._get_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", [])
+            return [int(pos) for pos in failed_data if isinstance(pos, (int, str))]
+        except (ValueError, TypeError):
+            self.logger.warning(f"Invalid failed positions data, defaulting to empty list")
             return []
+    
+    def add_failed_position(self, position: int) -> bool:
+        """Add a position to the failed positions list."""
+        failed_positions = self.get_failed_positions()
+        if position not in failed_positions:
+            failed_positions.append(position)
+            return self._set_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", failed_positions)
+        return True
+    
+    def remove_failed_position(self, position: int) -> bool:
+        """Remove a position from the failed positions list (when successfully posted)."""
+        failed_positions = self.get_failed_positions()
+        if position in failed_positions:
+            failed_positions.remove(position)
+            return self._set_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", failed_positions)
+        return True
+    
+    def get_total_album_photos(self) -> int:
+        """Get the total number of photos in the current album."""
+        try:
+            total_str = self._get_variable(f"TOTAL_ALBUM_PHOTOS_{self.current_album_id}", "0")
+            return int(total_str)
+        except (ValueError, TypeError):
+            self.logger.warning(f"Invalid total album photos, defaulting to 0")
+            return 0
+    
+    def set_total_album_photos(self, total: int) -> bool:
+        """Set the total number of photos in the current album."""
+        return self._set_variable(f"TOTAL_ALBUM_PHOTOS_{self.current_album_id}", str(total))
+    
+    def get_posted_photo_ids(self) -> List[str]:
+        """Legacy method for compatibility - returns empty list since we track by position now."""
+        self.logger.warning("get_posted_photo_ids() is deprecated - use position-based tracking instead")
+        return []
 
     def get_dry_run_photo_ids(self) -> List[str]:
         """Get list of photo IDs that have been selected in dry runs from the current album."""
@@ -185,56 +248,54 @@ class StateManager:
             return []
     
     def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None, is_dry_run: bool = False) -> Optional[str]:
-        """Create a GitHub issue to record the posted photo."""
+        """Record a successful post using position-based tracking."""
         try:
-            timestamp = datetime.now().isoformat()
-            position = photo_data.get('album_position', 'unknown')
+            position = photo_data.get('album_position', 0)
+            title = photo_data.get('title', 'Unknown')
             
             if is_dry_run:
-                title = f"Dry Run: {photo_data['title']} (#{position}) - {timestamp}"
-            else:
-                title = f"Posted: {photo_data['title']} (#{position}) - {timestamp}"
+                # For dry runs, just log - don't create issues or update state
+                self.logger.info(f"DRY RUN: Would post photo #{position} - {title}")
+                return "dry_run"
             
-            body_parts = [
-                f"**Photo ID:** {photo_data['id']}",
-                f"**Album ID:** {self.current_album_id}",
-                f"**Album Position:** {position}",
-                f"**Title:** {photo_data['title']}",
-                f"**Description:** {photo_data.get('description', 'N/A')}",
-                f"**Image URL:** {photo_data['url']}",
-                f"**Posted At:** {timestamp}",
-            ]
-            
+            # For successful posts, update position tracking
             if instagram_post_id:
-                body_parts.append(f"**Instagram Post ID:** {instagram_post_id}")
-            elif is_dry_run:
-                body_parts.append(f"**Status:** Dry run - not actually posted")
-            
-            body = '\n'.join(body_parts)
-            
-            if is_dry_run:
-                labels = [
-                    'automated-post',
-                    'dry-run',
-                    'flickr-album'
+                # Update last posted position
+                self.set_last_posted_position(position)
+                
+                # Remove from failed positions if it was there
+                self.remove_failed_position(position)
+                
+                # Create audit trail issue for successful posts only
+                timestamp = datetime.now().isoformat()
+                title_text = f"Posted: {title} (#{position}) - {timestamp}"
+                
+                body_parts = [
+                    f"**Photo ID:** {photo_data['id']}",
+                    f"**Album ID:** {self.current_album_id}",
+                    f"**Album Position:** {position}",
+                    f"**Title:** {title}",
+                    f"**Description:** {photo_data.get('description', 'N/A')}",
+                    f"**Image URL:** {photo_data['url']}",
+                    f"**Posted At:** {timestamp}",
+                    f"**Instagram Post ID:** {instagram_post_id}"
                 ]
+                
+                body = '\n'.join(body_parts)
+                
+                issue = self.repo.create_issue(
+                    title=title_text,
+                    body=body,
+                    labels=['automated-post', 'instagram', 'flickr-album', 'posted']
+                )
+                
+                self.logger.info(f"✅ POSTED: Photo #{position} successfully posted to Instagram (issue #{issue.number})")
+                return str(issue.number)
             else:
-                labels = [
-                    'automated-post',
-                    'instagram',
-                    'flickr-album',
-                    'posted' if instagram_post_id else 'failed'
-                ]
-            
-            issue = self.repo.create_issue(
-                title=title,
-                body=body,
-                labels=labels
-            )
-            
-            run_type = "dry run" if is_dry_run else "post"
-            self.logger.info(f"Created {run_type} issue #{issue.number} for photo {photo_data['id']} (position {position})")
-            return str(issue.number)
+                # For failed posts, add to failed positions
+                self.add_failed_position(position)
+                self.logger.error(f"❌ FAILED: Photo #{position} failed to post, added to retry list")
+                return None
             
         except Exception as e:
             self.logger.error(f"Failed to create post record: {e}")
@@ -268,54 +329,58 @@ class StateManager:
             return False
     
     def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
-        """Get the next photo that hasn't been posted yet, respecting album order."""
-        posted_ids = self.get_posted_photo_ids()
-        failed_ids = self.get_failed_photo_ids()
-        excluded_ids = posted_ids.copy()
-        excluded_ids.extend(failed_ids)
+        """Get the next photo that hasn't been posted yet, using position-based tracking."""
+        # Initialize total photos count if not set
+        if not photos:
+            self.logger.warning("No photos provided to get_next_photo_to_post")
+            return None
         
-        # Optionally include dry run selections in exclusion list
-        if include_dry_runs:
-            dry_run_ids = self.get_dry_run_photo_ids()
-            excluded_ids.extend(dry_run_ids)
-            self.logger.info(f"Including {len(dry_run_ids)} dry run selections in exclusion list")
-        
-        self.logger.info(f"Excluding {len(posted_ids)} posted photos and {len(failed_ids)} failed photos")
+        total_photos = len(photos)
+        if self.get_total_album_photos() != total_photos:
+            self.set_total_album_photos(total_photos)
+            self.logger.info(f"Updated total album photos to {total_photos}")
         
         # Sort photos by their album position to ensure correct order
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
-        self.logger.info(f"Checking {len(sorted_photos)} photos against {len(excluded_ids)} excluded IDs")
-        self.logger.info(f"Posted IDs: {posted_ids}")
-        self.logger.info(f"Failed IDs: {failed_ids}")
-        self.logger.info(f"All excluded IDs: {excluded_ids}")
+        last_posted_position = self.get_last_posted_position()
+        failed_positions = self.get_failed_positions()
         
+        self.logger.info(f"Position tracking - Last posted: {last_posted_position}, Failed positions: {failed_positions}")
+        self.logger.info(f"Checking {len(sorted_photos)} photos for next position to post")
+        
+        # Find the next photo to post
         for photo in sorted_photos:
-            photo_id = str(photo['id']).strip()  # Ensure photo ID is string for comparison
-            position = photo.get('album_position', 'unknown')
+            position = photo.get('album_position', 0)
             title = photo.get('title', 'Unknown')
+            photo_id = photo.get('id', 'unknown')
             
-            # Check if this photo ID is in the excluded list with detailed debugging
-            is_excluded = photo_id in excluded_ids
-            is_posted = photo_id in posted_ids
-            is_failed = photo_id in failed_ids
+            # Skip if position is less than or equal to last posted position
+            if position <= last_posted_position:
+                self.logger.debug(f"Photo #{position}: {title} - ALREADY POSTED (last posted: {last_posted_position})")
+                continue
             
-            status_details = []
-            if is_posted:
-                status_details.append("POSTED")
-            if is_failed:
-                status_details.append("FAILED")
-            if not is_excluded:
-                status_details.append("AVAILABLE")
+            # Skip if position is in failed positions (unless retrying)
+            if position in failed_positions:
+                self.logger.debug(f"Photo #{position}: {title} - PREVIOUSLY FAILED (skipping for now)")
+                continue
             
-            status_text = " | ".join(status_details) if status_details else "EXCLUDED"
-            self.logger.info(f"Photo #{position}: {photo_id} '{title}' -> {status_text}")
-            
-            if not is_excluded:
-                self.logger.info(f"✅ SELECTED: Next photo to post is #{position} - {title} (ID: {photo_id})")
-                return photo
+            # This is the next photo to post
+            self.logger.info(f"✅ SELECTED: Next photo to post is #{position} - {title} (ID: {photo_id})")
+            return photo
         
-        self.logger.info("No unposted photos found - all photos have been posted or selected!")
+        # Check if we should retry any failed positions
+        if failed_positions:
+            self.logger.info(f"No new photos to post, checking {len(failed_positions)} failed positions for retry")
+            for position in sorted(failed_positions):
+                for photo in sorted_photos:
+                    if photo.get('album_position') == position:
+                        title = photo.get('title', 'Unknown')
+                        photo_id = photo.get('id', 'unknown')
+                        self.logger.info(f"🔄 RETRY: Attempting failed photo #{position} - {title} (ID: {photo_id})")
+                        return photo
+        
+        self.logger.info("No unposted photos found - all photos have been posted!")
         return None
 
     def clear_dry_run_records(self) -> int:
@@ -418,20 +483,28 @@ class StateManager:
             return {}
     
     def is_album_complete(self, total_photos: int) -> bool:
-        """Check if all photos in the album have been processed (posted or failed)."""
+        """Check if all photos in the album have been processed using position tracking."""
         if total_photos <= 0:
             self.logger.warning(f"No photos found in album (total_photos: {total_photos}). This might indicate a Flickr API issue.")
             return False  # If we can't get photos, assume not complete to allow retry
         
-        posted_count = len(self.get_posted_photo_ids())
-        failed_count = len(self.get_failed_photo_ids())
-        processed_count = posted_count + failed_count
-        is_complete = processed_count >= total_photos
+        # Update total photos if different
+        stored_total = self.get_total_album_photos()
+        if stored_total != total_photos:
+            self.set_total_album_photos(total_photos)
+            self.logger.info(f"Updated total album photos from {stored_total} to {total_photos}")
+        
+        last_posted_position = self.get_last_posted_position()
+        failed_positions = self.get_failed_positions()
+        failed_count = len(failed_positions)
+        
+        # Album is complete if last posted position equals total photos
+        is_complete = last_posted_position >= total_photos
         
         if is_complete:
-            self.logger.info(f"Album complete! Processed {processed_count} of {total_photos} photos ({posted_count} posted, {failed_count} failed)")
+            self.logger.info(f"✅ Album complete! Posted {last_posted_position} of {total_photos} photos ({failed_count} failed positions remaining for manual retry)")
         else:
-            remaining = total_photos - processed_count
-            self.logger.info(f"Album progress: {processed_count} of {total_photos} photos processed ({posted_count} posted, {failed_count} failed, {remaining} remaining)")
+            remaining = total_photos - last_posted_position
+            self.logger.info(f"📊 Album progress: {last_posted_position} of {total_photos} photos posted ({remaining} remaining, {failed_count} failed)")
         
         return is_complete
