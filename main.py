@@ -125,13 +125,12 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
             logger.info(f"Image URL: {next_photo['url']}")
             logger.info(f"Caption: {full_caption}")
             
-            # Create dry run record to track selection
+            # Create dry run record (just logs, no issues created)
             state_manager.create_post_record(next_photo, None, is_dry_run=True)
-            state_manager.log_automation_run(True, f"Dry run completed for photo #{position}")
+            logger.info(f"✅ Dry run completed for photo #{position}")
             return True
         
-        # Create record before posting
-        issue_number = state_manager.create_post_record(next_photo, None)
+        # Post to Instagram (state will be updated after successful post)
         
         # Post to Instagram
         logger.info("📱 Posting to Instagram...")
@@ -140,39 +139,30 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         if instagram_post_id:
             logger.info(f"✅ Successfully posted to Instagram: {instagram_post_id}")
             
-            # Update record with Instagram post ID
-            if issue_number:
-                state_manager.update_post_record(issue_number, instagram_post_id)
-            else:
-                # Fallback: create new record if the initial one failed
-                logger.warning("No issue number from initial record creation, creating new one")
-                state_manager.create_post_record(next_photo, instagram_post_id)
+            # Record successful post (updates position tracking and creates audit issue)
+            state_manager.create_post_record(next_photo, instagram_post_id)
             
-            # Log progress - get actual posted count after updating record
-            posted_count = len(state_manager.get_posted_photo_ids())
+            # Log progress
+            last_position = state_manager.get_last_posted_position()
             total_count = len(photos)
-            progress_msg = f"Posted photo #{position} ({next_photo['id']}) - {posted_count}/{total_count} - Instagram post {instagram_post_id}"
             
-            state_manager.log_automation_run(True, progress_msg)
-            logger.info(f"📊 Progress: {posted_count}/{total_count} photos posted (just posted #{position})")
+            logger.info(f"📊 Progress: Posted {last_position}/{total_count} photos (just posted #{position})")
             
-            if posted_count >= total_count:
+            if last_position >= total_count:
                 logger.info("🎉 Album complete! All photos have been posted.")
             
             return True
         else:
             logger.error("❌ Failed to post to Instagram")
             logger.info(f"⏭️ Marking photo #{position} as failed and continuing with next photo")
-            state_manager.log_automation_run(True, f"Photo #{position} failed to post to Instagram, continuing")
+            
+            # Record failed post (adds to failed positions for retry)
+            state_manager.create_post_record(next_photo, None)
+            
             return True  # Return True to continue with next photo
     
     except Exception as e:
         logger.error(f"💥 Automation failed: {e}")
-        try:
-            if 'state_manager' in locals():
-                state_manager.log_automation_run(False, f"Exception: {str(e)}")
-        except:
-            pass  # Don't fail if logging fails
         return False
 
 
@@ -220,15 +210,22 @@ def show_stats() -> None:
         print(f"Album: {config.album_name}")
         print(f"Album ID: {config.flickr_album_id}")
         print(f"Album URL: {config.album_url}")
+        # Get position-based stats
+        last_position = state_manager.get_last_posted_position()
+        failed_positions = state_manager.get_failed_positions()
+        
         print(f"\n📈 Progress:")
         print(f"  Total Photos in Album: {total_photos}")
-        print(f"  Posted Photos: {stats.get('posted_photos', 0)}")
-        print(f"  Failed Photos: {stats.get('failed_photos', 0)}")
-        print(f"  Remaining Photos: {total_photos - stats.get('posted_photos', 0)}")
+        print(f"  Posted Photos (by position): {last_position}")
+        print(f"  Failed Photos: {len(failed_positions)}")
+        print(f"  Remaining Photos: {total_photos - last_position}")
         
         if total_photos > 0:
-            completion_rate = round((stats.get('posted_photos', 0) / total_photos) * 100, 1)
+            completion_rate = round((last_position / total_photos) * 100, 1)
             print(f"  Completion Rate: {completion_rate}%")
+        
+        if failed_positions:
+            print(f"  Failed Positions for Retry: {sorted(failed_positions)}")
         
         print(f"\n🤖 Automation Runs:")
         print(f"  Successful Runs: {stats.get('successful_runs', 0)}")
