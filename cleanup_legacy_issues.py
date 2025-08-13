@@ -80,14 +80,15 @@ def cleanup_legacy_issues(dry_run=True):
         total_issues = all_issues.totalCount
         logger.info(f"Found {total_issues} automation-related issues")
         
-        # Categories for cleanup
+        # Categories for cleanup - now removing ALL automation issues
         close_categories = {
             'dry_runs': [],
             'automation_logs': [],
-            'failed_posts': []
+            'failed_posts': [],
+            'successful_posts': []  # Now also removing successful posts - audit trail in variables
         }
         keep_categories = {
-            'successful_posts': []
+            'manual_issues': []  # Only keep non-automation issues
         }
         
         # Categorize issues
@@ -101,21 +102,24 @@ def cleanup_legacy_issues(dry_run=True):
             elif 'failed' in labels and 'instagram' in labels:
                 close_categories['failed_posts'].append(issue)
             elif 'posted' in labels and 'instagram' in labels:
-                keep_categories['successful_posts'].append(issue)
+                close_categories['successful_posts'].append(issue)  # Now also closing successful posts
             else:
-                logger.warning(f"Uncategorized issue #{issue.number}: {issue.title}")
+                # This is likely a real project issue, keep it
+                keep_categories['manual_issues'].append(issue)
+                logger.debug(f"Keeping non-automation issue #{issue.number}: {issue.title}")
         
         # Report categorization
         logger.info("\n=== Issue Categorization ===")
         logger.info(f"Dry Run Issues (will close): {len(close_categories['dry_runs'])}")
         logger.info(f"Automation Log Issues (will close): {len(close_categories['automation_logs'])}")
         logger.info(f"Failed Post Issues (will close): {len(close_categories['failed_posts'])}")
-        logger.info(f"Successful Post Issues (will keep): {len(keep_categories['successful_posts'])}")
+        logger.info(f"Successful Post Issues (will close): {len(close_categories['successful_posts'])}")
+        logger.info(f"Manual/Project Issues (will keep): {len(keep_categories['manual_issues'])}")
         
         total_to_close = sum(len(issues) for issues in close_categories.values())
-        total_to_keep = len(keep_categories['successful_posts'])
+        total_to_keep = len(keep_categories['manual_issues'])
         
-        logger.info(f"\nSUMMARY: Will close {total_to_close} issues, keep {total_to_keep} issues")
+        logger.info(f"\nSUMMARY: Will close {total_to_close} automation issues, keep {total_to_keep} project issues")
         
         if not dry_run:
             # Close unnecessary issues
@@ -136,10 +140,11 @@ This issue is being closed as part of the migration to a more efficient state ma
 
 The new system:
 - Uses Repository Variables for state tracking (scales to unlimited photos)
-- Only creates issues for successful posts (audit trail)
-- Eliminates repository pollution from temporary records
+- Stores complete audit trail in variables (INSTAGRAM_POSTS_*, LAST_POSTED_POSITION_*)
+- Zero GitHub Issues created for automation (clean repository)
+- Unlimited scalability without repository pollution
 
-This change improves performance and repository organization while maintaining all necessary audit trails.
+All Instagram post data, positions, and timestamps are preserved in repository variables for full audit trail.
 """
                         
                         issue.create_comment(comment_text)
@@ -151,8 +156,9 @@ This change improves performance and repository organization while maintaining a
                     except Exception as e:
                         logger.error(f"Failed to close issue #{issue.number}: {e}")
             
-            logger.info(f"\n✅ Successfully closed {closed_count} legacy issues")
-            logger.info(f"✅ Preserved {total_to_keep} successful post issues for audit trail")
+            logger.info(f"\n✅ Successfully closed {closed_count} automation issues")
+            logger.info(f"✅ Preserved {total_to_keep} project issues")
+            logger.info(f"🏗️ Audit trail now stored in repository variables (INSTAGRAM_POSTS_*, LAST_POSTED_POSITION_*)")
             
         else:
             logger.info("\n🧪 DRY RUN - No issues were actually closed")
