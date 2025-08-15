@@ -223,10 +223,9 @@ class FlickrAPI:
             }
             photos.append(photo_data)
         
-        # Sort photos by ID to ensure consistent ordering across API calls
-        photos.sort(key=lambda x: x['id'])
-        
-        # Assign album positions after sorting to ensure consistency
+        # Preserve original Flickr album order - DO NOT sort by ID!
+        # The Flickr API returns photos in their correct album order
+        # Assign album positions based on original Flickr order
         for index, photo in enumerate(photos):
             photo['album_position'] = index + 1
         
