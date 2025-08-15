@@ -24,8 +24,8 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write    # For state management via GitHub Issues
-  actions: read    # For accessing artifacts
+  issues: write    # For legacy GitHub Issues (compatibility)
+  actions: write   # For repository variables state management
 
 jobs:
   automation:

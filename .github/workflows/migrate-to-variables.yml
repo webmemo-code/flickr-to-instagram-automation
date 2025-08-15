@@ -11,9 +11,8 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: write    # To create and manage repository variables
   issues: read      # To read existing GitHub Issues
-  repository-projects: write  # To create repository variables
 
 jobs:
   migrate:
