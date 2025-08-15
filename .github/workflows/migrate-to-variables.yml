@@ -1,0 +1,148 @@
+name: Migrate State to Repository Variables
+
+on:
+  # Manual trigger only - run this once to migrate
+  workflow_dispatch:
+    inputs:
+      confirm_migration:
+        description: 'Type "MIGRATE" to confirm you want to run the migration'
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+  issues: read      # To read existing GitHub Issues
+  repository-projects: write  # To create repository variables
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    # Only run if user confirms
+    if: ${{ github.event.inputs.confirm_migration == 'MIGRATE' }}
+    
+    environment:
+      name: production-social-media
+      url: https://github.com/${{ github.repository }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Validate environment variables
+        run: |
+          echo "Checking required environment variables for migration..."
+          python -c "
+          import os
+          required = ['FLICKR_ALBUM_ID', 'GITHUB_TOKEN']
+          missing = [var for var in required if not os.getenv(var)]
+          if missing:
+              print(f'Missing required environment variables: {missing}')
+              exit(1)
+          print('Required environment variables are set')
+          print(f'Album ID: {os.getenv(\"FLICKR_ALBUM_ID\")}')
+          "
+        env:
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run migration
+        run: |
+          echo "🚀 Starting migration from GitHub Issues to Repository Variables..."
+          echo "Album ID: ${{ vars.FLICKR_ALBUM_ID }}"
+          echo "Repository: ${{ github.repository }}"
+          echo ""
+          
+          python migrate_to_variables.py
+        env:
+          # Required for migration
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          
+          # Optional - only needed for config validation
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      
+      - name: Verify migration
+        run: |
+          echo "🔍 Verifying migration results..."
+          python -c "
+          import os
+          from github import Github
+          
+          github = Github(os.getenv('GITHUB_TOKEN'))
+          repo = github.get_repo(os.getenv('GITHUB_REPOSITORY'))
+          album_id = os.getenv('FLICKR_ALBUM_ID')
+          
+          print('Checking created repository variables:')
+          variables = repo.get_variables()
+          
+          expected_vars = [
+              f'LAST_POSTED_POSITION_{album_id}',
+              f'FAILED_POSITIONS_{album_id}', 
+              f'INSTAGRAM_POSTS_{album_id}',
+              f'TOTAL_ALBUM_PHOTOS_{album_id}'
+          ]
+          
+          found_vars = []
+          for var in variables:
+              if any(expected in var.name for expected in expected_vars):
+                  found_vars.append(var.name)
+                  print(f'  ✅ {var.name} = {var.value[:100]}...')
+          
+          missing_vars = [v for v in expected_vars if v not in found_vars]
+          if missing_vars:
+              print(f'  ⚠️  Missing variables: {missing_vars}')
+          else:
+              print('  🎉 All expected variables created!')
+          "
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+      
+      - name: Migration summary
+        if: always()
+        run: |
+          echo "## 📊 Migration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Migration Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Album ID**: ${{ vars.FLICKR_ALBUM_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### ✅ Migration Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The automation system now uses Repository Variables for state management." >> $GITHUB_STEP_SUMMARY
+            echo "Future automation runs will continue from the correct position." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+            echo "1. The daily automation will now work correctly" >> $GITHUB_STEP_SUMMARY
+            echo "2. No more duplicate photo posting" >> $GITHUB_STEP_SUMMARY
+            echo "3. Use \`--stats\` to verify the current state" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Migration Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the workflow logs for error details." >> $GITHUB_STEP_SUMMARY
+          fi
