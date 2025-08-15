@@ -137,70 +137,15 @@ class StateManager:
         # Default fallback: assume it's from current album (conservative approach)
         return True
     
-    def _get_last_posted_position_from_issues(self) -> int:
-        """Fallback: Get last posted position by analyzing GitHub Issues."""
-        try:
-            issues = self.repo.get_issues(
-                state='all',
-                labels=['automated-post', 'instagram', 'flickr-album', 'posted']
-            )
-            
-            max_position = 0
-            for issue in issues:
-                if self._is_from_current_album(issue.body, issue.number):
-                    # Extract position from issue body
-                    lines = issue.body.split('\n') if issue.body else []
-                    for line in lines:
-                        if line.startswith('**Album Position:**'):
-                            position_str = line.split(':', 1)[1].strip()
-                            
-                            # Clean up markdown formatting
-                            while position_str.startswith('**'):
-                                position_str = position_str[2:].strip()
-                            while position_str.startswith('*'):
-                                position_str = position_str[1:].strip()
-                            while position_str.endswith('**'):
-                                position_str = position_str[:-2].strip()
-                            while position_str.endswith('*'):
-                                position_str = position_str[:-1].strip()
-                            
-                            try:
-                                position = int(position_str)
-                                max_position = max(max_position, position)
-                                self.logger.debug(f"Found posted position {position} from issue #{issue.number}")
-                                break
-                            except ValueError:
-                                continue
-            
-            self.logger.info(f"Fallback analysis: Last posted position from GitHub Issues = {max_position}")
-            
-            # Try to migrate this value to repository variable for next time
-            if max_position > 0:
-                try:
-                    self._set_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", str(max_position))
-                    self.logger.info(f"Successfully migrated last posted position {max_position} to repository variable")
-                except Exception as e:
-                    self.logger.debug(f"Could not migrate to repository variable: {e}")
-            
-            return max_position
-            
-        except Exception as e:
-            self.logger.error(f"Failed to analyze GitHub Issues: {e}")
-            return 0
     
     def get_last_posted_position(self) -> int:
         """Get the position of the last successfully posted photo."""
         try:
-            position_str = self._get_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", "")
-            if position_str:
-                return int(position_str)
-            else:
-                # Fallback: analyze GitHub Issues if variable doesn't exist
-                self.logger.info("Repository variable not found, analyzing GitHub Issues as fallback...")
-                return self._get_last_posted_position_from_issues()
+            position_str = self._get_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", "0")
+            return int(position_str)
         except (ValueError, TypeError):
-            self.logger.warning(f"Invalid last posted position, analyzing GitHub Issues as fallback...")
-            return self._get_last_posted_position_from_issues()
+            self.logger.warning(f"Invalid last posted position, defaulting to 0")
+            return 0
     
     def set_last_posted_position(self, position: int) -> bool:
         """Set the position of the last successfully posted photo."""
