@@ -57,8 +57,8 @@ class CaptionGenerator:
             
             if context_text:
                 # Enhanced prompt with context
-                prompt = ("You are an Instagram influencer for travel content. Create an engaging Instagram caption "
-                         "in five short paragraphs (1 sentence each). Do not number paragraphs or use quotation marks. "
+                prompt = ("You are an Instagram influencer who publishes travel content. Create an engaging Instagram caption "
+                         "in five short sentences. Add a new paragraph for each sentence."
                          "Make it factual, engaging, authentic and personal. Use the provided context to create a specific and "
                          "engaging caption that references the location, story, or context when available.")
                 prompt += f"\n\nContext about this photo:\n{context_text}"

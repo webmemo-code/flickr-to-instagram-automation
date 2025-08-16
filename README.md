@@ -10,7 +10,7 @@
 
 [![Automation](https://img.shields.io/badge/automation-daily-green.svg)]()
 [![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF.svg)](https://github.com/features/actions)
-[![Issues for State](https://img.shields.io/badge/state%20management-GitHub%20Issues-238636.svg)]()
+[![Repository Variables](https://img.shields.io/badge/state%20management-Repository%20Variables-238636.svg)]()
 
 Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
 
@@ -28,10 +28,11 @@ However, I don't take the time to post them on Instagram. This automation helps 
 - 📅 **Daily Posting**: Posts one photo per day until the album is complete
 - 🎯 **Single Album Focus**: Processes one specific Flickr album
 - 🤖 **AI-Generated Captions**: Uses OpenAI GPT-4 Vision for engaging Instagram captions
-- 📊 **Progress Tracking**: Shows completion progress and statistics
+- 📊 **Scalable State Management**: Repository Variables system handles unlimited photos without repository pollution  
 - 🔧 **Manual Control**: Run automation manually with different options
 - 🛡️ **Smart Stopping**: Automatically stops when all photos are posted
-- 📈 **Analytics**: Built-in statistics and monitoring
+- 📈 **Enhanced Context**: Incorporates EXIF data, location info, and blog URLs for richer AI captions
+- 🔄 **Retry Logic**: Automatically retries failed posts and validates image URLs
 
 ## Quick Start
 
@@ -44,7 +45,7 @@ However, I don't take the time to post them on Instagram. This automation helps 
 
 ### 2. Configure Secrets and Variables
 
-Add the following **secrets** to your GitHub repository (`Settings > Secrets and variables > Actions > Repository secrets`):
+Add the following **secrets** to your GitHub repository (`Settings > Secrets and variables > Actions > Environment secrets` in the `production-social-media` environment):
 
 ```
 FLICKR_API_KEY=your_flickr_api_key
@@ -52,6 +53,7 @@ FLICKR_USER_ID=your_flickr_user_id
 INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
 INSTAGRAM_ACCOUNT_ID=your_instagram_business_account_id
 OPENAI_API_KEY=your_openai_api_key
+PERSONAL_ACCESS_TOKEN=your_github_personal_access_token_with_repo_scope
 ```
 
 Add the following **variables** to your GitHub repository (`Settings > Secrets and variables > Actions > Repository variables`):
@@ -321,7 +323,7 @@ graph TB
 |:---------|:----------|:-----------|:--------|
 | **Infrastructure** | Orchestration | GitHub Actions | Workflow automation, scheduling |
 | | Runtime | Python 3.11 | Core application logic |
-| | State Storage | GitHub Issues API | Progress tracking, audit trail |
+| | State Storage | Repository Variables | Scalable progress tracking, unlimited photos |
 | **Configuration** | Credentials | GitHub Secrets | Encrypted credential storage |
 | | Settings | Environment Variables | Secure configuration management |
 | **External APIs** | Photo Source | Flickr API | Photo metadata and URLs |
@@ -381,20 +383,22 @@ python main.py --stats
 
 ## State Management
 
-The system uses GitHub Issues to track progress:
+The system uses **Repository Variables** for scalable state tracking:
 
-### Issue Types
-- **Posted Photos**: Each posted photo creates an issue with metadata
-- **Automation Logs**: Success/failure records for each run
-- **Progress Tracking**: Shows completion status
+### State Variables Created
+- `LAST_POSTED_POSITION_{album_id}` - Current progression through album
+- `TOTAL_ALBUM_PHOTOS_{album_id}` - Total photos in album  
+- `FAILED_POSITIONS_{album_id}` - Failed positions for retry
+- `INSTAGRAM_POSTS_{album_id}` - Complete Instagram post audit trail
 
-### Issue Labels
-- `automated-post`: Photos posted by automation
-- `instagram`: Posted to Instagram
-- `flickr-album`: From the configured Flickr album
-- `posted`: Successfully posted
-- `failed`: Failed to post
-- `automation-log`: Automation run records
+### Migration from GitHub Issues (August 2025)
+- **Previous System**: Each photo created a GitHub Issue (127+ issues for small album)
+- **New System**: Repository Variables provide O(1) performance for unlimited photos
+- **Benefits**: Zero repository pollution, constant performance, complete audit trail
+- **Backward Compatibility**: Legacy issue-based posts still supported
+
+### Optional Audit Issues
+Set `CREATE_AUDIT_ISSUES=true` in repository variables to create GitHub Issues for audit trail (disabled by default for scalability)
 
 ## Monitoring Progress
 
@@ -412,11 +416,11 @@ This shows:
 - Success rate
 
 ### Check Individual Posts
-View GitHub Issues in your repository to see:
-- Each photo that was posted
-- Instagram post IDs
-- Timestamps
-- Any errors that occurred
+View repository variables or optional GitHub Issues (if enabled) to see:
+- Each photo that was posted (stored in `INSTAGRAM_POSTS_{album_id}` variable)
+- Instagram post IDs and timestamps
+- Current position and failed positions
+- Complete audit trail without repository pollution
 
 ## Album Completion
 
@@ -433,16 +437,41 @@ When all photos in your album have been posted:
 ├── main.py                 # Main automation script
 ├── config.py              # Configuration management (environment variables)
 ├── flickr_api.py          # Flickr API integration
-├── caption_generator.py   # OpenAI caption generation
-├── instagram_api.py       # Instagram posting
-├── state_manager.py       # GitHub Issues state management
+├── caption_generator.py   # OpenAI caption generation with enhanced context
+├── instagram_api.py       # Instagram posting with retry logic
+├── state_manager.py       # Repository Variables state management
 ├── requirements.txt       # Python dependencies
 └── .github/
     └── workflows/
-        └── social-media-automation.yml  # GitHub Actions workflow
+        └── flickr-to-instagram-automation.yml  # GitHub Actions workflow
 ```
 
-### Common Issues
+## Common Issues & Troubleshooting
+
+### Repository Variables Issues
+
+**"403 Forbidden" when accessing repository variables**
+```
+Failed to set variable: Resource not accessible by integration: 403
+```
+- **Cause**: Using `GITHUB_TOKEN` instead of Personal Access Token  
+- **Solution**: Create PAT with `repo` scope and add as `PERSONAL_ACCESS_TOKEN` in environment secrets
+
+**Posted first photo instead of continuing from last position**
+```
+Posted position 1 instead of position 21
+```
+- **Cause**: Environment isolation - variables not accessible from workflow context
+- **Solution**: Ensure PAT is added to correct environment (`production-social-media`) secrets
+
+**Variables not being read correctly**
+```
+Variable LAST_POSTED_POSITION_72177720326837749 not found, using default: 0
+```
+- **Cause**: Workflow running outside environment context or insufficient permissions
+- **Solution**: Verify environment configuration and PAT permissions
+
+### Legacy Issues
 
 **Album Complete Message**
 ```
@@ -510,7 +539,7 @@ curl "https://www.flickr.com/services/rest/?method=flickr.photosets.getPhotos&ap
 - All API credentials stored as GitHub Secrets
 - Environment-specific deployment protection
 - Input validation for all external data
-- Secure state management via GitHub Issues
+- Scalable state management via Repository Variables
 - No credentials stored in code
 
 ## Support
