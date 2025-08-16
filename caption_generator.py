@@ -84,8 +84,8 @@ class CaptionGenerator:
                         ]
                     }
                 ],
-                max_tokens=120,
-                temperature=0.7
+                max_tokens=300,
+                temperature=0.6
             )
             
             generated_text = response.choices[0].message.content
