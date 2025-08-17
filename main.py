@@ -41,13 +41,13 @@ def setup_logging(level: str = "INFO") -> None:
     root_logger.addHandler(file_handler)
 
 
-def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> bool:
+def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, account: str = 'primary') -> bool:
     """Post the next available photo from the configured album."""
     logger = logging.getLogger(__name__)
     
     try:
         # Initialize components
-        config = Config()
+        config = Config(account=account)
         flickr_api = FlickrAPI(config)
         caption_generator = CaptionGenerator(config)
         instagram_api = InstagramAPI(config)
@@ -166,12 +166,12 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         return False
 
 
-def reset_dry_runs() -> None:
+def reset_dry_runs(account: str = 'primary') -> None:
     """Reset all dry run records."""
     logger = logging.getLogger(__name__)
     
     try:
-        config = Config()
+        config = Config(account=account)
         repo_name = os.getenv('GITHUB_REPOSITORY')
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
@@ -187,12 +187,12 @@ def reset_dry_runs() -> None:
         print(f"❌ Failed to reset dry runs: {e}")
 
 
-def show_stats() -> None:
+def show_stats(account: str = 'primary') -> None:
     """Show automation statistics."""
     logger = logging.getLogger(__name__)
     
     try:
-        config = Config()
+        config = Config(account=account)
         repo_name = os.getenv('GITHUB_REPOSITORY')
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
@@ -281,6 +281,12 @@ def main():
         default='INFO',
         help='Logging level'
     )
+    parser.add_argument(
+        '--account',
+        choices=['primary', 'reisememo'],
+        default='primary',
+        help='Account to use (primary or reisememo)'
+    )
     
     args = parser.parse_args()
     
@@ -290,18 +296,19 @@ def main():
     
     # Reset dry runs if requested
     if args.reset_dry_runs:
-        reset_dry_runs()
+        reset_dry_runs(args.account)
         return
     
     # Show stats if requested
     if args.stats:
-        show_stats()
+        show_stats(args.account)
         return
     
     # Run automation
-    logger.info("🚀 Starting Flickr to Instagram automation")
+    account_name = args.account.capitalize() if args.account != 'primary' else 'Primary'
+    logger.info(f"🚀 Starting Flickr to Instagram automation for {account_name} account")
     include_dry_runs = not args.ignore_dry_runs
-    success = post_next_photo(args.dry_run, include_dry_runs)
+    success = post_next_photo(args.dry_run, include_dry_runs, args.account)
     
     if success:
         logger.info("✅ Automation completed successfully")

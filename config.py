@@ -12,16 +12,32 @@ load_dotenv()
 class Config:
     """Configuration class for social media automation."""
     
-    def __init__(self):
+    def __init__(self, account: str = 'primary'):
+        """Initialize configuration for specified account.
+        
+        Args:
+            account: Account type - 'primary' (default) or 'reisememo'
+        """
+        self.account = account
+        
+        # Common configuration (shared between accounts)
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
         self.flickr_user_id = os.getenv('FLICKR_USER_ID')
-        self.flickr_username = os.getenv('FLICKR_USERNAME')  # New: Flickr username for URLs
-        self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')  # New: Flickr album ID from environment
-        self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
-        self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
-        self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # New: Instagram App ID
+        self.flickr_username = os.getenv('FLICKR_USERNAME')  # Flickr username for URLs
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.github_token = os.getenv('GITHUB_TOKEN')
+        
+        # Account-specific configuration
+        if account == 'reisememo':
+            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID_REISEMEMO')
+            self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN_REISEMEMO')
+            self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID_REISEMEMO')
+            self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID_REISEMEMO')  # Optional
+        else:  # primary account (default)
+            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
+            self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
+            self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
+            self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # Optional
         
         # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
@@ -37,21 +53,33 @@ class Config:
     
     def _validate_config(self):
         """Validate that all required environment variables are set."""
+        # Common required variables
         required_vars = {
             'FLICKR_API_KEY': self.flickr_api_key,
             'FLICKR_USER_ID': self.flickr_user_id,
             'FLICKR_USERNAME': self.flickr_username,
-            'FLICKR_ALBUM_ID': self.flickr_album_id,
-            'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
-            'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
-            # 'INSTAGRAM_APP_ID': self.instagram_app_id,  # Optional for now
             'OPENAI_API_KEY': self.openai_api_key,
             'GITHUB_TOKEN': self.github_token,
         }
         
+        # Account-specific required variables
+        if self.account == 'reisememo':
+            required_vars.update({
+                'FLICKR_ALBUM_ID_REISEMEMO': self.flickr_album_id,
+                'INSTAGRAM_ACCESS_TOKEN_REISEMEMO': self.instagram_access_token,
+                'INSTAGRAM_ACCOUNT_ID_REISEMEMO': self.instagram_account_id,
+            })
+        else:  # primary account
+            required_vars.update({
+                'FLICKR_ALBUM_ID': self.flickr_album_id,
+                'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
+                'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
+            })
+        
         missing_vars = [var for var, value in required_vars.items() if not value]
         if missing_vars:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+            account_info = f" for {self.account} account" if self.account != 'primary' else ""
+            raise ValueError(f"Missing required environment variables{account_info}: {', '.join(missing_vars)}")
     
     @property
     def graph_endpoint_base(self) -> str:
@@ -61,6 +89,8 @@ class Config:
     @property
     def album_name(self) -> str:
         """Get the album name for logging and state management."""
+        if self.account == 'reisememo':
+            return 'Reisememo'
         return 'Istrien'
     
     @property
