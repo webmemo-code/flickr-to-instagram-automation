@@ -439,12 +439,6 @@ The system uses **Repository Variables** for scalable state tracking:
 - `FAILED_POSITIONS_{album_id}` - Failed positions for retry
 - `INSTAGRAM_POSTS_{album_id}` - Complete Instagram post audit trail
 
-### Migration from GitHub Issues (August 2025)
-- **Previous System**: Each photo created a GitHub Issue (127+ issues for small album)
-- **New System**: Repository Variables provide O(1) performance for unlimited photos
-- **Benefits**: Zero repository pollution, constant performance, complete audit trail
-- **Backward Compatibility**: Legacy issue-based posts still supported
-
 ### Optional Audit Issues
 Set `CREATE_AUDIT_ISSUES=true` in repository variables to create GitHub Issues for audit trail (disabled by default for scalability)
 
