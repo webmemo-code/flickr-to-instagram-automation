@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.anthropic.com)",
+      "mcp__linear-server__get_issue",
+      "Bash(find:*)",
+      "Bash(python3:*)",
+      "Bash(pip install:*)",
+      "Bash(ls:*)",
+      "Bash(pip3 install:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh run list:*)",
+      "Bash(python:*)",
+      "Bash(copy:*)",
+      "Bash(cp:*)",
+      "Bash(mklink:*)",
+      "Bash(cmd /c 'mklink \"\"CLAUDE.md\"\" \"\"G:\\My Drive\\Repos\\flickr-to-instagram-private-docs\\CLAUDE.md\"\"')",
+      "Bash(ln:*)",
+      "Bash(readlink:*)",
+      "Bash(mv:*)",
+      "Bash(claude doctor)"
+    ],
+    "deny": [],
+    "defaultMode": "acceptEdits"
+  }
+}
