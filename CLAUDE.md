@@ -1,7 +1,9 @@
 # Claude Context for Flickr to Instagram Automation
 
 ## Project Overview
-This is a Python automation system that posts one photo per day from a specific Flickr album to Instagram with AI-generated captions using GitHub Actions and OpenAI GPT Vision. The system uses enhanced context from EXIF data, location information, and blog post URLs to generate more specific and engaging captions.
+This is a social media automation that posts one photo per day from a specific Flickr album to Instagram with AI-generated captions using GitHub Actions and OpenAI GPT Vision.
+
+The system uses enhanced context from EXIF data, location information, and blog post URLs to generate more specific and engaging captions.
 
 ## Key Components
 
@@ -11,7 +13,7 @@ This is a Python automation system that posts one photo per day from a specific 
 - `flickr_api.py` - Flickr API integration for photo retrieval
 - `caption_generator.py` - OpenAI GPT-4 Vision caption generation
 - `instagram_api.py` - Instagram Graph API posting
-- `state_manager.py` - Repository Variables-based state management for unlimited scale
+- `state_manager.py` - Repository variables-based state management for unlimited scale
 - `requirements.txt` - Python dependencies
 
 ### Dependencies
