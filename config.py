@@ -19,7 +19,6 @@ class Config:
         self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')  # New: Flickr album ID from environment
         self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
         self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
-        self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # New: Instagram App ID
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.github_token = os.getenv('GITHUB_TOKEN')
         
@@ -47,7 +46,6 @@ class Config:
             'FLICKR_ALBUM_ID': self.flickr_album_id,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
             'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
-            # 'INSTAGRAM_APP_ID': self.instagram_app_id,  # Optional for now
             'OPENAI_API_KEY': self.openai_api_key,
             'GITHUB_TOKEN': self.github_token,
         }
