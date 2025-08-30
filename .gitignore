@@ -106,7 +106,6 @@ processed_images/
 generated_captions/
 api_responses/
 temp/
-
 # Diagnostic and internal files
 read_write_github_variables.py
 CLAUDE.md

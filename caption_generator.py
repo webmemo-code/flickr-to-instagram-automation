@@ -6,6 +6,7 @@ import logging
 from openai import OpenAI
 from typing import Optional
 from config import Config
+from blog_content_extractor import BlogContentExtractor
 
 
 class CaptionGenerator:
@@ -15,6 +16,8 @@ class CaptionGenerator:
         self.config = config
         self.client = OpenAI(api_key=config.openai_api_key)
         self.logger = logging.getLogger(__name__)
+        self.blog_extractor = BlogContentExtractor(config)
+        self._blog_content_cache = None  # Cache blog content to avoid repeated fetching
     
     def generate_caption(self, photo_data: dict) -> Optional[str]:
         """Generate an Instagram caption for the given image with enhanced context."""
@@ -52,16 +55,29 @@ class CaptionGenerator:
                 if camera_info:
                     context_parts.append(f"Camera: {' '.join(camera_info)}")
             
+            # Add blog post content context (NEW FEATURE)
+            blog_context = self._get_blog_content_context(photo_data)
+            if blog_context:
+                context_parts.append(f"Blog context: {blog_context}")
+                self.logger.info(f"Added blog content context for photo {photo_data.get('id')}")
+            
             # Build the enhanced prompt
             context_text = "\n".join(context_parts) if context_parts else ""
             
             if context_text:
                 # Enhanced prompt with context
-                prompt = ("You are an Instagram influencer who publishes travel content. Create an engaging Instagram caption "
-                         "in five short sentences. Add a new paragraph for each sentence."
-                         "Make it factual, engaging, authentic and personal. Use the provided context to create a specific and "
-                         "engaging caption that references the location, story, or context when available.")
-                prompt += f"\n\nContext about this photo:\n{context_text}"
+                prompt_base = ("You are an Instagram influencer who publishes travel content. Create an engaging Instagram caption "
+                              "in five short sentences. Add a new paragraph for each sentence. "
+                              "Make it factual, engaging, authentic and personal. Use the provided context to create a specific and "
+                              "engaging caption that references the location, story, or context when available.")
+                
+                # Add special instructions for blog context
+                if blog_context:
+                    prompt_base += (" Pay special attention to the 'Blog context' information, which contains editorial descriptions "
+                                   "from the travel blog post where this photo appears. Use this rich context to create a more "
+                                   "informative and engaging caption that tells the story behind the photo.")
+                
+                prompt = prompt_base + f"\n\nContext about this photo:\n{context_text}"
                 self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')}")
             else:
                 # Fallback to original prompt style when no context available
@@ -140,3 +156,30 @@ class CaptionGenerator:
                     break
         
         return None
+    
+    def _get_blog_content_context(self, photo_data: dict) -> Optional[str]:
+        """Get relevant blog content context for the photo."""
+        if not self.config.blog_post_url:
+            return None
+        
+        try:
+            # Get or fetch blog content (with caching)
+            if self._blog_content_cache is None:
+                self.logger.info(f"Fetching blog content from: {self.config.blog_post_url}")
+                self._blog_content_cache = self.blog_extractor.extract_blog_content(self.config.blog_post_url)
+                
+                if not self._blog_content_cache:
+                    self.logger.warning("Failed to extract blog content")
+                    return None
+            
+            # Find content relevant to this photo
+            relevant_content = self.blog_extractor.find_relevant_content(
+                self._blog_content_cache, 
+                photo_data
+            )
+            
+            return relevant_content
+            
+        except Exception as e:
+            self.logger.error(f"Error getting blog content context: {e}")
+            return None

@@ -137,7 +137,6 @@ class StateManager:
         # Default fallback: assume it's from current album (conservative approach)
         return True
     
-    
     def get_last_posted_position(self) -> int:
         """Get the position of the last successfully posted photo."""
         try:
