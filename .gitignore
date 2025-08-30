@@ -109,4 +109,5 @@ temp/
 
 # Diagnostic and internal files
 read_write_github_variables.py
-CLAUDE.md
+PLANNING.md
+TASKS.md
