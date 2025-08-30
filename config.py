@@ -32,6 +32,9 @@ class Config:
         # State management options
         self.create_audit_issues = os.getenv('CREATE_AUDIT_ISSUES', 'false').lower() == 'true'  # Default: disabled for scale
         
+        # Optional blog post URL for enhanced caption generation
+        self.blog_post_url = os.getenv('BLOG_POST_URL')  # Optional: URL to blog post with photo descriptions
+        
         # Validate required environment variables
         self._validate_config()
     

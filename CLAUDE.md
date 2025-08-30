@@ -162,3 +162,8 @@ Always use these prefixes for commit messages (capitalized for visibility):
 
 Format: `[PREFIX] | [Description]`
 Example: `UPDATE | Add image retry mechanism for Flickr URL validation`
+
+### Co-Author Information
+For all commits, include both co-authors:
+- **Claude**: `Claude <noreply@anthropic.com>`
+- **Walter**: `walter@webmemo.ch <walter@webmemo.ch>`

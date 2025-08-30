@@ -81,6 +81,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
