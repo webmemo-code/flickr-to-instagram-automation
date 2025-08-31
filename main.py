@@ -14,6 +14,7 @@ from flickr_api import FlickrAPI
 from caption_generator import CaptionGenerator
 from instagram_api import InstagramAPI
 from state_manager import StateManager
+from email_notifier import EmailNotifier
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -82,6 +83,11 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
         # Check if album is complete (only count actual posts, not dry runs)
         if state_manager.is_album_complete(len(photos)):
             logger.info("🎉 Album complete! All photos have been posted to Instagram.")
+            
+            # Send completion notification email
+            email_notifier = EmailNotifier(config)
+            email_notifier.send_completion_notification(len(photos), config.album_name)
+            
             state_manager.log_automation_run(True, "Album complete - all photos posted")
             return True
         
@@ -150,6 +156,10 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True) -> boo
             
             if last_position >= total_count:
                 logger.info("🎉 Album complete! All photos have been posted.")
+                
+                # Send completion notification email
+                email_notifier = EmailNotifier(config)
+                email_notifier.send_completion_notification(total_count, config.album_name)
             
             return True
         else:
@@ -281,6 +291,11 @@ def main():
         default='INFO',
         help='Logging level'
     )
+    parser.add_argument(
+        '--test-email',
+        action='store_true',
+        help='Test email notification configuration'
+    )
     
     args = parser.parse_args()
     
@@ -296,6 +311,23 @@ def main():
     # Show stats if requested
     if args.stats:
         show_stats()
+        return
+    
+    # Test email configuration if requested
+    if args.test_email:
+        config = Config(email_test_mode=True)
+        email_notifier = EmailNotifier(config)
+        
+        logger.info("Testing email notification configuration...")
+        success = email_notifier.test_email_configuration()
+        
+        if success:
+            print("Email configuration test successful!")
+            logger.info("Email test completed successfully")
+        else:
+            print("Email configuration test failed - check logs for details")
+            logger.error("Email test failed")
+            sys.exit(1)
         return
     
     # Run automation

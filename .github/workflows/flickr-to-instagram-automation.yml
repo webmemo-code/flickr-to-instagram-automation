@@ -4,6 +4,7 @@ on:
   # Daily posting at 18:13 UTC (20:13 CEST)
   schedule:
     - cron: '13 18 * * *'
+    - cron: '43 09 * * *'
   
   # Manual trigger with options
   workflow_dispatch:

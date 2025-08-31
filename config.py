@@ -12,7 +12,7 @@ load_dotenv()
 class Config:
     """Configuration class for social media automation."""
     
-    def __init__(self):
+    def __init__(self, email_test_mode: bool = False):
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
         self.flickr_user_id = os.getenv('FLICKR_USER_ID')
         self.flickr_username = os.getenv('FLICKR_USERNAME')  # New: Flickr username for URLs
@@ -34,8 +34,20 @@ class Config:
         # Optional blog post URL for enhanced caption generation
         self.blog_post_url = os.getenv('BLOG_POST_URL')  # Optional: URL to blog post with photo descriptions
         
-        # Validate required environment variables
-        self._validate_config()
+        # Email notification settings (optional)
+        self.notification_email = os.getenv('NOTIFICATION_EMAIL')  # Manager's email address
+        self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')  # SMTP server
+        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))  # SMTP port
+        self.smtp_username = os.getenv('SMTP_USERNAME')  # Email account for sending
+        self.smtp_password = os.getenv('SMTP_PASSWORD')  # Email password/app password
+        
+        # Validate required environment variables (skip for email test mode)
+        if not email_test_mode:
+            self._validate_config()
+        else:
+            # Provide mock values for email testing
+            self.flickr_username = self.flickr_username or "testuser"
+            self.flickr_album_id = self.flickr_album_id or "12345678"
     
     def _validate_config(self):
         """Validate that all required environment variables are set."""
@@ -68,3 +80,12 @@ class Config:
     def album_url(self) -> str:
         """Get the Flickr album URL."""
         return f"https://flickr.com/photos/{self.flickr_username}/albums/{self.flickr_album_id}"
+    
+    @property
+    def email_notifications_enabled(self) -> bool:
+        """Check if email notifications are properly configured."""
+        return all([
+            self.notification_email,
+            self.smtp_username,
+            self.smtp_password
+        ])
