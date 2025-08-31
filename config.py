@@ -35,6 +35,13 @@ class Config:
         # Optional blog post URL for enhanced caption generation
         self.blog_post_url = os.getenv('BLOG_POST_URL')  # Optional: URL to blog post with photo descriptions
         
+        # Email notification settings (optional)
+        self.notification_email = os.getenv('NOTIFICATION_EMAIL')  # Manager's email address
+        self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')  # SMTP server
+        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))  # SMTP port
+        self.smtp_username = os.getenv('SMTP_USERNAME')  # Email account for sending
+        self.smtp_password = os.getenv('SMTP_PASSWORD')  # Email password/app password
+        
         # Validate required environment variables
         self._validate_config()
     
@@ -70,3 +77,12 @@ class Config:
     def album_url(self) -> str:
         """Get the Flickr album URL."""
         return f"https://flickr.com/photos/{self.flickr_username}/albums/{self.flickr_album_id}"
+    
+    @property
+    def email_notifications_enabled(self) -> bool:
+        """Check if email notifications are properly configured."""
+        return all([
+            self.notification_email,
+            self.smtp_username,
+            self.smtp_password
+        ])
