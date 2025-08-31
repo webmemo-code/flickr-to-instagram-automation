@@ -315,18 +315,18 @@ def main():
     
     # Test email configuration if requested
     if args.test_email:
-        config = Config()
+        config = Config(email_test_mode=True)
         email_notifier = EmailNotifier(config)
         
-        logger.info("🧪 Testing email notification configuration...")
+        logger.info("Testing email notification configuration...")
         success = email_notifier.test_email_configuration()
         
         if success:
-            print("✅ Email configuration test successful!")
-            logger.info("✅ Email test completed successfully")
+            print("Email configuration test successful!")
+            logger.info("Email test completed successfully")
         else:
-            print("❌ Email configuration test failed - check logs for details")
-            logger.error("❌ Email test failed")
+            print("Email configuration test failed - check logs for details")
+            logger.error("Email test failed")
             sys.exit(1)
         return
     
