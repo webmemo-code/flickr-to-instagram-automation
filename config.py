@@ -25,7 +25,7 @@ class Config:
         # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = 'https://graph.facebook.com/'
-        self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
+        self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v23.0')  # Default to v23.0
         self.openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')  # Default to gpt-4o-mini
         
         # State management options
@@ -74,7 +74,12 @@ class Config:
     @property
     def album_name(self) -> str:
         """Get the album name for logging and state management."""
-        return 'Istrien'
+        from flickr_api import FlickrAPI
+        flickr_api = FlickrAPI(self)
+        photoset_info = flickr_api.get_photoset_info(self.flickr_album_id)
+        if photoset_info and 'photoset' in photoset_info:
+            return photoset_info['photoset']['title']['_content']
+        return 'Unknown Album'
     
     @property
     def album_url(self) -> str:

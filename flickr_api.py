@@ -183,6 +183,33 @@ class FlickrAPI:
         
         return ' '.join(hashtags)
     
+    def get_photoset_info(self, photoset_id: str) -> Optional[Dict]:
+        """Get photoset information including title."""
+        params = {
+            'method': 'flickr.photosets.getInfo',
+            'api_key': self.config.flickr_api_key,
+            'user_id': self.config.flickr_user_id,
+            'photoset_id': photoset_id,
+            'format': 'json',
+            'nojsoncallback': '1'
+        }
+        
+        try:
+            response = requests.get(self.config.flickr_api_url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get('stat') == 'ok':
+                self.logger.debug(f"Retrieved info for photoset {photoset_id}")
+                return data
+            else:
+                self.logger.error(f"Flickr API error for photoset {photoset_id}: {data.get('message', 'Unknown error')}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to get photoset info for {photoset_id}: {e}")
+            return None
+
     def get_unposted_photos(self) -> List[Dict]:
         """Get list of photos that haven't been posted yet."""
         photoset_id = self.config.flickr_album_id
