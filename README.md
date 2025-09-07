@@ -12,7 +12,7 @@
 [![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF.svg)](https://github.com/features/actions)
 [![Repository Variables](https://img.shields.io/badge/state%20management-Repository%20Variables-238636.svg)]()
 
-Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision.
+Automated social media posting system that posts one photo per day from a specific **Flickr album** to **Instagram** with **AI-generated captions** using GitHub Actions and OpenAI GPT Vision. Supports multiple Instagram accounts running independently from the same Flickr source.
 
 **Instagram's API** requires source photos to be published online. I chose my Flickr gallery as the source: https://flickr.com/photos/schaerer/albums/.
 
@@ -26,13 +26,15 @@ However, I don't take the time to post them on Instagram. This automation helps 
 ## Features
 
 - 📅 **Daily Posting**: Posts one photo per day until the album is complete
-- 🎯 **Single Album Focus**: Processes one specific Flickr album
+- 🎯 **Single Album Focus**: Processes one specific Flickr album per Instagram account
+- 🏢 **Multiple Account Support**: Independent automation for primary and Reisememo Instagram accounts
 - 🤖 **AI-Generated Captions**: Uses OpenAI GPT-4 Vision for engaging Instagram captions
 - 📊 **Scalable State Management**: Repository Variables system handles unlimited photos without repository pollution  
-- 🔧 **Manual Control**: Run automation manually with different options
+- 🔧 **Manual Control**: Run automation manually with different options for each account
 - 🛡️ **Smart Stopping**: Automatically stops when all photos are posted
 - 📈 **Enhanced Context**: Incorporates EXIF data, location info, and blog URLs for richer AI captions
 - 🔄 **Retry Logic**: Automatically retries failed posts and validates image URLs
+- 🔀 **Independent State**: Each account maintains separate posting progress and failed photo tracking
 
 ## Quick Start
 
@@ -105,6 +107,52 @@ https://flickr.com/photos/[your_username]/albums/72177720326826937
 ```
 
 The album ID is the number at the end: `72177720326826937`
+
+## Multi-Account Support
+
+### Running Multiple Instagram Accounts
+
+The system supports running multiple Instagram accounts independently from the same Flickr source. Each account:
+- Has its own workflow and schedule
+- Maintains separate posting progress and state
+- Uses different Instagram credentials
+- Can use different Flickr albums
+
+### Configuration for Reisememo Account
+
+To use the Reisememo account automation, add these **additional secrets** to the `production-social-media-reisememo` environment:
+
+```
+INSTAGRAM_ACCESS_TOKEN_REISEMEMO=your_reisememo_instagram_access_token
+INSTAGRAM_ACCOUNT_ID_REISEMEMO=your_reisememo_instagram_account_id
+```
+
+Add this **additional variable**:
+
+```
+FLICKR_ALBUM_ID_REISEMEMO=your_reisememo_flickr_album_id
+```
+
+### Manual Testing for Each Account
+
+**Primary Account:**
+```bash
+python main.py --account primary --dry-run
+python main.py --account primary --stats
+```
+
+**Reisememo Account:**
+```bash
+python main.py --account reisememo --dry-run
+python main.py --account reisememo --stats
+```
+
+### Automation Schedules
+
+- **Primary Account**: Daily at 18:13 UTC (20:13 CEST)
+- **Reisememo Account**: Daily at 19:13 UTC (21:13 CEST)
+
+Both automations run independently with separate state management and retry logic.
 
 ## Architecture Overview
 
@@ -390,12 +438,6 @@ The system uses **Repository Variables** for scalable state tracking:
 - `TOTAL_ALBUM_PHOTOS_{album_id}` - Total photos in album  
 - `FAILED_POSITIONS_{album_id}` - Failed positions for retry
 - `INSTAGRAM_POSTS_{album_id}` - Complete Instagram post audit trail
-
-### Migration from GitHub Issues (August 2025)
-- **Previous System**: Each photo created a GitHub Issue (127+ issues for small album)
-- **New System**: Repository Variables provide O(1) performance for unlimited photos
-- **Benefits**: Zero repository pollution, constant performance, complete audit trail
-- **Backward Compatibility**: Legacy issue-based posts still supported
 
 ### Optional Audit Issues
 Set `CREATE_AUDIT_ISSUES=true` in repository variables to create GitHub Issues for audit trail (disabled by default for scalability)

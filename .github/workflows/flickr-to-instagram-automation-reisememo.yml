@@ -1,0 +1,344 @@
+name: Flickr to Instagram Automation - Reisememo
+
+on:
+  # Daily posting at 19:13 UTC (21:13 CEST) - 1 hour after main account
+  schedule:
+    - cron: '13 9 * * *'
+  
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without posting (dry run)'
+        type: boolean
+        default: false
+      show_stats:
+        description: 'Show statistics only'
+        type: boolean
+        default: false
+
+# Ensure only one Reisememo automation runs at a time
+concurrency:
+  group: social-media-automation-reisememo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write    # For legacy GitHub Issues (compatibility)
+  actions: write   # For repository variables state management
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    environment:
+      name: production-social-media-reisememo
+      url: https://github.com/${{ github.repository }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python with caching
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Validate environment variables
+        run: |
+          echo "Checking required environment variables for Reisememo account..."
+          python -c "
+          import os
+          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'FLICKR_ALBUM_ID_REISEMEMO', 'INSTAGRAM_ACCESS_TOKEN_REISEMEMO', 'INSTAGRAM_ACCOUNT_ID_REISEMEMO', 'OPENAI_API_KEY']
+          missing = [var for var in required if not os.getenv(var)]
+          if missing:
+              print(f'Missing required environment variables: {missing}')
+              exit(1)
+          print('All required environment variables are set for Reisememo account')
+          
+          # Show API versions being used
+          graph_version = os.getenv('GRAPH_API_VERSION', 'v18.0')
+          openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+          print(f'Using Graph API version: {graph_version}')
+          print(f'Using OpenAI model: {openai_model}')
+          print(f'Account: Reisememo')
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Show statistics
+        if: ${{ inputs.show_stats == true }}
+        run: |
+          python main.py --stats --account reisememo
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Check if album is complete
+        id: check_complete
+        run: |
+          python -c "
+          import sys
+          import os
+          import traceback
+          
+          try:
+              sys.path.append('.')
+              from config import Config
+              from state_manager import StateManager
+              from flickr_api import FlickrAPI
+              
+              print('Initializing components for Reisememo account...')
+              config = Config(account='reisememo')
+              repo_name = os.getenv('GITHUB_REPOSITORY')
+              if not repo_name:
+                  raise ValueError('GITHUB_REPOSITORY environment variable not set')
+              
+              state_manager = StateManager(config, repo_name)
+              flickr_api = FlickrAPI(config)
+              
+              print('Getting photos from Flickr...')
+              photos = flickr_api.get_unposted_photos()
+              total_photos = len(photos) if photos else 0
+              print(f'Found {total_photos} photos in Reisememo album')
+              
+              print('Checking album completion status...')
+              is_complete = state_manager.is_album_complete(total_photos)
+              
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              if is_complete:
+                  print('Reisememo album is complete!')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=true\\n')
+              else:
+                  print('Reisememo album has remaining photos to post')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=false\\n')
+          except Exception as e:
+              print(f'Error checking album completion: {e}')
+              traceback.print_exc()
+              # Default to not complete on error to allow automation to run
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=false\\n')
+              sys.exit(1)
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Run automation (scheduled)
+        if: ${{ github.event_name == 'schedule' && env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          echo "Running scheduled automation for Reisememo..."
+          python main.py --account reisememo
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Run automation (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          
+          echo "Running manual automation for Reisememo..."
+          python main.py --account reisememo $DRY_RUN_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Album complete notification
+        if: ${{ env.ALBUM_COMPLETE == 'true' }}
+        run: |
+          echo "🎉 Reisememo album is complete! All photos have been posted to Instagram."
+          echo "The automation will not run until you configure a new album."
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reisememo-automation-logs-${{ github.run_id }}
+          path: |
+            automation_*.log
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: warn
+      
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## 📱 Reisememo Social Media Automation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "**Trigger**: Scheduled (daily)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Trigger**: Manual" >> $GITHUB_STEP_SUMMARY
+            echo "**Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Show Stats**: ${{ inputs.show_stats }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "**Account**: Reisememo" >> $GITHUB_STEP_SUMMARY
+          echo "**Album Complete**: ${{ env.ALBUM_COMPLETE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Graph API Version**: ${{ vars.GRAPH_API_VERSION || 'v18.0 (default)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**OpenAI Model**: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini (default)' }}" >> $GITHUB_STEP_SUMMARY
+          
+          # Add recent log entries if available
+          if [ -f "automation_$(date +%Y%m%d).log" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Recent Log Entries" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -20 "automation_$(date +%Y%m%d).log" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Retry job for failed automation (only for scheduled runs)
+  retry-automation:
+    runs-on: ubuntu-latest
+    needs: automation
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    timeout-minutes: 15
+    
+    environment:
+      name: production-social-media-reisememo
+      url: https://github.com/${{ github.repository }}
+    
+    steps:
+      - name: Wait before retry
+        run: sleep 300  # Wait 5 minutes before retry
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python with caching
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Check if album is complete before retry
+        id: check_complete_retry
+        run: |
+          python -c "
+          import sys
+          import os
+          sys.path.append('.')
+          from config import Config
+          from state_manager import StateManager
+          from flickr_api import FlickrAPI
+          
+          config = Config(account='reisememo')
+          repo_name = os.getenv('GITHUB_REPOSITORY')
+          state_manager = StateManager(config, repo_name)
+          flickr_api = FlickrAPI(config)
+          
+          photos = flickr_api.get_unposted_photos()
+          total_photos = len(photos) if photos else 0
+          
+          github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+          if state_manager.is_album_complete(total_photos):
+              print('Reisememo album is complete - no retry needed!')
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=true\n')
+          else:
+              print('Reisememo album has remaining photos - proceeding with retry')
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=false\n')
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Retry automation
+        if: ${{ env.ALBUM_COMPLETE != 'true' }}
+        run: |
+          echo "Retrying automation for Reisememo..."
+          python main.py --account reisememo
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
+          INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
+          INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      
+      - name: Upload retry logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reisememo-retry-automation-logs-${{ github.run_id }}
+          path: |
+            automation_*.log
+          retention-days: 30
+          if-no-files-found: warn
