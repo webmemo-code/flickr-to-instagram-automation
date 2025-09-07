@@ -25,13 +25,16 @@ def setup_logging(level: str = "INFO") -> None:
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Setup console handler
+    # Setup console handler with UTF-8 encoding for Windows compatibility
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
+    # Force UTF-8 encoding to handle emoji characters on Windows
+    if hasattr(console_handler.stream, 'reconfigure'):
+        console_handler.stream.reconfigure(encoding='utf-8')
     
-    # Setup file handler
+    # Setup file handler with UTF-8 encoding
     log_file = f"automation_{datetime.now().strftime('%Y%m%d')}.log"
-    file_handler = logging.FileHandler(log_file)
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setFormatter(formatter)
     
     # Configure root logger
