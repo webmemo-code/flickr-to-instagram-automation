@@ -11,19 +11,16 @@
 ## 🔧 IMMEDIATE TASKS FOR NEXT SESSION
 
 ### 1. Fix GitHub Token Authentication (HIGH PRIORITY)
-**Issue:** Reisememo workflow fails with "Bad credentials" error during GitHub API access
-**Error:** `github.GithubException.BadCredentialsException: 401 {"message": "Bad credentials"}`
+● The Issue: Both workflows reference GITHUB_TOKEN but you only have PERSONAL_ACCESS_TOKEN in secrets.
 
-**Required Actions:**
-- [ ] Check `PERSONAL_ACCESS_TOKEN` secret in GitHub repository settings
-- [ ] Verify token has required permissions: `repo` and `workflow` scopes
-- [ ] Generate new token if expired or insufficient permissions
-- [ ] Update repository secret with corrected token
-- [ ] Re-test Reisememo workflow to confirm fix
+  What I Fixed: Updated both workflow files to use ${{ secrets.GITHUB_TOKEN }} instead of ${{ secrets.PERSONAL_ACCESS_TOKEN }}.
 
-**Token Requirements:**
-- ✅ `repo` (full repository access)  
-- ✅ `workflow` (GitHub Actions workflow access)
+  What You Need To Do:
+  1. Go to your repository → Settings → Secrets and variables → Actions
+  2. Add a new secret called GITHUB_TOKEN
+  3. Use the same Personal Access Token value from your existing PERSONAL_ACCESS_TOKEN
+
+  Once you add the GITHUB_TOKEN secret, both accounts will work with the same token as intended.
 
 ### 2. Complete Reisememo Workflow Testing
 **Once GitHub token is fixed:**
@@ -33,12 +30,6 @@
 - [ ] Test Instagram API connection for Reisememo account
 - [ ] Verify AI caption generation works
 - [ ] Confirm dry-run simulation completes successfully
-
-### 3. Environment Variable Verification
-**Ensure these Reisememo-specific variables are set:**
-- [ ] `INSTAGRAM_ACCESS_TOKEN_REISEMEMO` (Secret) ✅ Already added
-- [ ] `INSTAGRAM_ACCOUNT_ID_REISEMEMO` (Secret) - Verify exists
-- [ ] `FLICKR_ALBUM_ID_REISEMEMO` (Variable) - Verify exists
 
 ## 🎯 SUCCESS CRITERIA
 

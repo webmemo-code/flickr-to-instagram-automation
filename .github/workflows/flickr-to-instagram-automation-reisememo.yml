@@ -94,7 +94,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
@@ -155,7 +155,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
@@ -172,7 +172,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
@@ -194,7 +194,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
@@ -312,7 +312,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
@@ -329,7 +329,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       
