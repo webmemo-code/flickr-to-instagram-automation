@@ -47,25 +47,38 @@ However, I don't take the time to post them on Instagram. This automation helps 
 
 ### 2. Configure Secrets and Variables
 
-Add the following **secrets** to your GitHub repository (`Settings > Secrets and variables > Actions > Environment secrets` in the `production-social-media` environment):
+#### Repository-Wide Configuration
+
+Add these **repository secrets** (`Settings > Secrets and variables > Actions > Repository secrets`):
 
 ```
 FLICKR_API_KEY=your_flickr_api_key
-FLICKR_USER_ID=your_flickr_user_id
-INSTAGRAM_ACCESS_TOKEN=your_instagram_access_token
-INSTAGRAM_ACCOUNT_ID=your_instagram_business_account_id
+FLICKR_USER_ID=your_flickr_user_id  
 OPENAI_API_KEY=your_openai_api_key
-PERSONAL_ACCESS_TOKEN=your_github_personal_access_token_with_repo_scope
+PERSONAL_ACCESS_TOKEN=your_github_fine_grained_pat_with_variables_permission
 ```
 
-Add the following **variables** to your GitHub repository (`Settings > Secrets and variables > Actions > Repository variables`):
+Add these **repository variables** (`Settings > Secrets and variables > Actions > Repository variables`):
 
 ```
 FLICKR_USERNAME=your_flickr_username
-FLICKR_ALBUM_ID=your_flickr_album_id
-GRAPH_API_VERSION=v18.0 (current Facebook/Instagram API version)
-OPENAI_MODEL=gpt-4o-mini (current OpenAI vision model number. The mini version will do just fine at a lower cost)
+GRAPH_API_VERSION=v18.0
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+#### Environment-Specific Configuration
+
+Create GitHub environments (`Settings > Environments`) and configure:
+
+**For the main account** - `production-social-media` environment:
+- **Environment variables**: `FLICKR_ALBUM_ID`, `BLOG_POST_URL`
+- **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
+
+**For the reisememo account** - `production-social-media-reisememo` environment:
+- **Environment variables**: `FLICKR_ALBUM_ID`, `BLOG_POST_URL` 
+- **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
+
+⚠️ **Important**: Use a **fine-grained Personal Access Token** with `Variables` permission for `PERSONAL_ACCESS_TOKEN`.
 
 ### 3. First Run
 
@@ -91,13 +104,13 @@ The automation follows this simple process:
 
 ### Setting Your Album
 
-The system is now fully configurable via GitHub repository variables. No code changes are needed.
+The system uses **environment-specific configuration** for multi-account support. No code changes are needed.
 
-Set your Flickr album by updating the repository variables:
-- `FLICKR_ALBUM_ID`: Your specific album ID
-- `FLICKR_USERNAME`: Your Flickr username
+**For each Instagram account**, configure the `FLICKR_ALBUM_ID` in the respective GitHub environment:
+- **Main account**: Set `FLICKR_ALBUM_ID` in `production-social-media` environment variables
+- **Reisememo account**: Set `FLICKR_ALBUM_ID` in `production-social-media-reisememo` environment variables
 
-To change albums, simply update the `FLICKR_ALBUM_ID` variable in your GitHub repository settings.
+This allows each account to post from different Flickr albums independently.
 
 ### Finding Your Album ID
 
@@ -120,17 +133,18 @@ The system supports running multiple Instagram accounts independently from the s
 
 ### Configuration for Reisememo Account
 
-To use the Reisememo account automation, add these **additional secrets** to the `production-social-media-reisememo` environment:
+The Reisememo account uses **environment-specific configuration**. Configure the `production-social-media-reisememo` environment with:
 
+**Environment Variables:**
 ```
-INSTAGRAM_ACCESS_TOKEN_REISEMEMO=your_reisememo_instagram_access_token
-INSTAGRAM_ACCOUNT_ID_REISEMEMO=your_reisememo_instagram_account_id
+FLICKR_ALBUM_ID=your_reisememo_flickr_album_id
+BLOG_POST_URL=https://reisememo.ch/your-blog-post-url
 ```
 
-Add this **additional variable**:
-
-```
-FLICKR_ALBUM_ID_REISEMEMO=your_reisememo_flickr_album_id
+**Environment Secrets:**
+```  
+INSTAGRAM_ACCESS_TOKEN=your_reisememo_instagram_access_token
+INSTAGRAM_ACCOUNT_ID=your_reisememo_instagram_account_id
 ```
 
 ### Manual Testing for Each Account
@@ -496,8 +510,9 @@ When all photos in your album have been posted:
 ```
 Failed to set variable: Resource not accessible by integration: 403
 ```
-- **Cause**: Using `GITHUB_TOKEN` instead of Personal Access Token  
-- **Solution**: Create PAT with `repo` scope and add as `PERSONAL_ACCESS_TOKEN` in environment secrets
+- **Cause**: Personal Access Token lacks repository variables permissions
+- **Solution**: Create **fine-grained PAT** with `Variables` (Read and write) permission and add as `PERSONAL_ACCESS_TOKEN` in repository secrets
+- **Note**: Classic tokens don't have granular enough permissions for the Actions variables API
 
 **Posted first photo instead of continuing from last position**
 ```
