@@ -30,7 +30,7 @@ class Config:
         
         # Account-specific configuration
         if account == 'reisememo':
-            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID_REISEMEMO')
+            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
             self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN_REISEMEMO')
             self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID_REISEMEMO')
             self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID_REISEMEMO')  # Optional
@@ -81,7 +81,7 @@ class Config:
         # Account-specific required variables
         if self.account == 'reisememo':
             required_vars.update({
-                'FLICKR_ALBUM_ID_REISEMEMO': self.flickr_album_id,
+                'FLICKR_ALBUM_ID': self.flickr_album_id,
                 'INSTAGRAM_ACCESS_TOKEN_REISEMEMO': self.instagram_access_token,
                 'INSTAGRAM_ACCOUNT_ID_REISEMEMO': self.instagram_account_id,
             })

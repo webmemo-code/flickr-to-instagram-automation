@@ -57,7 +57,7 @@ jobs:
           echo "Checking required environment variables for Reisememo account..."
           python -c "
           import os
-          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'FLICKR_ALBUM_ID_REISEMEMO', 'INSTAGRAM_ACCESS_TOKEN_REISEMEMO', 'INSTAGRAM_ACCOUNT_ID_REISEMEMO', 'OPENAI_API_KEY']
+          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'FLICKR_ALBUM_ID', 'INSTAGRAM_ACCESS_TOKEN_REISEMEMO', 'INSTAGRAM_ACCOUNT_ID_REISEMEMO', 'OPENAI_API_KEY']
           missing = [var for var in required if not os.getenv(var)]
           if missing:
               print(f'Missing required environment variables: {missing}')
@@ -75,7 +75,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -90,7 +89,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -151,7 +149,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -168,7 +165,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -190,7 +186,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -308,7 +303,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -325,7 +319,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID_REISEMEMO: ${{ vars.FLICKR_ALBUM_ID_REISEMEMO }}
           INSTAGRAM_ACCESS_TOKEN_REISEMEMO: ${{ secrets.INSTAGRAM_ACCESS_TOKEN_REISEMEMO }}
           INSTAGRAM_ACCOUNT_ID_REISEMEMO: ${{ secrets.INSTAGRAM_ACCOUNT_ID_REISEMEMO }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

@@ -54,12 +54,15 @@ All configuration is done via environment variables/GitHub repository settings:
 
 ### Required Variables
 - `FLICKR_USERNAME` - Your Flickr username
-- `FLICKR_ALBUM_ID` - Target Flickr album ID
 - `GRAPH_API_VERSION` - Facebook/Instagram API version (e.g., v18.0)
 - `OPENAI_MODEL` - OpenAI model (e.g., gpt-4o-mini)
 
 ### Optional Variables
 - `CREATE_AUDIT_ISSUES` - Set to `true` to create GitHub Issues for audit trail (default: `false` for scale)
+
+### Environment-Specific Variables
+- `BLOG_POST_URL` - URL to blog post with photo context (configure in GitHub environment settings, not repository variables)
+- `FLICKR_ALBUM_ID` - Target Flickr album ID (configure in GitHub environment settings for multi-account support)
 
 ## Architecture
 - **Infrastructure**: GitHub Actions for automation, Python 3.11 runtime

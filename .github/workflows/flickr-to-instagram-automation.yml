@@ -75,13 +75,11 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
-          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
@@ -91,7 +89,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -152,7 +149,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -169,7 +165,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -191,7 +186,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -308,7 +302,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -325,7 +318,6 @@ jobs:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
           FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
           FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
-          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
