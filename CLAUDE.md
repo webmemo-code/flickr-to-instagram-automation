@@ -48,8 +48,6 @@ All configuration is done via environment variables/GitHub repository settings:
 ### Required Secrets
 - `FLICKR_API_KEY` - Your Flickr API key
 - `FLICKR_USER_ID` - Your Flickr user ID
-- `INSTAGRAM_ACCESS_TOKEN` - Instagram Graph API access token
-- `INSTAGRAM_ACCOUNT_ID` - Instagram business account ID
 - `OPENAI_API_KEY` - OpenAI API key
 
 ### Required Variables
@@ -63,6 +61,8 @@ All configuration is done via environment variables/GitHub repository settings:
 ### Environment-Specific Variables
 - `BLOG_POST_URL` - URL to blog post with photo context (configure in GitHub environment settings, not repository variables)
 - `FLICKR_ALBUM_ID` - Target Flickr album ID (configure in GitHub environment settings for multi-account support)
+- `INSTAGRAM_ACCESS_TOKEN` - Instagram Graph API access token (configure in GitHub environment secrets for multi-account support)
+- `INSTAGRAM_ACCOUNT_ID` - Instagram business account ID (configure in GitHub environment secrets for multi-account support)
 
 ## Architecture
 - **Infrastructure**: GitHub Actions for automation, Python 3.11 runtime
