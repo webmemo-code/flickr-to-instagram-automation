@@ -78,6 +78,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
@@ -94,6 +95,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Check if album is complete
         id: check_complete
@@ -155,6 +157,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Run automation (scheduled)
         if: ${{ github.event_name == 'schedule' && env.ALBUM_COMPLETE != 'true' }}
@@ -172,6 +175,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Run automation (manual)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && env.ALBUM_COMPLETE != 'true' }}
@@ -194,6 +198,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Album complete notification
         if: ${{ env.ALBUM_COMPLETE == 'true' }}
@@ -312,6 +317,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Retry automation
         if: ${{ env.ALBUM_COMPLETE != 'true' }}
@@ -329,6 +335,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
       
       - name: Upload retry logs
         if: always()

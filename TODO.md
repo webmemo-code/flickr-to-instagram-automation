@@ -4,6 +4,7 @@
 
 ### 1. Fix Reisememo Captioning
 ● Currently the caption is in English
+● The blog post URL is not included in the caption
 
 ### 2. Complete Reisememo Workflow Testing
 - [ ] Re-run Reisememo workflow with dry-run enabled
