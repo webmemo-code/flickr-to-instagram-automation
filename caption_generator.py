@@ -131,6 +131,10 @@ class CaptionGenerator:
         # Add standard footer
         caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
         
+        # Add blog post URL if available
+        if self.config.blog_post_url:
+            caption_parts.append(self.config.blog_post_url)
+        
         # Add hashtags
         if photo_data.get('hashtags'):
             caption_parts.append(photo_data['hashtags'])
