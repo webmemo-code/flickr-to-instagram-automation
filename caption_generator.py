@@ -70,7 +70,7 @@ class CaptionGenerator:
                     # German prompts for Reisememo account
                     prompt_base = ("Du bist ein Instagram Influencer, der Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
-                                  "Schreibe sachlich, authentisch und persönlich. Nutze den gegebenen Blog-Kontext, "
+                                  "Schreibe sachlich, authentisch, persönlich und duze deine Follower. Nutze den gegebenen Blog-Kontext, "
                                   "um eine spezifische Caption zu erstellen, die den Ort, die Geschichte oder den Kontext erwähnt.")
                     
                     # Add special instructions for blog context in German
