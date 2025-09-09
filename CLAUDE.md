@@ -157,11 +157,12 @@ The system now collects rich context for better captions:
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):
+- **PLANNING** | For initial plans, PRDs, to dos
 - **UPDATE** | When adding functionality
 - **FIXING** | For intermediate fixes  
 - **FIXED** | When fixing is complete
 - **SECURITY** | For security fixes
-- **INIT** | For initial file uploads
+- **TESTING** | For testing procedures
 
 Format: `[PREFIX] | [Description]`
 Example: `UPDATE | Add image retry mechanism for Flickr URL validation`

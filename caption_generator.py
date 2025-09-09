@@ -65,26 +65,47 @@ class CaptionGenerator:
             context_text = "\n".join(context_parts) if context_parts else ""
             
             if context_text:
-                # Enhanced prompt with context
-                prompt_base = ("You are an Instagram influencer who publishes travel content. Create an Instagram caption "
-                              "in five short sentences. Add a new paragraph for each sentence. "
-                              "Make it factual, authentic and personal. Use the provided blog post context "
-                              "to create a specific caption that references the location, story, or context.")
-                
-                # Add special instructions for blog context
-                if blog_context:
-                    prompt_base += (" Pay special attention to the 'Blog context' information, which contains editorial descriptions "
-                                   "from the travel blog post where this photo appears. Use this rich context to create a more "
-                                   "informative caption that tells more about the destination the photo was taken.")
+                # Enhanced prompt with context - language-aware
+                if self.config.account == 'reisememo':
+                    # German prompts for Reisememo account
+                    prompt_base = ("Du bist ein Instagram Influencer, der Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
+                                  "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
+                                  "Schreibe sachlich, authentisch und persönlich. Nutze den gegebenen Blog-Kontext, "
+                                  "um eine spezifische Caption zu erstellen, die den Ort, die Geschichte oder den Kontext erwähnt.")
+                    
+                    # Add special instructions for blog context in German
+                    if blog_context:
+                        prompt_base += (" Achte besonders auf die 'Blog context' Informationen, die redaktionelle Beschreibungen "
+                                       "aus dem Reiseblog-Post enthalten, in dem dieses Foto erscheint. Nutze diesen umfangreichen Kontext, "
+                                       "um eine informative Caption zu erstellen, die mehr über das Reiseziel erzählt.")
+                else:
+                    # English prompts for primary account
+                    prompt_base = ("You are an Instagram influencer who publishes travel photos. Create an Instagram caption "
+                                  "in five short sentences. Add a new paragraph for each sentence. "
+                                  "Make it factual, authentic and personal. Use the provided blog post context "
+                                  "to create a specific caption that references the location, story, or context.")
+                    
+                    # Add special instructions for blog context in English
+                    if blog_context:
+                        prompt_base += (" Pay special attention to the 'Blog context' information, which contains editorial descriptions "
+                                       "from the travel blog post where this photo appears. Use this rich context to create a more "
+                                       "informative caption that tells more about the destination the photo was taken.")
                 
                 prompt = prompt_base + f"\n\nContext about this photo:\n{context_text}"
-                self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')}")
+                self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')} (account: {self.config.account})")
             else:
-                # Fallback to original prompt style when no context available
-                prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
-                         "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                         "Do not use quotation marks. Keep it personal and authentic.")
-                self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')}")
+                # Fallback to original prompt style when no context available - language-aware
+                if self.config.account == 'reisememo':
+                    # German fallback prompt for Reisememo account
+                    prompt = ("Du bist ein Instagram Influencer. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
+                             "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
+                             "Verwende keine Anführungszeichen. Halte es persönlich und authentisch.")
+                else:
+                    # English fallback prompt for primary account
+                    prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
+                             "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
+                             "Do not use quotation marks. Keep it personal and authentic.")
+                self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
             response = self.client.chat.completions.create(
                 model=self.config.openai_model,
@@ -101,7 +122,7 @@ class CaptionGenerator:
                     }
                 ],
                 max_tokens=400,
-                temperature=0.4
+                temperature=0.3
             )
             
             generated_text = response.choices[0].message.content
@@ -128,8 +149,11 @@ class CaptionGenerator:
         if generated_caption:
             caption_parts.append(generated_caption)
         
-        # Add standard footer
-        caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
+        # Add account-specific footer branding
+        if self.config.account == 'reisememo':
+            caption_parts.append("Reisememo des Schweizer Reiseblogs über Erlebnisreisen.")
+        else:
+            caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
         
         # Add blog post URL if available
         if self.config.blog_post_url:
