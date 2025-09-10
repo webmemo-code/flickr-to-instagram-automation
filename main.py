@@ -74,7 +74,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         photos = flickr_api.get_unposted_photos()
         if not photos:
             logger.warning("No photos found in the album")
-            state_manager.log_automation_run(False, "No photos found in album")
+            account_display = account.capitalize() if account != 'primary' else 'Primary'
+            state_manager.log_automation_run(False, "No photos found in album", account_display, config.album_name, config.album_url)
             return False
         
         logger.info(f"Retrieved {len(photos)} photos from album")
@@ -91,7 +92,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             email_notifier = EmailNotifier(config)
             email_notifier.send_completion_notification(len(photos), config.album_name)
             
-            state_manager.log_automation_run(True, "Album complete - all photos posted")
+            account_display = account.capitalize() if account != 'primary' else 'Primary'
+            state_manager.log_automation_run(True, "Album complete - all photos posted", account_display, config.album_name, config.album_url)
             return True
         
         # Get next photo to post
@@ -101,7 +103,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
                 logger.info("🎉 All photos have been selected in dry runs! Use --reset-dry-runs to start over.")
             else:
                 logger.info("🎉 Album complete! All photos have been posted to Instagram.")
-            state_manager.log_automation_run(True, "No more photos to process")
+            account_display = account.capitalize() if account != 'primary' else 'Primary'
+            state_manager.log_automation_run(True, "No more photos to process", account_display, config.album_name, config.album_url)
             return True
         
         position = next_photo.get('album_position', 'unknown')
@@ -113,7 +116,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             logger.error(f"❌ Invalid or inaccessible image URL after retries: {next_photo['url']}")
             logger.info(f"⏭️ Skipping photo #{position} and marking as failed to continue with next photo")
             state_manager.create_post_record(next_photo, None, is_dry_run=dry_run)
-            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL (after retries)")
+            account_display = account.capitalize() if account != 'primary' else 'Primary'
+            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL (after retries)", account_display, config.album_name, config.album_url)
             return True  # Return True to continue with next photo
         
         # Generate caption with GPT-4 Vision

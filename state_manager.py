@@ -425,19 +425,49 @@ class StateManager:
             self.logger.error(f"Failed to clear dry run records: {e}")
             return 0
     
-    def log_automation_run(self, success: bool, details: str = "") -> None:
-        """Log an automation run."""
+    def log_automation_run(self, success: bool, details: str = "", account_name: str = "", album_name: str = "", album_url: str = "") -> None:
+        """Log an automation run with enhanced context."""
         try:
             timestamp = datetime.now().isoformat()
             status = "SUCCESS" if success else "FAILED"
             
-            title = f"Automation Run: {status} ({timestamp})"
+            # Build enhanced title with account and album info
+            title_parts = [f"Automation Run: {status}"]
+            if account_name:
+                title_parts.append(f"({account_name} account)")
+            title_parts.append(f"({timestamp})")
+            title = " ".join(title_parts)
+            
+            # Build enhanced details with album context
+            enhanced_details = details
+            if account_name or album_name:
+                context_parts = []
+                if account_name:
+                    context_parts.append(f"{account_name} account")
+                if album_name:
+                    context_parts.append(f"{album_name}")
+                    if album_url:
+                        context_parts.append(f"({album_url})")
+                
+                if context_parts:
+                    if enhanced_details:
+                        enhanced_details = f"{' '.join(context_parts)} - {enhanced_details}"
+                    else:
+                        enhanced_details = ' '.join(context_parts)
             
             body_parts = [
                 f"**Status:** {status}",
                 f"**Timestamp:** {timestamp}",
-                f"**Details:** {details}",
+                f"**Details:** {enhanced_details}",
             ]
+            
+            # Add account and album info to body if available
+            if account_name:
+                body_parts.append(f"**Account:** {account_name}")
+            if album_name:
+                body_parts.append(f"**Album:** {album_name}")
+            if album_url:
+                body_parts.append(f"**Album URL:** {album_url}")
             
             body = '\n'.join(body_parts)
             
@@ -446,6 +476,10 @@ class StateManager:
                 'flickr-album',
                 'success' if success else 'failure'
             ]
+            
+            # Add account-specific label if available
+            if account_name and account_name.lower() != 'primary':
+                labels.append(f'account-{account_name.lower()}')
             
             issue = self.repo.create_issue(
                 title=title,
