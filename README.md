@@ -499,7 +499,7 @@ When all photos in your album have been posted:
 ├── requirements.txt       # Python dependencies
 └── .github/
     └── workflows/
-        └── flickr-to-instagram-automation.yml  # GitHub Actions workflow
+        └── flickr-to-insta-automation.yml  # GitHub Actions workflow
 ```
 
 ## Common Issues & Troubleshooting
