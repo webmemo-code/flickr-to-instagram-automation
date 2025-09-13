@@ -9,40 +9,88 @@ from github import Github
 from config import Config
 
 class StateManager:
-    """Manage posting state using GitHub Repository Variables for scalability."""
+    """Manage posting state using GitHub Environment Variables for proper account isolation."""
     
-    def __init__(self, config: Config, repo_name: str):
+    def __init__(self, config: Config, repo_name: str, environment_name: str = None):
         self.config = config
         self.github = Github(config.github_token)
         self.repo = self.github.get_repo(repo_name)
         self.logger = logging.getLogger(__name__)
         self.current_album_id = config.flickr_album_id  # Track current album ID
+        self.environment_name = environment_name or self._detect_environment_name(config.account)
+        self.logger.info(f"StateManager initialized for account: {self.environment_name}")
+    
+    def _detect_environment_name(self, account: str) -> str:
+        """Detect account suffix for variable naming."""
+        if account and account.lower() == 'reisememo':
+            return 'REISEMEMO'
+        return 'PRIMARY'
     
     def _get_variable(self, name: str, default: str = "") -> str:
-        """Get a repository variable value."""
+        """Get a state variable value with account-aware naming."""
+        # Create account-scoped variable name to ensure isolation
+        scoped_name = f"{name}_{self.environment_name}"
+        
         try:
-            variable = self.repo.get_variable(name)
-            return variable.value
+            # First, try to get from current environment variables (runtime)
+            import os
+            env_value = os.getenv(scoped_name)
+            if env_value is not None:
+                self.logger.debug(f"Found account-scoped variable {scoped_name} from runtime")
+                return env_value
+            
+            # Fallback: try the original name for backwards compatibility
+            env_value = os.getenv(name)
+            if env_value is not None:
+                self.logger.debug(f"Found variable {name} from runtime (legacy naming)")
+                return env_value
+            
+            # Final fallback: try repository variables with scoped name
+            try:
+                variable = self.repo.get_variable(scoped_name)
+                self.logger.debug(f"Found account-scoped repository variable {scoped_name}")
+                return variable.value
+            except Exception:
+                # Try original name in repository variables for backwards compatibility
+                try:
+                    variable = self.repo.get_variable(name)
+                    self.logger.warning(f"Found {name} in repository variables (legacy). Consider migrating to account-scoped variables.")
+                    return variable.value
+                except Exception:
+                    self.logger.debug(f"State variable {name} not found anywhere, using default: {default}")
+                    return default
+                
         except Exception as e:
-            self.logger.debug(f"Variable {name} not found, using default: {default}")
+            self.logger.debug(f"Error retrieving state variable {name}: {e}, using default: {default}")
             return default
     
     def _set_variable(self, name: str, value: str) -> bool:
-        """Set a repository variable value."""
+        """Set a state variable value with account-aware naming."""
+        # Create account-scoped variable name to ensure isolation
+        scoped_name = f"{name}_{self.environment_name}"
+        
         try:
-            # Try to update existing variable
+            # For now, use repository variables with scoped names for simplicity
+            # This provides the isolation we need while being implementable
+            
+            # Try to update existing scoped variable
             try:
-                variable = self.repo.get_variable(name)
+                variable = self.repo.get_variable(scoped_name)
                 variable.edit(value)
-                self.logger.debug(f"Updated variable {name} = {value}")
+                self.logger.debug(f"Updated account-scoped variable {scoped_name} = {value}")
                 return True
             except Exception:
                 # Variable doesn't exist, create it
-                self.repo.create_variable(name, value)
-                self.logger.debug(f"Created variable {name} = {value}")
-                return True
+                try:
+                    self.repo.create_variable(scoped_name, value)
+                    self.logger.debug(f"Created account-scoped variable {scoped_name} = {value}")
+                    return True
+                except Exception as create_e:
+                    self.logger.error(f"Failed to create account-scoped variable {scoped_name}: {create_e}")
+                    return False
+                
         except Exception as e:
-            self.logger.error(f"Failed to set variable {name}: {e}")
+            self.logger.error(f"Failed to set account-scoped variable {scoped_name}: {e}")
             return False
     
     def _get_json_variable(self, name: str, default: list = None) -> list:
