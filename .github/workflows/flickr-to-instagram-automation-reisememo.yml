@@ -1,9 +1,9 @@
 name: Flickr to Instagram Automation - Reisememo
 
 on:
-  # Daily posting at 19:13 UTC (21:13 CEST) - 1 hour after main account
+  # Daily posting at 05:11 UTC (07:11 CEST)
   schedule:
-    - cron: '13 9 * * *'
+    - cron: '11 5 * * *'
   
   # Manual trigger with options
   workflow_dispatch:
