@@ -97,14 +97,15 @@ class CaptionGenerator:
                 # Fallback to original prompt style when no context available - language-aware
                 if self.config.account == 'reisememo':
                     # German fallback prompt for Reisememo account
-                    prompt = ("Du bist ein Instagram Influencer. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
+                    prompt = ("Du bist ein Schweizer Instagram Influencer. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
                              "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
                              "Verwende keine Anführungszeichen. Halte es persönlich und authentisch.")
                 else:
                     # English fallback prompt for primary account
                     prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                              "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                             "Do not use quotation marks. Keep it personal and authentic.")
+                             "Do not use quotation marks. Keep it personal and authentic. "
+                             "Verwende kein scharfes 'ß' wie in Deutschland, sondern 'ss' wie in der Schweiz.")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
             response = self.client.chat.completions.create(
