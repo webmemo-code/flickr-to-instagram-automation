@@ -68,10 +68,11 @@ class CaptionGenerator:
                 # Enhanced prompt with context - language-aware
                 if self.config.account == 'reisememo':
                     # German prompts for Reisememo account
-                    prompt_base = ("Du bist ein Instagram Influencer, der Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
+                    prompt_base = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
                                   "Schreibe sachlich, authentisch, persönlich und duze deine Follower. Nutze den gegebenen Blog-Kontext, "
-                                  "um eine spezifische Caption zu erstellen, die den Ort, die Geschichte oder den Kontext erwähnt.")
+                                  "um eine spezifische Caption zu erstellen, die den Ort, die Geschichte oder den Kontext erwähnt." 
+                                  "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz.")
                     
                     # Add special instructions for blog context in German
                     if blog_context:
@@ -97,15 +98,15 @@ class CaptionGenerator:
                 # Fallback to original prompt style when no context available - language-aware
                 if self.config.account == 'reisememo':
                     # German fallback prompt for Reisememo account
-                    prompt = ("Du bist ein Schweizer Instagram Influencer. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
+                    prompt = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
                              "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
-                             "Verwende keine Anführungszeichen. Halte es persönlich und authentisch.")
+                             "Verwende keine Anführungszeichen. Halte es persönlich und authentisch. "
+                             "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz.")
                 else:
                     # English fallback prompt for primary account
                     prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                              "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
-                             "Do not use quotation marks. Keep it personal and authentic. "
-                             "Verwende kein scharfes 'ß' wie in Deutschland, sondern 'ss' wie in der Schweiz.")
+                             "Do not use quotation marks. Keep it personal and authentic. ")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
             response = self.client.chat.completions.create(
