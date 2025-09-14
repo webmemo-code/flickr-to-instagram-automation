@@ -121,7 +121,7 @@ jobs:
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
               
-              state_manager = StateManager(config, repo_name, environment_name=config.account)
+              state_manager = StateManager(config, repo_name)
               flickr_api = FlickrAPI(config)
               
               print('Getting photos from Flickr...')
@@ -294,7 +294,7 @@ jobs:
           
           config = Config(account='reisememo')
           repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name, environment_name=config.account)
+          state_manager = StateManager(config, repo_name)
           flickr_api = FlickrAPI(config)
           
           photos = flickr_api.get_unposted_photos()
