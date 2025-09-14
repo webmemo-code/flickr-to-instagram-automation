@@ -65,44 +65,22 @@ class StateManager:
 
     def _get_repository_variable(self, name: str, default: str = "") -> str:
         """Get a repository-wide variable using PyGithub."""
-        # Create account-scoped variable name to ensure isolation
-        scoped_name = f"{name}_{self.environment_name}"
-
         try:
             # First, try to get from current environment variables (runtime)
             import os
-            env_value = os.getenv(scoped_name)
-            if env_value is not None:
-                self.logger.debug(f"Found account-scoped variable {scoped_name} from runtime")
-                return env_value
-
-            # Fallback: try the original name for backwards compatibility
             env_value = os.getenv(name)
             if env_value is not None:
-                self.logger.debug(f"Found variable {name} from runtime (legacy naming)")
+                self.logger.debug(f"Found variable {name} from runtime")
                 return env_value
 
-            # Try repository variables with scoped name
+            # Try repository variables (global/shared state)
             try:
-                variable = self.repo.get_variable(scoped_name)
-                self.logger.debug(f"Found account-scoped repository variable {scoped_name}")
+                variable = self.repo.get_variable(name)
+                self.logger.debug(f"Found repository variable {name}")
                 return variable.value
             except Exception:
-                # Try original name in repository variables for backwards compatibility
-                # BUT only if this is the primary account to avoid cross-account contamination
-                if self.environment_name == 'PRIMARY':
-                    try:
-                        variable = self.repo.get_variable(name)
-                        self.logger.warning(f"Found {name} in repository variables (legacy). Consider migrating to account-scoped variables.")
-                        return variable.value
-                    except Exception:
-                        self.logger.debug(f"State variable {name} not found anywhere, using default: {default}")
-                        return default
-                else:
-                    # For non-primary accounts (like Reisememo), don't fall back to legacy variables
-                    # to avoid cross-account state contamination
-                    self.logger.debug(f"Account-scoped variable {scoped_name} not found for {self.environment_name} account, using default: {default}")
-                    return default
+                self.logger.debug(f"Repository variable {name} not found, using default: {default}")
+                return default
 
         except Exception as e:
             self.logger.debug(f"Error retrieving repository variable {name}: {e}, using default: {default}")
@@ -153,28 +131,26 @@ class StateManager:
 
     def _set_repository_variable(self, name: str, value: str) -> bool:
         """Set a repository-wide variable using PyGithub (for global state)."""
-        # Create account-scoped variable name to ensure isolation
-        scoped_name = f"{name}_{self.environment_name}"
-
+        # Use the variable name as-is for repository variables (global/shared state)
         try:
-            # Try to update existing scoped variable
+            # Try to update existing variable
             try:
-                variable = self.repo.get_variable(scoped_name)
+                variable = self.repo.get_variable(name)
                 variable.edit(value)
-                self.logger.debug(f"Updated repository variable {scoped_name} = {value}")
+                self.logger.debug(f"Updated repository variable {name} = {value}")
                 return True
             except Exception:
                 # Variable doesn't exist, create it
                 try:
-                    self.repo.create_variable(scoped_name, value)
-                    self.logger.debug(f"Created repository variable {scoped_name} = {value}")
+                    self.repo.create_variable(name, value)
+                    self.logger.debug(f"Created repository variable {name} = {value}")
                     return True
                 except Exception as create_e:
-                    self.logger.error(f"Failed to create repository variable {scoped_name}: {create_e}")
+                    self.logger.error(f"Failed to create repository variable {name}: {create_e}")
                     return False
 
         except Exception as e:
-            self.logger.error(f"Failed to set repository variable {scoped_name}: {e}")
+            self.logger.error(f"Failed to set repository variable {name}: {e}")
             return False
     
     def _get_json_variable(self, name: str, default: list = None) -> list:

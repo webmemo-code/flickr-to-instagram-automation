@@ -209,9 +209,10 @@ The system now collects rich context for better captions:
 - Created `_set_environment_variable()` using GitHub CLI subprocess calls
 - Updated `_get_environment_variable()` to fetch from proper environment scope
 - **Fixed**: Preserved full variable names including album_id to prevent conflicts
-- Maintained backward compatibility for existing repository variables
+- **Simplified**: Removed redundant environment name suffixes (GitHub Environments provide isolation)
+- Clean variable names: `LAST_POSTED_POSITION_{album_id}` in appropriate GitHub Environment
 
-**Result**: Proper state isolation between environments, preventing cross-account contamination while maintaining album-specific tracking within each environment.
+**Result**: Clean architecture with proper state isolation via GitHub Environments, preventing cross-account contamination while maintaining album-specific tracking.
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):
