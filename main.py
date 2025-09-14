@@ -171,10 +171,18 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         else:
             logger.error("❌ Failed to post to Instagram")
             logger.info(f"⏭️ Marking photo #{position} as failed and continuing with next photo")
-            
+
             # Record failed post (adds to failed positions for retry)
-            state_manager.create_post_record(next_photo, None)
-            
+            success = state_manager.create_post_record(next_photo, None)
+
+            # If we can't even record the failure, that's a critical error
+            if not success:
+                logger.error("💥 Critical error: Cannot record failed post - stopping automation")
+                return False
+
+            # Photo failed but state management succeeded - this is a partial failure
+            # We can continue automation but should log it as a processing issue
+            logger.warning("⚠️ Photo processing failed but automation can continue")
             return True  # Return True to continue with next photo
     
     except Exception as e:
@@ -349,10 +357,10 @@ def main():
     success = post_next_photo(args.dry_run, include_dry_runs, args.account)
     
     if success:
-        logger.info("✅ Automation completed successfully")
+        logger.info("✅ Automation run completed")
         sys.exit(0)
     else:
-        logger.error("❌ Automation failed")
+        logger.error("❌ Automation failed - unable to continue")
         sys.exit(1)
 
 
