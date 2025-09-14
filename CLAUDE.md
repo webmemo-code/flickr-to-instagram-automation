@@ -127,11 +127,15 @@ The system now collects rich context for better captions:
 - **Lightning Fast**: Constant performance for any number of photos
 - **Complete Audit Trail**: All data preserved in repository variables
 
-**State Variables Created**:
-- `LAST_POSTED_POSITION_{album_id}` - Current progression through album
-- `TOTAL_ALBUM_PHOTOS_{album_id}` - Total photos in album
-- `FAILED_POSITIONS_{album_id}` - Failed positions for retry
-- `INSTAGRAM_POSTS_{album_id}` - Complete Instagram post audit trail
+**State Variables Architecture**:
+
+**Environment Variables** (per-environment isolation):
+- `LAST_POSTED_POSITION` - Current progression through album
+- `FAILED_POSITIONS` - Failed positions for retry
+- `INSTAGRAM_POSTS` - Complete Instagram post audit trail
+
+**Repository Variables** (shared/global state):
+- `TOTAL_ALBUM_PHOTOS_{album_id}` - Total photos in album (shared across environments)
 
 #### Migration Results
 - **Issues Cleaned**: 127 → 0 automation issues (93% reduction)
@@ -174,6 +178,39 @@ The system now collects rich context for better captions:
 - Added comprehensive logging to verify photo ordering
 
 **Result**: Automation now publishes photos in proper chronological sequence (oldest to newest), ensuring travel stories unfold in the correct temporal order.
+
+## Environment Variable Architecture Fix (September 2025)
+
+### Issue: LAST_POSTED_POSITION stored as repository variable instead of environment variable
+**Problem**: State variables like `LAST_POSTED_POSITION_*`, `FAILED_POSITIONS_*`, and `INSTAGRAM_POSTS_*` were being stored as repository variables when they should be environment-specific.
+
+**Architectural Issue**:
+- Repository variables are global to all environments
+- Each environment (reisememo, travelmemo, etc.) should have isolated state tracking
+- Cross-environment state contamination was possible
+
+**Solution Implemented**:
+1. **Variable Classification**: Distinguished between environment-specific and repository-wide variables
+2. **GitHub CLI Integration**: Used `gh variable set --env` for environment-specific variables
+3. **Proper Isolation**: Each environment maintains its own state independently
+
+**New Architecture**:
+
+**Environment Variables** (per-environment isolation):
+- `LAST_POSTED_POSITION` - Each environment tracks its own album progress
+- `FAILED_POSITIONS` - Per-environment retry lists
+- `INSTAGRAM_POSTS` - Environment-specific audit trails
+
+**Repository Variables** (shared/global):
+- `TOTAL_ALBUM_PHOTOS_{album_id}` - Album metadata shared across environments
+
+**Technical Implementation**:
+- Added `_is_environment_specific_variable()` method for classification
+- Created `_set_environment_variable()` using GitHub CLI subprocess calls
+- Updated `_get_environment_variable()` to fetch from proper environment scope
+- Maintained backward compatibility for existing repository variables
+
+**Result**: Proper state isolation between environments, preventing cross-account contamination while maintaining shared global metadata.
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):

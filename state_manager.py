@@ -3,6 +3,8 @@ State management using GitHub Repository Variables for scalable tracking.
 """
 import json
 import logging
+import subprocess
+import os
 from datetime import datetime
 from typing import List, Optional, Dict
 from github import Github
@@ -28,9 +30,50 @@ class StateManager:
     
     def _get_variable(self, name: str, default: str = "") -> str:
         """Get a state variable value with account-aware naming."""
+        # Determine if this should be fetched from environment or repository variables
+        if self._is_environment_specific_variable(name):
+            return self._get_environment_variable(name, default)
+        else:
+            return self._get_repository_variable(name, default)
+
+    def _get_environment_variable(self, name: str, default: str = "") -> str:
+        """Get an environment-specific variable using GitHub CLI."""
+        try:
+            # Convert full variable name to environment-appropriate name
+            if name.startswith('LAST_POSTED_POSITION_'):
+                base_name = 'LAST_POSTED_POSITION'
+            elif name.startswith('FAILED_POSITIONS_'):
+                base_name = 'FAILED_POSITIONS'
+            elif name.startswith('INSTAGRAM_POSTS_'):
+                base_name = 'INSTAGRAM_POSTS'
+            else:
+                base_name = name.split('_')[0]
+
+            # Try to get from GitHub CLI environment variables
+            cmd = ['gh', 'variable', 'get', base_name, '--env', self.environment_name]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+            if result.returncode == 0:
+                value = result.stdout.strip()
+                self.logger.debug(f"Found environment variable {base_name} = {value} for {self.environment_name}")
+                return value
+            else:
+                # Variable not found, check if it's just missing or an error
+                if "not found" in result.stderr.lower() or "no such variable" in result.stderr.lower():
+                    self.logger.debug(f"Environment variable {base_name} not found for {self.environment_name}, using default: {default}")
+                else:
+                    self.logger.warning(f"Error getting environment variable {base_name}: {result.stderr}")
+                return default
+
+        except Exception as e:
+            self.logger.debug(f"Error retrieving environment variable {name}: {e}, using default: {default}")
+            return default
+
+    def _get_repository_variable(self, name: str, default: str = "") -> str:
+        """Get a repository-wide variable using PyGithub."""
         # Create account-scoped variable name to ensure isolation
         scoped_name = f"{name}_{self.environment_name}"
-        
+
         try:
             # First, try to get from current environment variables (runtime)
             import os
@@ -38,14 +81,14 @@ class StateManager:
             if env_value is not None:
                 self.logger.debug(f"Found account-scoped variable {scoped_name} from runtime")
                 return env_value
-            
+
             # Fallback: try the original name for backwards compatibility
             env_value = os.getenv(name)
             if env_value is not None:
                 self.logger.debug(f"Found variable {name} from runtime (legacy naming)")
                 return env_value
-            
-            # Final fallback: try repository variables with scoped name
+
+            # Try repository variables with scoped name
             try:
                 variable = self.repo.get_variable(scoped_name)
                 self.logger.debug(f"Found account-scoped repository variable {scoped_name}")
@@ -66,38 +109,87 @@ class StateManager:
                     # to avoid cross-account state contamination
                     self.logger.debug(f"Account-scoped variable {scoped_name} not found for {self.environment_name} account, using default: {default}")
                     return default
-                
+
         except Exception as e:
-            self.logger.debug(f"Error retrieving state variable {name}: {e}, using default: {default}")
+            self.logger.debug(f"Error retrieving repository variable {name}: {e}, using default: {default}")
             return default
     
     def _set_variable(self, name: str, value: str) -> bool:
         """Set a state variable value with account-aware naming."""
+        # Determine if this should be an environment variable or repository variable
+        if self._is_environment_specific_variable(name):
+            return self._set_environment_variable(name, value)
+        else:
+            return self._set_repository_variable(name, value)
+
+    def _is_environment_specific_variable(self, name: str) -> bool:
+        """Determine if a variable should be stored per-environment."""
+        environment_specific = [
+            "LAST_POSTED_POSITION_",
+            "FAILED_POSITIONS_",
+            "INSTAGRAM_POSTS_"
+        ]
+        return any(name.startswith(prefix) for prefix in environment_specific)
+
+    def _set_environment_variable(self, name: str, value: str) -> bool:
+        """Set an environment-specific variable using GitHub CLI."""
+        try:
+            # Convert full variable name to environment-appropriate name
+            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION
+            # FAILED_POSITIONS_72177720326837749 -> FAILED_POSITIONS
+            # INSTAGRAM_POSTS_72177720326837749 -> INSTAGRAM_POSTS
+            if name.startswith('LAST_POSTED_POSITION_'):
+                base_name = 'LAST_POSTED_POSITION'
+            elif name.startswith('FAILED_POSITIONS_'):
+                base_name = 'FAILED_POSITIONS'
+            elif name.startswith('INSTAGRAM_POSTS_'):
+                base_name = 'INSTAGRAM_POSTS'
+            else:
+                # Fallback for other environment-specific variables
+                base_name = name.split('_')[0]
+
+            cmd = [
+                'gh', 'variable', 'set', base_name,
+                '--env', self.environment_name,
+                '--body', value
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                self.logger.debug(f"Set environment variable {base_name} = {value} for {self.environment_name}")
+                return True
+            else:
+                self.logger.error(f"Failed to set environment variable {base_name}: {result.stderr}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Error setting environment variable {name}: {e}")
+            return False
+
+    def _set_repository_variable(self, name: str, value: str) -> bool:
+        """Set a repository-wide variable using PyGithub (for global state)."""
         # Create account-scoped variable name to ensure isolation
         scoped_name = f"{name}_{self.environment_name}"
-        
+
         try:
-            # For now, use repository variables with scoped names for simplicity
-            # This provides the isolation we need while being implementable
-            
             # Try to update existing scoped variable
             try:
                 variable = self.repo.get_variable(scoped_name)
                 variable.edit(value)
-                self.logger.debug(f"Updated account-scoped variable {scoped_name} = {value}")
+                self.logger.debug(f"Updated repository variable {scoped_name} = {value}")
                 return True
             except Exception:
                 # Variable doesn't exist, create it
                 try:
                     self.repo.create_variable(scoped_name, value)
-                    self.logger.debug(f"Created account-scoped variable {scoped_name} = {value}")
+                    self.logger.debug(f"Created repository variable {scoped_name} = {value}")
                     return True
                 except Exception as create_e:
-                    self.logger.error(f"Failed to create account-scoped variable {scoped_name}: {create_e}")
+                    self.logger.error(f"Failed to create repository variable {scoped_name}: {create_e}")
                     return False
-                
+
         except Exception as e:
-            self.logger.error(f"Failed to set account-scoped variable {scoped_name}: {e}")
+            self.logger.error(f"Failed to set repository variable {scoped_name}: {e}")
             return False
     
     def _get_json_variable(self, name: str, default: list = None) -> list:
