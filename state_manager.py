@@ -39,30 +39,24 @@ class StateManager:
     def _get_environment_variable(self, name: str, default: str = "") -> str:
         """Get an environment-specific variable using GitHub CLI."""
         try:
-            # Convert full variable name to environment-appropriate name
-            if name.startswith('LAST_POSTED_POSITION_'):
-                base_name = 'LAST_POSTED_POSITION'
-            elif name.startswith('FAILED_POSITIONS_'):
-                base_name = 'FAILED_POSITIONS'
-            elif name.startswith('INSTAGRAM_POSTS_'):
-                base_name = 'INSTAGRAM_POSTS'
-            else:
-                base_name = name.split('_')[0]
+            # Keep the full variable name including album_id for proper isolation
+            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION_72177720326837749
+            variable_name = name
 
             # Try to get from GitHub CLI environment variables
-            cmd = ['gh', 'variable', 'get', base_name, '--env', self.environment_name]
+            cmd = ['gh', 'variable', 'get', variable_name, '--env', self.environment_name]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode == 0:
                 value = result.stdout.strip()
-                self.logger.debug(f"Found environment variable {base_name} = {value} for {self.environment_name}")
+                self.logger.debug(f"Found environment variable {variable_name} = {value} for {self.environment_name}")
                 return value
             else:
                 # Variable not found, check if it's just missing or an error
                 if "not found" in result.stderr.lower() or "no such variable" in result.stderr.lower():
-                    self.logger.debug(f"Environment variable {base_name} not found for {self.environment_name}, using default: {default}")
+                    self.logger.debug(f"Environment variable {variable_name} not found for {self.environment_name}, using default: {default}")
                 else:
-                    self.logger.warning(f"Error getting environment variable {base_name}: {result.stderr}")
+                    self.logger.warning(f"Error getting environment variable {variable_name}: {result.stderr}")
                 return default
 
         except Exception as e:
@@ -134,32 +128,23 @@ class StateManager:
     def _set_environment_variable(self, name: str, value: str) -> bool:
         """Set an environment-specific variable using GitHub CLI."""
         try:
-            # Convert full variable name to environment-appropriate name
-            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION
-            # FAILED_POSITIONS_72177720326837749 -> FAILED_POSITIONS
-            # INSTAGRAM_POSTS_72177720326837749 -> INSTAGRAM_POSTS
-            if name.startswith('LAST_POSTED_POSITION_'):
-                base_name = 'LAST_POSTED_POSITION'
-            elif name.startswith('FAILED_POSITIONS_'):
-                base_name = 'FAILED_POSITIONS'
-            elif name.startswith('INSTAGRAM_POSTS_'):
-                base_name = 'INSTAGRAM_POSTS'
-            else:
-                # Fallback for other environment-specific variables
-                base_name = name.split('_')[0]
+            # Keep the full variable name including album_id for proper isolation
+            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION_72177720326837749
+            # This ensures multiple albums in same environment don't conflict
+            variable_name = name
 
             cmd = [
-                'gh', 'variable', 'set', base_name,
+                'gh', 'variable', 'set', variable_name,
                 '--env', self.environment_name,
                 '--body', value
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
-                self.logger.debug(f"Set environment variable {base_name} = {value} for {self.environment_name}")
+                self.logger.debug(f"Set environment variable {variable_name} = {value} for {self.environment_name}")
                 return True
             else:
-                self.logger.error(f"Failed to set environment variable {base_name}: {result.stderr}")
+                self.logger.error(f"Failed to set environment variable {variable_name}: {result.stderr}")
                 return False
 
         except Exception as e:

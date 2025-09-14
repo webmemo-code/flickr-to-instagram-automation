@@ -197,9 +197,9 @@ The system now collects rich context for better captions:
 **New Architecture**:
 
 **Environment Variables** (per-environment isolation):
-- `LAST_POSTED_POSITION` - Each environment tracks its own album progress
-- `FAILED_POSITIONS` - Per-environment retry lists
-- `INSTAGRAM_POSTS` - Environment-specific audit trails
+- `LAST_POSTED_POSITION_{album_id}` - Each environment tracks its own album progress (album-specific)
+- `FAILED_POSITIONS_{album_id}` - Per-environment retry lists (album-specific)
+- `INSTAGRAM_POSTS_{album_id}` - Environment-specific audit trails (album-specific)
 
 **Repository Variables** (shared/global):
 - `TOTAL_ALBUM_PHOTOS_{album_id}` - Album metadata shared across environments
@@ -208,9 +208,10 @@ The system now collects rich context for better captions:
 - Added `_is_environment_specific_variable()` method for classification
 - Created `_set_environment_variable()` using GitHub CLI subprocess calls
 - Updated `_get_environment_variable()` to fetch from proper environment scope
+- **Fixed**: Preserved full variable names including album_id to prevent conflicts
 - Maintained backward compatibility for existing repository variables
 
-**Result**: Proper state isolation between environments, preventing cross-account contamination while maintaining shared global metadata.
+**Result**: Proper state isolation between environments, preventing cross-account contamination while maintaining album-specific tracking within each environment.
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):
