@@ -95,6 +95,7 @@ The system now collects rich context for better captions:
 7. Stops automatically when album is complete
 
 ## Recent Changes
+- **CHRONOLOGICAL ORDERING**: Fixed photo publication order to ensure oldest photos are published first (September 2025)
 - **MAJOR MIGRATION**: Migrated from GitHub Issues to Repository Variables for state management
 - **Unlimited Scalability**: System now handles thousands of photos without repository pollution
 - **Zero Issue Creation**: By default, no GitHub Issues are created (configurable via `CREATE_AUDIT_ISSUES`)
@@ -154,6 +155,25 @@ The system now collects rich context for better captions:
 - `config.py` - Added `CREATE_AUDIT_ISSUES` configuration option
 - `cleanup_legacy_issues.py` - Script to clean up legacy automation issues
 - `.env.example.txt` - Documented new configuration options
+
+## Photo Publication Order Fix (September 2025)
+
+### Issue #145: Order of photos to publish
+**Problem**: Photos were being published in Flickr album order, not chronological order by date taken.
+
+**Solution Implemented**:
+1. **Enhanced Flickr API Call**: Added `extras=date_taken` parameter to retrieve photo capture dates
+2. **Chronological Sorting**: Photos now sorted by `date_taken` (oldest first) before position assignment
+3. **Position Assignment**: Album positions now reflect chronological order (position 1 = oldest photo)
+4. **Logging Enhancement**: Added detailed logging to verify correct chronological ordering
+
+**Technical Changes**:
+- `flickr_api.py`: Modified `get_photos_from_photoset()` to include date_taken data
+- `flickr_api.py`: Updated `get_unposted_photos()` to sort by date_taken before position assignment
+- `state_manager.py`: Updated comments to reflect chronological ordering
+- Added comprehensive logging to verify photo ordering
+
+**Result**: Automation now publishes photos in proper chronological sequence (oldest to newest), ensuring travel stories unfold in the correct temporal order.
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):

@@ -23,7 +23,8 @@ class FlickrAPI:
             'user_id': self.config.flickr_user_id,
             'photoset_id': photoset_id,
             'format': 'json',
-            'nojsoncallback': '1'
+            'nojsoncallback': '1',
+            'extras': 'date_taken'  # Include date taken for proper chronological sorting
         }
         
         # Log the request details for debugging
@@ -224,17 +225,17 @@ class FlickrAPI:
             photo_info, description = self.get_photo_info(photo['id'])
             location_data = self.get_photo_location(photo['id'])
             exif_data = self.get_photo_exif(photo['id'])
-            
+
             # Build photo URL
             photo_url = self.build_photo_url(photo)
-            
+
             # Extract additional URLs and context
             photo_page_url = self.get_photo_page_url(photo_info)
             source_url = self.extract_source_url(description, photo_info)
-            
+
             # Extract hashtags
             hashtags = self.extract_hashtags(photo_info, location_data)
-            
+
             photo_data = {
                 'id': photo['id'],
                 'title': photo['title'],
@@ -246,15 +247,27 @@ class FlickrAPI:
                 'photo_page_url': photo_page_url,
                 'source_url': source_url,
                 'exif_data': exif_data,
-                'location_data': location_data
+                'location_data': location_data,
+                'date_taken': photo.get('datetaken', '')  # Include date taken from Flickr API
             }
             photos.append(photo_data)
-        
-        # Preserve original Flickr album order - DO NOT sort by ID!
-        # The Flickr API returns photos in their correct album order
-        # Assign album positions based on original Flickr order
+
+        # Sort photos by date taken (oldest first) - this ensures chronological publication order
+        # Photos without date_taken will be sorted to the end
+        photos.sort(key=lambda x: x['date_taken'] or '9999-12-31 23:59:59')
+
+        # Assign album positions based on chronological order (oldest = position 1)
         for index, photo in enumerate(photos):
             photo['album_position'] = index + 1
-        
-        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} in deterministic order")
+
+        # Log the chronological order for verification
+        if photos:
+            self.logger.info(f"Photo ordering (oldest to newest):")
+            for i, photo in enumerate(photos[:5]):  # Show first 5 for brevity
+                date_display = photo['date_taken'] if photo['date_taken'] else 'No date'
+                self.logger.info(f"  #{photo['album_position']}: {photo['title']} - {date_display}")
+            if len(photos) > 5:
+                self.logger.info(f"  ... and {len(photos) - 5} more photos")
+
+        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} sorted chronologically (oldest first)")
         return photos

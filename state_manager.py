@@ -416,7 +416,7 @@ class StateManager:
             self.set_total_album_photos(total_photos)
             self.logger.info(f"Updated total album photos to {total_photos}")
         
-        # Sort photos by their album position to ensure correct order
+        # Sort photos by their album position to ensure correct chronological order (oldest first)
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
         
         last_posted_position = self.get_last_posted_position()
