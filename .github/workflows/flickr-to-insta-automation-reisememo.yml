@@ -4,7 +4,7 @@ on:
   # Daily posting at 05:11 UTC (07:11 CEST)
   schedule:
     - cron: '11 5 * * *'
-    - cron: '00 10 * * *'  # Test run
+    - cron: '15 10 * * *'  # Test run
   
   # Manual trigger with options
   workflow_dispatch:
