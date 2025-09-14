@@ -61,7 +61,7 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
-        state_manager = StateManager(config, repo_name)
+        state_manager = StateManager(config, repo_name, environment_name=config.account)
         
         logger.info(f"Starting automation for album: {config.album_name}")
         logger.info(f"Album URL: {config.album_url}")
@@ -193,7 +193,7 @@ def reset_dry_runs(account: str = 'primary') -> None:
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
-        state_manager = StateManager(config, repo_name)
+        state_manager = StateManager(config, repo_name, environment_name=config.account)
         cleared_count = state_manager.clear_dry_run_records()
         
         print(f"✅ Cleared {cleared_count} dry run records")
@@ -214,7 +214,7 @@ def show_stats(account: str = 'primary') -> None:
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
-        state_manager = StateManager(config, repo_name)
+        state_manager = StateManager(config, repo_name, environment_name=config.account)
         flickr_api = FlickrAPI(config)
         
         # Get total photos in album

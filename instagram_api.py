@@ -27,9 +27,23 @@ class InstagramAPI:
         }
         
         try:
+            self.logger.debug(f"Creating media container at: {endpoint}")
+            self.logger.debug(f"Request params: image_url={image_url[:100]}..., caption length={len(caption)}")
+
             response = requests.post(endpoint, data=params, timeout=60)
-            response.raise_for_status()
-            
+
+            # Enhanced error handling for bad requests
+            if response.status_code != 200:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                    error_code = error_data.get('error', {}).get('code', 'Unknown code')
+                    self.logger.error(f"Instagram API Error {response.status_code}: {error_code} - {error_msg}")
+                    self.logger.error(f"Full error response: {error_data}")
+                except:
+                    self.logger.error(f"Instagram API Error {response.status_code}: {response.text}")
+                return None
+
             data = response.json()
             if 'id' in data:
                 self.logger.info(f"Created media container: {data['id']}")
@@ -37,7 +51,7 @@ class InstagramAPI:
             else:
                 self.logger.error(f"Failed to create media container: {data}")
                 return None
-                
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to create media container: {e}")
             return None
@@ -52,9 +66,23 @@ class InstagramAPI:
         }
         
         try:
+            self.logger.debug(f"Publishing media container at: {endpoint}")
+            self.logger.debug(f"Publishing creation_id: {creation_id}")
+
             response = requests.post(endpoint, data=params, timeout=60)
-            response.raise_for_status()
-            
+
+            # Enhanced error handling for bad requests
+            if response.status_code != 200:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                    error_code = error_data.get('error', {}).get('code', 'Unknown code')
+                    self.logger.error(f"Instagram API Publish Error {response.status_code}: {error_code} - {error_msg}")
+                    self.logger.error(f"Full publish error response: {error_data}")
+                except:
+                    self.logger.error(f"Instagram API Publish Error {response.status_code}: {response.text}")
+                return None
+
             data = response.json()
             if 'id' in data:
                 self.logger.info(f"Published post: {data['id']}")
@@ -62,7 +90,7 @@ class InstagramAPI:
             else:
                 self.logger.error(f"Failed to publish media container: {data}")
                 return None
-                
+
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to publish media container: {e}")
             return None

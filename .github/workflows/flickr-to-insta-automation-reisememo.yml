@@ -4,6 +4,7 @@ on:
   # Daily posting at 05:11 UTC (07:11 CEST)
   schedule:
     - cron: '11 5 * * *'
+    - cron: '30 6 * * 0'  # Test run
   
   # Manual trigger with options
   workflow_dispatch:
@@ -57,19 +58,22 @@ jobs:
           echo "Checking required environment variables for Reisememo account..."
           python -c "
           import os
+          # Only validate repository-level variables at this scope
+          # Environment-specific variables will be validated when the environment scope is available
           required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'OPENAI_API_KEY']
           missing = [var for var in required if not os.getenv(var)]
           if missing:
-              print(f'Missing required environment variables: {missing}')
+              print(f'Missing required repository-level environment variables: {missing}')
               exit(1)
-          print('All required environment variables are set for Reisememo account')
-          
+          print('All required repository-level environment variables are set for Reisememo account')
+
           # Show API versions being used
           graph_version = os.getenv('GRAPH_API_VERSION', 'v18.0')
           openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
           print(f'Using Graph API version: {graph_version}')
           print(f'Using OpenAI model: {openai_model}')
           print(f'Account: Reisememo')
+          print('Note: Instagram credentials will be validated in environment scope')
           "
         env:
           FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
@@ -117,7 +121,7 @@ jobs:
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
               
-              state_manager = StateManager(config, repo_name)
+              state_manager = StateManager(config, repo_name, environment_name='reisememo')
               flickr_api = FlickrAPI(config)
               
               print('Getting photos from Flickr...')
@@ -290,7 +294,7 @@ jobs:
           
           config = Config(account='reisememo')
           repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name)
+          state_manager = StateManager(config, repo_name, environment_name='reisememo')
           flickr_api = FlickrAPI(config)
           
           photos = flickr_api.get_unposted_photos()

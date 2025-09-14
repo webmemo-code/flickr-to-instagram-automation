@@ -52,12 +52,19 @@ class StateManager:
                 return variable.value
             except Exception:
                 # Try original name in repository variables for backwards compatibility
-                try:
-                    variable = self.repo.get_variable(name)
-                    self.logger.warning(f"Found {name} in repository variables (legacy). Consider migrating to account-scoped variables.")
-                    return variable.value
-                except Exception:
-                    self.logger.debug(f"State variable {name} not found anywhere, using default: {default}")
+                # BUT only if this is the primary account to avoid cross-account contamination
+                if self.environment_name == 'PRIMARY':
+                    try:
+                        variable = self.repo.get_variable(name)
+                        self.logger.warning(f"Found {name} in repository variables (legacy). Consider migrating to account-scoped variables.")
+                        return variable.value
+                    except Exception:
+                        self.logger.debug(f"State variable {name} not found anywhere, using default: {default}")
+                        return default
+                else:
+                    # For non-primary accounts (like Reisememo), don't fall back to legacy variables
+                    # to avoid cross-account state contamination
+                    self.logger.debug(f"Account-scoped variable {scoped_name} not found for {self.environment_name} account, using default: {default}")
                     return default
                 
         except Exception as e:
