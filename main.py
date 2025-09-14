@@ -154,14 +154,13 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             
             # Record successful post (updates position tracking, optionally creates audit issue)
             state_manager.create_post_record(next_photo, instagram_post_id, create_audit_issue=config.create_audit_issues)
-            
-            # Log progress
-            last_position = state_manager.get_last_posted_position()
+
+            # Log progress (use current position since we just posted it)
             total_count = len(photos)
-            
-            logger.info(f"📊 Progress: Posted {last_position}/{total_count} photos (just posted #{position})")
-            
-            if last_position >= total_count:
+
+            logger.info(f"📊 Progress: Posted {position}/{total_count} photos (just posted #{position})")
+
+            if position >= total_count:
                 logger.info("🎉 Album complete! All photos have been posted.")
                 
                 # Send completion notification email

@@ -19,7 +19,12 @@ class BlogContentExtractor:
         self.logger = logging.getLogger(__name__)
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         })
     
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
@@ -57,6 +62,16 @@ class BlogContentExtractor:
             
             return content_data
             
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 403:
+                self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url}. "
+                                  f"This may be due to bot detection, cookie consent, or Cloudflare protection. "
+                                  f"Caption generation will proceed without blog context.")
+            elif e.response.status_code == 404:
+                self.logger.warning(f"Blog post not found (404) at {blog_url}")
+            else:
+                self.logger.error(f"HTTP error fetching blog content from {blog_url}: {e}")
+            return None
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to fetch blog content from {blog_url}: {e}")
             return None

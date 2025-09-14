@@ -23,10 +23,10 @@ class StateManager:
         self.logger.info(f"StateManager initialized for account: {self.environment_name}")
     
     def _detect_environment_name(self, account: str) -> str:
-        """Detect account suffix for variable naming."""
+        """Detect GitHub Environment name based on account."""
         if account and account.lower() == 'reisememo':
-            return 'REISEMEMO'
-        return 'PRIMARY'
+            return 'production-social-media-reisememo'
+        return 'production-social-media'
     
     def _get_variable(self, name: str, default: str = "") -> str:
         """Get a state variable value with account-aware naming."""
