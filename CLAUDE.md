@@ -68,7 +68,8 @@ All configuration is done via environment variables/GitHub repository settings:
 - **Infrastructure**: GitHub Actions for automation, Python 3.11 runtime
 - **State Management**: GitHub Repository Variables for unlimited scalability
 - **External APIs**: Flickr API, Instagram Graph API, OpenAI GPT-4 Vision
-- **Security**: GitHub Secrets for credential management
+- **Security**: GitHub Secrets for credential management, built-in GITHUB_TOKEN for state management
+- **Authentication**: Built-in GITHUB_TOKEN with `actions: write` permission for environment variable access
 
 ## Enhanced Caption Generation
 The system now collects rich context for better captions:
@@ -95,6 +96,7 @@ The system now collects rich context for better captions:
 7. Stops automatically when album is complete
 
 ## Recent Changes
+- **GITHUB TOKEN FIX**: Fixed recurring photo issue by replacing PERSONAL_ACCESS_TOKEN with built-in GITHUB_TOKEN (September 2025)
 - **CHRONOLOGICAL ORDERING**: Fixed photo publication order to ensure oldest photos are published first (September 2025)
 - **MAJOR MIGRATION**: Migrated from GitHub Issues to Repository Variables for state management
 - **Unlimited Scalability**: System now handles thousands of photos without repository pollution
@@ -107,6 +109,8 @@ The system now collects rich context for better captions:
 
 ## Current Status
 **OPTIMIZED FOR SCALE**: Repository Variables migration complete - Ready for unlimited photos ✅
+
+**GITHUB TOKEN FIXED**: Issue #148 resolved - Photo progression working correctly ✅
 
 ## State Management Migration (August 2025)
 
@@ -149,9 +153,11 @@ The system now collects rich context for better captions:
 - **Performance**: ✅ LIGHTNING FAST (O(1) operations)
 - **Repository**: ✅ CLEAN (zero automation issues)
 - **Audit Trail**: ✅ COMPLETE (stored in variables)
+- **GitHub Token**: ✅ FIXED (proper environment variable access)
+- **Photo Progression**: ✅ WORKING (no more repetition)
 - **Workflow schedule**: 📅 Daily at 18:13 UTC (20:13 CEST)
 
-**Last Successful Test**: August 13, 2025 - Repository Variables system tested successfully
+**Last Successful Test**: September 15, 2025 - GitHub Token permissions fixed and verified
 
 **Files Modified for Migration**:
 - `state_manager.py` - Complete rewrite for Repository Variables API
@@ -213,6 +219,34 @@ The system now collects rich context for better captions:
 - Clean variable names: `LAST_POSTED_POSITION_{album_id}` in appropriate GitHub Environment
 
 **Result**: Clean architecture with proper state isolation via GitHub Environments, preventing cross-account contamination while maintaining album-specific tracking.
+
+## GitHub Token Permission Fix (September 2025)
+
+### Issue #148: Primary workflow keeps publishing the same photo
+**Problem**: Automation was repeatedly posting the same photo instead of progressing through the album sequence.
+
+**Root Cause Analysis**:
+1. **Token Permission Issue**: GitHub Actions workflow was using `PERSONAL_ACCESS_TOKEN` which lacked permissions to update environment variables
+2. **HTTP 403 Error**: `"Resource not accessible by personal access token"` when trying to set `LAST_POSTED_POSITION`
+3. **State Update Failure**: Without successful state updates, automation defaulted to position 0, repeatedly posting photo #1
+4. **Album Confusion**: Investigation initially focused on wrong album (Triest vs Sardinia)
+
+**Solution Implemented**:
+1. **Token Replacement**: Replaced all instances of `PERSONAL_ACCESS_TOKEN` with built-in `GITHUB_TOKEN` in workflow
+2. **Permission Verification**: Confirmed `GITHUB_TOKEN` with `actions: write` permission provides proper environment variable access
+3. **Environment Isolation**: Verified environment variables maintain proper isolation between account automations
+4. **State Validation**: Confirmed `LAST_POSTED_POSITION_72177720313113125 = 1` is correct for Sardinia album (1/39 photos)
+
+**Technical Changes**:
+- `.github/workflows/flickr-to-insta-automation.yml`: Updated all `GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}` to `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
+- Updated permissions comment to clarify environment variables access
+- No code changes needed in `state_manager.py` - issue was purely token permissions
+
+**Key Insight**: Environment variables are essential for multi-account parallel execution isolation. Each GitHub Environment maintains separate state tracking:
+- `production-social-media`: Primary account automation
+- `production-social-media-reisememo`: Reisememo account automation
+
+**Result**: Automation now properly updates `LAST_POSTED_POSITION` after successful Instagram posts, ensuring correct photo progression (1 → 2 → 3, etc.) instead of repetition.
 
 ## Commit Message Convention
 Always use these prefixes for commit messages (capitalized for visibility):
