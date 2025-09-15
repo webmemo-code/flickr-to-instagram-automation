@@ -84,7 +84,8 @@ class CaptionGenerator:
                     prompt_base = ("You are an Instagram influencer who publishes travel photos. Create an Instagram caption "
                                   "in five short sentences. Add a new paragraph for each sentence. "
                                   "Make it factual, authentic and personal. Use the provided blog post context "
-                                  "to create a specific caption that references the location, story, or context.")
+                                  "to create a specific caption that references the location, story, or context. "
+                                  "Do not use the terms 'I can\'t wait to share more...' or 'Stay tuned for more...'.")
                     
                     # Add special instructions for blog context in English
                     if blog_context:
@@ -124,7 +125,7 @@ class CaptionGenerator:
                     }
                 ],
                 max_tokens=400,
-                temperature=0.2
+                temperature=0.1
             )
             
             generated_text = response.choices[0].message.content
