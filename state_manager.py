@@ -177,11 +177,19 @@ class StateManager:
                     self.logger.debug(f"Created repository variable {name} = {value}")
                     return True
                 except Exception as create_e:
-                    self.logger.error(f"Failed to create repository variable {name}: {create_e}")
+                    # Check if it's a permission error
+                    if "403" in str(create_e) or "not accessible by integration" in str(create_e).lower():
+                        self.logger.debug(f"GitHub token lacks permission to create repository variable {name}")
+                    else:
+                        self.logger.error(f"Failed to create repository variable {name}: {create_e}")
                     return False
 
         except Exception as e:
-            self.logger.error(f"Failed to set repository variable {name}: {e}")
+            # Check if it's a permission error
+            if "403" in str(e) or "not accessible by integration" in str(e).lower():
+                self.logger.debug(f"GitHub token lacks permission to access repository variable {name}")
+            else:
+                self.logger.error(f"Failed to set repository variable {name}: {e}")
             return False
     
     def _get_json_variable(self, name: str, default: list = None) -> list:
@@ -314,18 +322,6 @@ class StateManager:
             return self._set_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", failed_positions)
         return True
     
-    def get_total_album_photos(self) -> int:
-        """Get the total number of photos in the current album."""
-        try:
-            total_str = self._get_variable(f"TOTAL_ALBUM_PHOTOS_{self.current_album_id}", "0")
-            return int(total_str)
-        except (ValueError, TypeError):
-            self.logger.warning(f"Invalid total album photos, defaulting to 0")
-            return 0
-    
-    def set_total_album_photos(self, total: int) -> bool:
-        """Set the total number of photos in the current album."""
-        return self._set_variable(f"TOTAL_ALBUM_PHOTOS_{self.current_album_id}", str(total))
     
     def get_instagram_posts(self) -> List[Dict]:
         """Get all Instagram post records for the current album."""
@@ -494,11 +490,9 @@ class StateManager:
         if not photos:
             self.logger.warning("No photos provided to get_next_photo_to_post")
             return None
-        
+
         total_photos = len(photos)
-        if self.get_total_album_photos() != total_photos:
-            self.set_total_album_photos(total_photos)
-            self.logger.info(f"Updated total album photos to {total_photos}")
+        self.logger.info(f"Processing {total_photos} photos from album")
         
         # Sort photos by their album position to ensure correct chronological order (oldest first)
         sorted_photos = sorted(photos, key=lambda x: x.get('album_position', 0))
@@ -681,24 +675,18 @@ class StateManager:
         if total_photos <= 0:
             self.logger.warning(f"No photos found in album (total_photos: {total_photos}). This might indicate a Flickr API issue.")
             return False  # If we can't get photos, assume not complete to allow retry
-        
-        # Update total photos if different
-        stored_total = self.get_total_album_photos()
-        if stored_total != total_photos:
-            self.set_total_album_photos(total_photos)
-            self.logger.info(f"Updated total album photos from {stored_total} to {total_photos}")
-        
+
         last_posted_position = self.get_last_posted_position()
         failed_positions = self.get_failed_positions()
         failed_count = len(failed_positions)
-        
+
         # Album is complete if last posted position equals total photos
         is_complete = last_posted_position >= total_photos
-        
+
         if is_complete:
             self.logger.info(f"✅ Album complete! Posted {last_posted_position} of {total_photos} photos ({failed_count} failed positions remaining for manual retry)")
         else:
             remaining = total_photos - last_posted_position
             self.logger.info(f"📊 Album progress: {last_posted_position} of {total_photos} photos posted ({remaining} remaining, {failed_count} failed)")
-        
+
         return is_complete
