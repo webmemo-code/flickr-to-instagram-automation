@@ -1,4 +1,4 @@
-name: Flickr to Instagram Automation
+name: Flickr to Insta Automation
 
 on:
   # Daily posting at 18:13 UTC (20:13 CEST)
@@ -27,6 +27,7 @@ permissions:
   contents: read
   issues: write        # For legacy GitHub Issues (compatibility)
   actions: write       # For repository and environment variables state management
+  variables: write     # For repository and environment variables access
 
 jobs:
   automation:

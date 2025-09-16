@@ -105,8 +105,12 @@ class StateManager:
                 variable = self.repo.get_variable(name)
                 self.logger.debug(f"Found repository variable {name}")
                 return variable.value
-            except Exception:
-                self.logger.debug(f"Repository variable {name} not found, using default: {default}")
+            except Exception as e:
+                # Check if it's a permission error
+                if "403" in str(e) or "not accessible by integration" in str(e).lower():
+                    self.logger.debug(f"GitHub token lacks permission to access repository variable {name}, using default: {default}")
+                else:
+                    self.logger.debug(f"Repository variable {name} not found, using default: {default}")
                 return default
 
         except Exception as e:
