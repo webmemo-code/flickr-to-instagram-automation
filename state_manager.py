@@ -37,13 +37,38 @@ class StateManager:
             return self._get_repository_variable(name, default)
 
     def _get_environment_variable(self, name: str, default: str = "") -> str:
-        """Get an environment-specific variable using GitHub CLI."""
+        """Get an environment-specific variable, prioritizing runtime environment over GitHub CLI."""
         try:
+            # First, try to get from runtime environment variables (GitHub Actions workflow env: section)
+            import os
+            env_value = os.getenv(name)
+            if env_value is not None:
+                self.logger.debug(f"Found environment variable {name} = {env_value} from runtime environment")
+                return env_value
+
+            # Try generic environment variable patterns for state variables
+            # This allows us to pass state variables with generic names from the workflow
+            if name.startswith('LAST_POSTED_POSITION_'):
+                generic_value = os.getenv('LAST_POSTED_POSITION')
+                if generic_value is not None:
+                    self.logger.debug(f"Found generic LAST_POSTED_POSITION = {generic_value} from runtime environment")
+                    return generic_value
+            elif name.startswith('FAILED_POSITIONS_'):
+                generic_value = os.getenv('FAILED_POSITIONS')
+                if generic_value is not None:
+                    self.logger.debug(f"Found generic FAILED_POSITIONS = {generic_value} from runtime environment")
+                    return generic_value
+            elif name.startswith('INSTAGRAM_POSTS_'):
+                generic_value = os.getenv('INSTAGRAM_POSTS')
+                if generic_value is not None:
+                    self.logger.debug(f"Found generic INSTAGRAM_POSTS = {generic_value} from runtime environment")
+                    return generic_value
+
             # Keep the full variable name including album_id for proper isolation
             # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION_72177720326837749
             variable_name = name
 
-            # Try to get from GitHub CLI environment variables
+            # Fallback to GitHub CLI environment variables (may fail due to permissions)
             cmd = ['gh', 'variable', 'get', variable_name, '--env', self.environment_name]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
@@ -52,9 +77,11 @@ class StateManager:
                 self.logger.debug(f"Found environment variable {variable_name} = {value} for {self.environment_name}")
                 return value
             else:
-                # Variable not found, check if it's just missing or an error
+                # Variable not found or permission error
                 if "not found" in result.stderr.lower() or "no such variable" in result.stderr.lower():
                     self.logger.debug(f"Environment variable {variable_name} not found for {self.environment_name}, using default: {default}")
+                elif "403" in result.stderr or "not accessible" in result.stderr.lower():
+                    self.logger.debug(f"GitHub token lacks permission to access environment variable {variable_name}, using default: {default}")
                 else:
                     self.logger.warning(f"Error getting environment variable {variable_name}: {result.stderr}")
                 return default

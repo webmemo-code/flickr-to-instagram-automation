@@ -104,30 +104,30 @@ jobs:
           import sys
           import os
           import traceback
-          
+
           try:
               sys.path.append('.')
               from config import Config
               from state_manager import StateManager
               from flickr_api import FlickrAPI
-              
+
               print('Initializing components...')
               config = Config()
               repo_name = os.getenv('GITHUB_REPOSITORY')
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
-              
-              state_manager = StateManager(config, repo_name, environment_name='primary')
+
+              state_manager = StateManager(config, repo_name, environment_name='production-social-media')
               flickr_api = FlickrAPI(config)
-              
+
               print('Getting photos from Flickr...')
               photos = flickr_api.get_unposted_photos()
               total_photos = len(photos) if photos else 0
               print(f'Found {total_photos} photos in album')
-              
+
               print('Checking album completion status...')
               is_complete = state_manager.is_album_complete(total_photos)
-              
+
               github_env = os.environ.get('GITHUB_ENV', '/dev/null')
               if is_complete:
                   print('Album is complete!')
@@ -184,7 +184,7 @@ jobs:
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
           fi
-          
+
           echo "Running manual automation..."
           python main.py $DRY_RUN_FLAG
         env:
@@ -286,15 +286,15 @@ jobs:
           from config import Config
           from state_manager import StateManager
           from flickr_api import FlickrAPI
-          
+
           config = Config()
           repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name, environment_name='primary')
+          state_manager = StateManager(config, repo_name, environment_name='production-social-media')
           flickr_api = FlickrAPI(config)
-          
+
           photos = flickr_api.get_unposted_photos()
           total_photos = len(photos) if photos else 0
-          
+
           github_env = os.environ.get('GITHUB_ENV', '/dev/null')
           if state_manager.is_album_complete(total_photos):
               print('Album is complete - no retry needed!')
