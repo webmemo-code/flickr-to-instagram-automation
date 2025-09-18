@@ -23,7 +23,7 @@ class StateManager:
         self.logger.info(f"StateManager initialized for account: {self.environment_name}")
     
     def _detect_environment_name(self, account: str) -> str:
-        """Detect GitHub Environment name based on account."""
+        """Detect environment name based on account."""
         if account and account.lower() == 'reisememo':
             return 'secondary-account'
         return 'primary-account'
