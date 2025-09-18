@@ -117,7 +117,7 @@ jobs:
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
 
-              state_manager = StateManager(config, repo_name, environment_name='primary-account')
+              state_manager = StateManager(config, repo_name, environment_name='PRIMARY_ACCOUNT')
               flickr_api = FlickrAPI(config)
 
               print('Getting photos from Flickr...')

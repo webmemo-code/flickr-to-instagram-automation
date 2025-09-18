@@ -25,8 +25,8 @@ class StateManager:
     def _detect_environment_name(self, account: str) -> str:
         """Detect environment name based on account."""
         if account and account.lower() == 'reisememo':
-            return 'secondary-account'
-        return 'primary-account'
+            return 'SECONDARY_ACCOUNT'
+        return 'PRIMARY_ACCOUNT'
     
     def _get_variable(self, name: str, default: str = "") -> str:
         """Get a state variable value with account-aware naming."""
