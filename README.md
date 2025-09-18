@@ -70,11 +70,11 @@ OPENAI_MODEL=gpt-4o-mini
 
 Create GitHub environments (`Settings > Environments`) and configure:
 
-**For the main account** - `production-social-media` environment:
+**For the main account** - `primary-account` environment:
 - **Environment variables**: `FLICKR_ALBUM_ID`, `BLOG_POST_URL`
 - **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
 
-**For the reisememo account** - `production-social-media-reisememo` environment:
+**For the secondary account** - `secondary-account` environment:
 - **Environment variables**: `FLICKR_ALBUM_ID`, `BLOG_POST_URL` 
 - **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
 
@@ -107,8 +107,8 @@ The automation follows this simple process:
 The system uses **environment-specific configuration** for multi-account support. No code changes are needed.
 
 **For each Instagram account**, configure the `FLICKR_ALBUM_ID` in the respective GitHub environment:
-- **Main account**: Set `FLICKR_ALBUM_ID` in `production-social-media` environment variables
-- **Reisememo account**: Set `FLICKR_ALBUM_ID` in `production-social-media-reisememo` environment variables
+- **Main account**: Set `FLICKR_ALBUM_ID` in `primary-account` environment variables
+- **Secondary account**: Set `FLICKR_ALBUM_ID` in `secondary-account` environment variables
 
 This allows each account to post from different Flickr albums independently.
 
@@ -133,7 +133,7 @@ The system supports running multiple Instagram accounts independently from the s
 
 ### Configuration for Reisememo Account
 
-The Reisememo account uses **environment-specific configuration**. Configure the `production-social-media-reisememo` environment with:
+The secondary account uses **environment-specific configuration**. Configure the `secondary-account` environment with:
 
 **Environment Variables:**
 ```
@@ -519,7 +519,7 @@ Failed to set variable: Resource not accessible by integration: 403
 Posted position 1 instead of position 21
 ```
 - **Cause**: Environment isolation - variables not accessible from workflow context
-- **Solution**: Ensure PAT is added to correct environment (`production-social-media`) secrets
+- **Solution**: Ensure PAT is added to correct environment (`primary-account`) secrets
 
 **Variables not being read correctly**
 ```

@@ -297,7 +297,7 @@ jobs:
 
           config = Config()
           repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name, environment_name='production-social-media')
+          state_manager = StateManager(config, repo_name, environment_name='primary-account')
           flickr_api = FlickrAPI(config)
 
           photos = flickr_api.get_unposted_photos()
