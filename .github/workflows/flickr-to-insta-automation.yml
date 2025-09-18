@@ -26,7 +26,7 @@ concurrency:
 permissions:
   contents: read
   issues: write        # For legacy GitHub Issues (compatibility)
-  actions: write       # For repository and environment variables state management
+  actions: write       # For repository variables state management
 
 jobs:
   automation:
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media
+      name: primary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
@@ -117,7 +117,7 @@ jobs:
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
 
-              state_manager = StateManager(config, repo_name, environment_name='production-social-media')
+              state_manager = StateManager(config, repo_name, environment_name='primary-account')
               flickr_api = FlickrAPI(config)
 
               print('Getting photos from Flickr...')
@@ -262,7 +262,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media
+      name: primary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
