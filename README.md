@@ -35,6 +35,8 @@ However, I don't take the time to post them on Instagram. This automation helps 
 - 📈 **Enhanced Context**: Incorporates EXIF data, location info, and blog URLs for richer AI captions
 - 🔄 **Retry Logic**: Automatically retries failed posts and validates image URLs
 - 🔀 **Independent State**: Each account maintains separate posting progress and failed photo tracking
+- 📝 **Enhanced Content**: WordPress authentication for full blog post content extraction
+- 🎯 **Smart Context**: Blog content matched with photos for richer AI captions
 
 ## Quick Start
 
@@ -53,9 +55,10 @@ Add these **repository secrets** (`Settings > Secrets and variables > Actions > 
 
 ```
 FLICKR_API_KEY=your_flickr_api_key
-FLICKR_USER_ID=your_flickr_user_id  
+FLICKR_USER_ID=your_flickr_user_id
 OPENAI_API_KEY=your_openai_api_key
-PERSONAL_ACCESS_TOKEN=your_github_fine_grained_pat_with_variables_permission
+WORDPRESS_USERNAME=your_wordpress_username
+WORDPRESS_APP_PASSWORD=your_wordpress_app_password
 ```
 
 Add these **repository variables** (`Settings > Secrets and variables > Actions > Repository variables`):
@@ -78,7 +81,7 @@ Create GitHub environments (`Settings > Environments`) and configure:
 - **Environment variables**: `FLICKR_ALBUM_ID`, `BLOG_POST_URL` 
 - **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
 
-⚠️ **Important**: Use a **fine-grained Personal Access Token** with `Variables` permission for `PERSONAL_ACCESS_TOKEN`.
+⚠️ **Important**: Configure WordPress Application Password for authenticated blog content access.
 
 ### 3. First Run
 
@@ -97,7 +100,7 @@ The automation follows this simple process:
 3. **Find Next Photo**: Identifies the next unposted photo
 4. **Generate Caption**: Uses GPT-4 Vision to create an engaging caption
 5. **Post to Instagram**: Publishes the photo with the generated caption
-6. **Track Progress**: Records the post in GitHub Issues
+6. **Track Progress**: Records the post in Repository Variables
 7. **Auto-Complete**: Stops automatically when all photos are posted
 
 ## Album Configuration
@@ -504,29 +507,28 @@ When all photos in your album have been posted:
 
 ## Common Issues & Troubleshooting
 
-### Repository Variables Issues
+### Blog Content Issues
 
-**"403 Forbidden" when accessing repository variables**
+**"Bot traffic blocked" when accessing blog content**
 ```
-Failed to set variable: Resource not accessible by integration: 403
+Failed to extract blog content: 403 Forbidden
 ```
-- **Cause**: Personal Access Token lacks repository variables permissions
-- **Solution**: Create **fine-grained PAT** with `Variables` (Read and write) permission and add as `PERSONAL_ACCESS_TOKEN` in repository secrets
-- **Note**: Classic tokens don't have granular enough permissions for the Actions variables API
+- **Cause**: Website blocking automated requests without authentication
+- **Solution**: Configure WordPress authentication credentials (`WORDPRESS_USERNAME` and `WORDPRESS_APP_PASSWORD`) for full content access
 
-**Posted first photo instead of continuing from last position**
-```
-Posted position 1 instead of position 21
-```
-- **Cause**: Environment isolation - variables not accessible from workflow context
-- **Solution**: Ensure PAT is added to correct environment (`primary-account`) secrets
+**WordPress authentication setup**
+1. Go to your WordPress admin → Users → Profile
+2. Scroll down to "Application Passwords"
+3. Add a new application password with a descriptive name
+4. Copy the generated password (not your regular password)
+5. Add both `WORDPRESS_USERNAME` and `WORDPRESS_APP_PASSWORD` to GitHub repository secrets
 
-**Variables not being read correctly**
+**Limited blog content in captions**
 ```
-Variable LAST_POSTED_POSITION_72177720326837749 not found, using default: 0
+Using excerpt instead of full editorial content
 ```
-- **Cause**: Workflow running outside environment context or insufficient permissions
-- **Solution**: Verify environment configuration and PAT permissions
+- **Cause**: Unauthenticated requests only receive limited content excerpts
+- **Solution**: WordPress authentication provides access to complete editorial content for richer caption generation
 
 ### Legacy Issues
 
