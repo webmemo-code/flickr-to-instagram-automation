@@ -23,10 +23,10 @@ class StateManager:
         self.logger.info(f"StateManager initialized for account: {self.environment_name}")
     
     def _detect_environment_name(self, account: str) -> str:
-        """Detect GitHub Environment name based on account."""
+        """Detect environment name based on account."""
         if account and account.lower() == 'reisememo':
-            return 'production-social-media-reisememo'
-        return 'production-social-media'
+            return 'SECONDARY_ACCOUNT'
+        return 'PRIMARY_ACCOUNT'
     
     def _get_variable(self, name: str, default: str = "") -> str:
         """Get a state variable value with account-aware naming."""
@@ -46,26 +46,8 @@ class StateManager:
                 self.logger.debug(f"Found environment variable {name} = {env_value} from runtime environment")
                 return env_value
 
-            # Try generic environment variable patterns for state variables
-            # This allows us to pass state variables with generic names from the workflow
-            if name.startswith('LAST_POSTED_POSITION_'):
-                generic_value = os.getenv('LAST_POSTED_POSITION')
-                if generic_value is not None:
-                    self.logger.debug(f"Found generic LAST_POSTED_POSITION = {generic_value} from runtime environment")
-                    return generic_value
-            elif name.startswith('FAILED_POSITIONS_'):
-                generic_value = os.getenv('FAILED_POSITIONS')
-                if generic_value is not None:
-                    self.logger.debug(f"Found generic FAILED_POSITIONS = {generic_value} from runtime environment")
-                    return generic_value
-            elif name.startswith('INSTAGRAM_POSTS_'):
-                generic_value = os.getenv('INSTAGRAM_POSTS')
-                if generic_value is not None:
-                    self.logger.debug(f"Found generic INSTAGRAM_POSTS = {generic_value} from runtime environment")
-                    return generic_value
-
             # Keep the full variable name including album_id for proper isolation
-            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION_72177720326837749
+            # For new architecture: primary-account_LAST_POSTED_POSITION_72177720326837749
             variable_name = name
 
             # Fallback to GitHub CLI environment variables (may fail due to permissions)
@@ -126,20 +108,25 @@ class StateManager:
             return self._set_repository_variable(name, value)
 
     def _is_environment_specific_variable(self, name: str) -> bool:
-        """Determine if a variable should be stored per-environment."""
+        """Determine if a variable should be stored per-environment.
+
+        Due to GitHub Environment Variable API access restrictions,
+        we now use repository variables with environment prefixes for isolation.
+        """
         environment_specific = [
             "LAST_POSTED_POSITION_",
             "FAILED_POSITIONS_",
             "INSTAGRAM_POSTS_"
         ]
-        return any(name.startswith(prefix) for prefix in environment_specific)
+        # Changed from True to False - use repository variables with prefixes instead
+        return False
 
     def _set_environment_variable(self, name: str, value: str) -> bool:
         """Set an environment-specific variable using GitHub CLI."""
         try:
             # Keep the full variable name including album_id for proper isolation
-            # LAST_POSTED_POSITION_72177720326837749 -> LAST_POSTED_POSITION_72177720326837749
-            # This ensures multiple albums in same environment don't conflict
+            # For new architecture: primary-account_LAST_POSTED_POSITION_72177720326837749
+            # This ensures multiple albums and accounts don't conflict
             variable_name = name
 
             cmd = [
@@ -148,12 +135,26 @@ class StateManager:
                 '--body', value
             ]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            # Set GitHub token for CLI authentication
+            env = os.environ.copy()
+            if 'GITHUB_TOKEN' in env:
+                env['GH_TOKEN'] = env['GITHUB_TOKEN']  # GitHub CLI prefers GH_TOKEN
+
+            self.logger.info(f"Executing GitHub CLI command: {' '.join(cmd)}")
+            self.logger.info(f"Environment: {self.environment_name}")
+            self.logger.info(f"Using token: {'Yes' if 'GITHUB_TOKEN' in os.environ else 'No'}")
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+
             if result.returncode == 0:
-                self.logger.debug(f"Set environment variable {variable_name} = {value} for {self.environment_name}")
+                self.logger.info(f"✅ Successfully set environment variable {variable_name} = {value} for {self.environment_name}")
                 return True
             else:
-                self.logger.error(f"Failed to set environment variable {variable_name}: {result.stderr}")
+                self.logger.error(f"❌ Failed to set environment variable {variable_name}")
+                self.logger.error(f"Command: {' '.join(cmd)}")
+                self.logger.error(f"Return code: {result.returncode}")
+                self.logger.error(f"STDERR: {result.stderr}")
+                self.logger.error(f"STDOUT: {result.stdout}")
                 return False
 
         except Exception as e:
@@ -287,7 +288,9 @@ class StateManager:
     def get_last_posted_position(self) -> int:
         """Get the position of the last successfully posted photo."""
         try:
-            position_str = self._get_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", "0")
+            # Use environment-prefixed repository variable for isolation
+            var_name = f"{self.environment_name}_LAST_POSTED_POSITION_{self.current_album_id}"
+            position_str = self._get_variable(var_name, "0")
             return int(position_str)
         except (ValueError, TypeError):
             self.logger.warning(f"Invalid last posted position, defaulting to 0")
@@ -295,12 +298,16 @@ class StateManager:
     
     def set_last_posted_position(self, position: int) -> bool:
         """Set the position of the last successfully posted photo."""
-        return self._set_variable(f"LAST_POSTED_POSITION_{self.current_album_id}", str(position))
+        # Use environment-prefixed repository variable for isolation
+        var_name = f"{self.environment_name}_LAST_POSTED_POSITION_{self.current_album_id}"
+        return self._set_variable(var_name, str(position))
     
     def get_failed_positions(self) -> List[int]:
         """Get list of photo positions that have failed to post."""
         try:
-            failed_data = self._get_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", [])
+            # Use environment-prefixed repository variable for isolation
+            var_name = f"{self.environment_name}_FAILED_POSITIONS_{self.current_album_id}"
+            failed_data = self._get_json_variable(var_name, [])
             return [int(pos) for pos in failed_data if isinstance(pos, (int, str))]
         except (ValueError, TypeError):
             self.logger.warning(f"Invalid failed positions data, defaulting to empty list")
@@ -311,7 +318,9 @@ class StateManager:
         failed_positions = self.get_failed_positions()
         if position not in failed_positions:
             failed_positions.append(position)
-            return self._set_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", failed_positions)
+            # Use environment-prefixed repository variable for isolation
+            var_name = f"{self.environment_name}_FAILED_POSITIONS_{self.current_album_id}"
+            return self._set_json_variable(var_name, failed_positions)
         return True
     
     def remove_failed_position(self, position: int) -> bool:
@@ -319,13 +328,17 @@ class StateManager:
         failed_positions = self.get_failed_positions()
         if position in failed_positions:
             failed_positions.remove(position)
-            return self._set_json_variable(f"FAILED_POSITIONS_{self.current_album_id}", failed_positions)
+            # Use environment-prefixed repository variable for isolation
+            var_name = f"{self.environment_name}_FAILED_POSITIONS_{self.current_album_id}"
+            return self._set_json_variable(var_name, failed_positions)
         return True
     
     
     def get_instagram_posts(self) -> List[Dict]:
         """Get all Instagram post records for the current album."""
-        return self._get_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", [])
+        # Use environment-prefixed repository variable for isolation
+        var_name = f"{self.environment_name}_INSTAGRAM_POSTS_{self.current_album_id}"
+        return self._get_json_variable(var_name, [])
     
     def get_posted_photo_ids(self) -> List[str]:
         """Legacy method for compatibility - returns empty list since we track by position now."""
@@ -406,7 +419,9 @@ class StateManager:
                 self.remove_failed_position(position)
                 
                 # Store Instagram post ID in repository variable for reference
-                instagram_posts = self._get_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", [])
+                # Use environment-prefixed repository variable for isolation
+                var_name = f"{self.environment_name}_INSTAGRAM_POSTS_{self.current_album_id}"
+                instagram_posts = self._get_json_variable(var_name, [])
                 post_record = {
                     "position": position,
                     "photo_id": photo_data['id'],
@@ -415,7 +430,7 @@ class StateManager:
                     "title": title
                 }
                 instagram_posts.append(post_record)
-                self._set_json_variable(f"INSTAGRAM_POSTS_{self.current_album_id}", instagram_posts)
+                self._set_json_variable(var_name, instagram_posts)
                 
                 # Optionally create audit trail issue (disabled by default for scale)
                 issue_number = None

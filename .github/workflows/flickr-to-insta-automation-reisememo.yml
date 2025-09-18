@@ -1,4 +1,4 @@
-name: Flickr to Insta Automation Reisememo
+name: Flickr to Instagram Automation Reisememo
 
 on:
   # Daily posting at 05:11 UTC (07:11 CEST)
@@ -25,8 +25,8 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write    # For legacy GitHub Issues (compatibility)
-  actions: write   # For repository variables state management
+  issues: write        # For legacy GitHub Issues (compatibility)
+  actions: write       # For repository variables state management
 
 jobs:
   automation:
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media-reisememo
+      name: secondary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
@@ -83,6 +83,11 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
@@ -96,10 +101,15 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Check if album is complete
         id: check_complete
@@ -132,20 +142,28 @@ jobs:
               print('Checking album completion status...')
               is_complete = state_manager.is_album_complete(total_photos)
               
+              github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
               github_env = os.environ.get('GITHUB_ENV', '/dev/null')
               if is_complete:
                   print('Reisememo album is complete!')
+                  with open(github_output, 'a') as f:
+                      f.write('album_complete=true\\n')
                   with open(github_env, 'a') as f:
                       f.write('ALBUM_COMPLETE=true\\n')
               else:
                   print('Reisememo album has remaining photos to post')
+                  with open(github_output, 'a') as f:
+                      f.write('album_complete=false\\n')
                   with open(github_env, 'a') as f:
                       f.write('ALBUM_COMPLETE=false\\n')
           except Exception as e:
               print(f'Error checking album completion: {e}')
               traceback.print_exc()
               # Default to not complete on error to allow automation to run
+              github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
               github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              with open(github_output, 'a') as f:
+                  f.write('album_complete=false\\n')
               with open(github_env, 'a') as f:
                   f.write('ALBUM_COMPLETE=false\\n')
               sys.exit(1)
@@ -158,13 +176,18 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Run automation (scheduled)
-        if: ${{ github.event_name == 'schedule' && env.ALBUM_COMPLETE != 'true' }}
+        if: ${{ github.event_name == 'schedule' && steps.check_complete.outputs.album_complete != 'true' }}
         run: |
           echo "Running scheduled automation for Reisememo..."
           python main.py --account reisememo
@@ -176,13 +199,18 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Run automation (manual)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && env.ALBUM_COMPLETE != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && steps.check_complete.outputs.album_complete != 'true' }}
         run: |
           DRY_RUN_FLAG=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then
@@ -199,13 +227,18 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Album complete notification
-        if: ${{ env.ALBUM_COMPLETE == 'true' }}
+        if: ${{ steps.check_complete.outputs.album_complete == 'true' }}
         run: |
           echo "🎉 Reisememo album is complete! All photos have been posted to Instagram."
           echo "The automation will not run until you configure a new album."
@@ -236,7 +269,7 @@ jobs:
           fi
           
           echo "**Account**: Reisememo" >> $GITHUB_STEP_SUMMARY
-          echo "**Album Complete**: ${{ env.ALBUM_COMPLETE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Album Complete**: ${{ steps.check_complete.outputs.album_complete }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
           echo "**Graph API Version**: ${{ vars.GRAPH_API_VERSION || 'v18.0 (default)' }}" >> $GITHUB_STEP_SUMMARY
@@ -259,7 +292,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media-reisememo
+      name: secondary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
@@ -299,14 +332,19 @@ jobs:
           
           photos = flickr_api.get_unposted_photos()
           total_photos = len(photos) if photos else 0
-          
+
+          github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
           github_env = os.environ.get('GITHUB_ENV', '/dev/null')
           if state_manager.is_album_complete(total_photos):
               print('Reisememo album is complete - no retry needed!')
+              with open(github_output, 'a') as f:
+                  f.write('album_complete=true\n')
               with open(github_env, 'a') as f:
                   f.write('ALBUM_COMPLETE=true\n')
           else:
               print('Reisememo album has remaining photos - proceeding with retry')
+              with open(github_output, 'a') as f:
+                  f.write('album_complete=false\n')
               with open(github_env, 'a') as f:
                   f.write('ALBUM_COMPLETE=false\n')
           "
@@ -318,13 +356,18 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Retry automation
-        if: ${{ env.ALBUM_COMPLETE != 'true' }}
+        if: ${{ steps.check_complete_retry.outputs.album_complete != 'true' }}
         run: |
           echo "Retrying automation for Reisememo..."
           python main.py --account reisememo
@@ -336,10 +379,15 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
       - name: Upload retry logs
         if: always()

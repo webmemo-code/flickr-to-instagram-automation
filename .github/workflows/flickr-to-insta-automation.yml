@@ -26,7 +26,7 @@ concurrency:
 permissions:
   contents: read
   issues: write        # For legacy GitHub Issues (compatibility)
-  actions: write       # For repository and environment variables state management
+  actions: write       # For repository variables state management
 
 jobs:
   automation:
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media
+      name: primary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
@@ -79,6 +79,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
@@ -92,10 +94,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Check if album is complete
         id: check_complete
@@ -117,7 +121,7 @@ jobs:
               if not repo_name:
                   raise ValueError('GITHUB_REPOSITORY environment variable not set')
 
-              state_manager = StateManager(config, repo_name, environment_name='production-social-media')
+              state_manager = StateManager(config, repo_name, environment_name='PRIMARY_ACCOUNT')
               flickr_api = FlickrAPI(config)
 
               print('Getting photos from Flickr...')
@@ -162,10 +166,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Run automation (scheduled)
         if: ${{ github.event_name == 'schedule' && steps.check_complete.outputs.album_complete != 'true' }}
@@ -180,10 +186,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Run automation (manual)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && steps.check_complete.outputs.album_complete != 'true' }}
@@ -203,10 +211,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Album complete notification
         if: ${{ steps.check_complete.outputs.album_complete == 'true' }}
@@ -262,7 +272,7 @@ jobs:
     timeout-minutes: 15
     
     environment:
-      name: production-social-media
+      name: primary-account
       url: https://github.com/${{ github.repository }}
     
     steps:
@@ -297,7 +307,7 @@ jobs:
 
           config = Config()
           repo_name = os.getenv('GITHUB_REPOSITORY')
-          state_manager = StateManager(config, repo_name, environment_name='production-social-media')
+          state_manager = StateManager(config, repo_name, environment_name='primary-account')
           flickr_api = FlickrAPI(config)
 
           photos = flickr_api.get_unposted_photos()
@@ -326,10 +336,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Retry automation
         if: ${{ steps.check_complete_retry.outputs.album_complete != 'true' }}
@@ -344,10 +356,12 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
       
       - name: Upload retry logs
         if: always()
