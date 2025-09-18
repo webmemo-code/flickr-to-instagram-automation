@@ -28,6 +28,10 @@ class Config:
         self.flickr_username = os.getenv('FLICKR_USERNAME')  # Flickr username for URLs
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.github_token = os.getenv('GITHUB_TOKEN')
+
+        # WordPress credentials for authenticated content access
+        self.wordpress_username = os.getenv('WORDPRESS_USERNAME')
+        self.wordpress_app_password = os.getenv('WORDPRESS_APP_PASSWORD')
         
         # Account-specific configuration
         if account == 'reisememo':

@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+import base64
 
 
 class BlogContentExtractor:
@@ -71,7 +72,7 @@ class BlogContentExtractor:
 
     def _extract_via_wordpress_api(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
-        Extract content using WordPress REST API.
+        Extract content using WordPress REST API with optional authentication.
 
         Args:
             blog_url: URL of the blog post
@@ -92,8 +93,18 @@ class BlogContentExtractor:
 
             self.logger.info(f"Trying WordPress API for slug: {slug}")
 
-            # Search for post by slug
-            response = self.session.get(api_url, params={'slug': slug}, timeout=30)
+            # Prepare authentication if available
+            auth_headers = {}
+            if self.config.wordpress_username and self.config.wordpress_app_password:
+                # Create Basic Authentication header
+                credentials = f"{self.config.wordpress_username}:{self.config.wordpress_app_password}"
+                encoded_credentials = base64.b64encode(credentials.encode()).decode()
+                auth_headers['Authorization'] = f'Basic {encoded_credentials}'
+                self.logger.info("Using WordPress authentication for full content access")
+
+            # Search for post by slug (with authentication if available)
+            headers = {**self.session.headers, **auth_headers}
+            response = self.session.get(api_url, params={'slug': slug}, headers=headers, timeout=30)
             response.raise_for_status()
 
             posts = response.json()
