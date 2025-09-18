@@ -5,6 +5,8 @@ Fetches and processes blog post content to provide context for photo captions.
 import requests
 import logging
 import re
+import time
+import random
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -18,66 +20,131 @@ class BlogContentExtractor:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        })
+
+        # Rotate through multiple realistic User-Agent strings
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+        ]
+
+        self._update_headers()
     
+    def _update_headers(self):
+        """Update session headers with browser-like values."""
+        user_agent = random.choice(self.user_agents)
+
+        self.session.headers.update({
+            'User-Agent': user_agent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'DNT': '1'
+        })
+
+        # Add referrer if this looks like travelmemo.com
+        if hasattr(self, '_last_url') and 'travelmemo.com' in self._last_url:
+            self.session.headers['Referer'] = 'https://www.google.com/'
+
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
-        Extract structured content from a blog post URL.
-        
+        Extract structured content from a blog post URL with improved bot detection bypass.
+
         Args:
             blog_url: URL of the blog post to analyze
-            
+
         Returns:
             Dict containing extracted content or None if extraction fails
         """
-        try:
-            self.logger.info(f"Extracting content from blog URL: {blog_url}")
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                self.logger.info(f"Extracting content from blog URL: {blog_url} (attempt {attempt + 1}/{max_retries})")
+
+                # Update headers with random user agent for each attempt
+                self._update_headers()
+
+                # Add human-like delay between requests
+                if attempt > 0:
+                    delay = random.uniform(2, 5)  # 2-5 second delay
+                    self.logger.debug(f"Waiting {delay:.1f} seconds before retry...")
+                    time.sleep(delay)
+
+                # Store URL for referrer header
+                self._last_url = blog_url
+
+                # Fetch the blog post content with extended timeout
+                response = self.session.get(blog_url, timeout=45)
+                response.raise_for_status()
+
+                # Parse HTML content
+                soup = BeautifulSoup(response.content, 'html.parser')
+
+                # Extract structured content
+                content_data = {
+                    'url': blog_url,
+                    'title': self._extract_title(soup),
+                    'paragraphs': self._extract_paragraphs(soup),
+                    'images': self._extract_image_references(soup, blog_url),
+                    'headings': self._extract_headings(soup),
+                    'meta_description': self._extract_meta_description(soup)
+                }
+
+                self.logger.info(f"Successfully extracted content: {len(content_data['paragraphs'])} paragraphs, "
+                               f"{len(content_data['images'])} image references")
+
+                return content_data
             
-            # Fetch the blog post content
-            response = self.session.get(blog_url, timeout=30)
-            response.raise_for_status()
-            
-            # Parse HTML content
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Extract structured content
-            content_data = {
-                'url': blog_url,
-                'title': self._extract_title(soup),
-                'paragraphs': self._extract_paragraphs(soup),
-                'images': self._extract_image_references(soup, blog_url),
-                'headings': self._extract_headings(soup),
-                'meta_description': self._extract_meta_description(soup)
-            }
-            
-            self.logger.info(f"Successfully extracted content: {len(content_data['paragraphs'])} paragraphs, "
-                           f"{len(content_data['images'])} image references")
-            
-            return content_data
-            
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 403:
-                self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url}. "
-                                  f"This may be due to bot detection, cookie consent, or Cloudflare protection. "
-                                  f"Caption generation will proceed without blog context.")
-            elif e.response.status_code == 404:
-                self.logger.warning(f"Blog post not found (404) at {blog_url}")
-            else:
-                self.logger.error(f"HTTP error fetching blog content from {blog_url}: {e}")
-            return None
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Failed to fetch blog content from {blog_url}: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error processing blog content: {e}")
-            return None
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 403:
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url} on attempt {attempt + 1}. "
+                                          f"Retrying with different headers...")
+                        continue
+                    else:
+                        self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url} after {max_retries} attempts. "
+                                          f"This may be due to bot detection, cookie consent, or Cloudflare protection. "
+                                          f"Caption generation will proceed without blog context.")
+                elif e.response.status_code == 404:
+                    self.logger.warning(f"Blog post not found (404) at {blog_url}")
+                    break  # Don't retry 404s
+                elif e.response.status_code in [429, 503]:  # Rate limiting or service unavailable
+                    if attempt < max_retries - 1:
+                        delay = (2 ** attempt) + random.uniform(1, 3)  # Exponential backoff
+                        self.logger.warning(f"Rate limited or service unavailable ({e.response.status_code}) from {blog_url}. "
+                                          f"Waiting {delay:.1f} seconds before retry...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        self.logger.error(f"HTTP error fetching blog content from {blog_url} after {max_retries} attempts: {e}")
+                else:
+                    self.logger.error(f"HTTP error fetching blog content from {blog_url}: {e}")
+                    break  # Don't retry other HTTP errors
+                return None
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"Network error fetching blog content from {blog_url} on attempt {attempt + 1}: {e}. Retrying...")
+                    continue
+                else:
+                    self.logger.error(f"Failed to fetch blog content from {blog_url} after {max_retries} attempts: {e}")
+                return None
+            except Exception as e:
+                self.logger.error(f"Error processing blog content: {e}")
+                return None
+
+        # If we get here, all retries failed
+        return None
     
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Extract the blog post title."""
