@@ -56,9 +56,176 @@ class BlogContentExtractor:
         if hasattr(self, '_last_url') and 'travelmemo.com' in self._last_url:
             self.session.headers['Referer'] = 'https://www.google.com/'
 
+    def _extract_url_slug(self, url: str) -> Optional[str]:
+        """Extract the post slug from a URL."""
+        try:
+            parsed = urlparse(url)
+            # Get the last part of the path as the slug
+            path_parts = parsed.path.strip('/').split('/')
+            if path_parts:
+                return path_parts[-1]
+        except Exception as e:
+            self.logger.debug(f"Error extracting slug from URL {url}: {e}")
+        return None
+
+    def _extract_via_wordpress_api(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """
+        Extract content using WordPress REST API.
+
+        Args:
+            blog_url: URL of the blog post
+
+        Returns:
+            Dict containing extracted content or None if extraction fails
+        """
+        try:
+            # Extract slug from URL
+            slug = self._extract_url_slug(blog_url)
+            if not slug:
+                self.logger.debug(f"Could not extract slug from URL: {blog_url}")
+                return None
+
+            # Try WordPress REST API endpoint
+            parsed_url = urlparse(blog_url)
+            api_url = f"{parsed_url.scheme}://{parsed_url.netloc}/wp-json/wp/v2/posts"
+
+            self.logger.info(f"Trying WordPress API for slug: {slug}")
+
+            # Search for post by slug
+            response = self.session.get(api_url, params={'slug': slug}, timeout=30)
+            response.raise_for_status()
+
+            posts = response.json()
+            if not posts or len(posts) == 0:
+                self.logger.debug(f"No posts found for slug: {slug}")
+                return None
+
+            post = posts[0]  # Take the first matching post
+
+            # Extract content from WordPress API response
+            raw_content = post.get('content', {}).get('rendered', '')
+            title = post.get('title', {}).get('rendered', 'Unknown Title')
+            excerpt = post.get('excerpt', {}).get('rendered', '')
+
+            # Clean HTML content
+            if raw_content:
+                soup = BeautifulSoup(raw_content, 'html.parser')
+
+                # Extract paragraphs from cleaned content (enhanced for Elementor)
+                paragraphs = []
+
+                # Handle Elementor content - look for text in various containers
+                elementor_text_selectors = [
+                    '.elementor-widget-text-editor .elementor-widget-container',
+                    '.elementor-text-editor',
+                    '.post-content',
+                    'p'
+                ]
+
+                found_content = False
+                for selector in elementor_text_selectors:
+                    elements = soup.select(selector)
+                    for element in elements:
+                        # Get all text content, including from nested elements
+                        text = element.get_text().strip()
+                        if len(text) > 30:  # Substantial content
+                            # Clean up text
+                            text = re.sub(r'\s+', ' ', text)
+                            # Split into sentences/paragraphs if it's a long block
+                            if len(text) > 500:
+                                # Split on sentence endings
+                                sentences = re.split(r'[.!?]\s+', text)
+                                for sentence in sentences:
+                                    if len(sentence.strip()) > 50:
+                                        paragraphs.append(sentence.strip() + '.')
+                                        found_content = True
+                            else:
+                                paragraphs.append(text)
+                                found_content = True
+
+                # Fallback: extract all paragraphs if Elementor extraction didn't work
+                if not found_content:
+                    for p in soup.find_all('p'):
+                        text = p.get_text().strip()
+                        if len(text) > 50:
+                            text = re.sub(r'\s+', ' ', text)
+                            paragraphs.append(text)
+
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_paragraphs = []
+                for para in paragraphs:
+                    if para not in seen:
+                        seen.add(para)
+                        unique_paragraphs.append(para)
+                paragraphs = unique_paragraphs
+
+                # Extract headings
+                headings = []
+                for level in range(1, 7):
+                    for heading in soup.find_all(f'h{level}'):
+                        text = heading.get_text().strip()
+                        if text:
+                            headings.append({
+                                'level': level,
+                                'text': text
+                            })
+
+                # Extract images
+                images = self._extract_image_references(soup, blog_url)
+
+                # Clean excerpt
+                excerpt_text = ''
+                if excerpt:
+                    excerpt_soup = BeautifulSoup(excerpt, 'html.parser')
+                    excerpt_text = excerpt_soup.get_text().strip()
+
+                content_data = {
+                    'url': blog_url,
+                    'title': title,
+                    'paragraphs': paragraphs,
+                    'images': images,
+                    'headings': headings,
+                    'meta_description': excerpt_text,
+                    'source': 'wordpress_api'
+                }
+
+                self.logger.info(f"Successfully extracted WordPress content: {len(paragraphs)} paragraphs, "
+                               f"{len(images)} image references")
+                return content_data
+
+        except requests.exceptions.RequestException as e:
+            self.logger.debug(f"WordPress API request failed for {blog_url}: {e}")
+        except Exception as e:
+            self.logger.debug(f"WordPress API extraction failed for {blog_url}: {e}")
+
+        return None
+
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
-        Extract structured content from a blog post URL with improved bot detection bypass.
+        Extract structured content from a blog post URL with WordPress API and HTML fallback.
+
+        Args:
+            blog_url: URL of the blog post to analyze
+
+        Returns:
+            Dict containing extracted content or None if extraction fails
+        """
+        # First, try WordPress REST API if this looks like a WordPress site
+        if 'travelmemo.com' in blog_url or 'reisememo.ch' in blog_url:
+            self.logger.info(f"Attempting WordPress API extraction for: {blog_url}")
+            wordpress_content = self._extract_via_wordpress_api(blog_url)
+            if wordpress_content:
+                return wordpress_content
+
+            self.logger.info("WordPress API extraction failed, falling back to HTML scraping")
+
+        # Fallback to HTML scraping with bot detection bypass
+        return self._extract_via_html_scraping(blog_url)
+
+    def _extract_via_html_scraping(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """
+        Extract content via HTML scraping with bot detection bypass.
 
         Args:
             blog_url: URL of the blog post to analyze
@@ -98,10 +265,11 @@ class BlogContentExtractor:
                     'paragraphs': self._extract_paragraphs(soup),
                     'images': self._extract_image_references(soup, blog_url),
                     'headings': self._extract_headings(soup),
-                    'meta_description': self._extract_meta_description(soup)
+                    'meta_description': self._extract_meta_description(soup),
+                    'source': 'html_scraping'
                 }
 
-                self.logger.info(f"Successfully extracted content: {len(content_data['paragraphs'])} paragraphs, "
+                self.logger.info(f"Successfully extracted HTML content: {len(content_data['paragraphs'])} paragraphs, "
                                f"{len(content_data['images'])} image references")
 
                 return content_data
