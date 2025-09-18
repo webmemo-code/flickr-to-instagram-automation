@@ -83,6 +83,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -103,6 +105,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -176,6 +180,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -197,6 +203,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -223,6 +231,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -350,6 +360,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
@@ -371,6 +383,8 @@ jobs:
           GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
           LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
