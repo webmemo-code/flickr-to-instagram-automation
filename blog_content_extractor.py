@@ -7,6 +7,7 @@ import logging
 import re
 import time
 import random
+import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -201,9 +202,126 @@ class BlogContentExtractor:
 
         return None
 
+    def _extract_via_rss_feed(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """
+        Extract content using RSS feed.
+
+        Args:
+            blog_url: URL of the blog post
+
+        Returns:
+            Dict containing extracted content or None if extraction fails
+        """
+        try:
+            # Try common RSS feed URLs
+            parsed_url = urlparse(blog_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+            rss_urls = [
+                f"{base_url}/feed/",
+                f"{base_url}/feed",
+                f"{base_url}/rss/",
+                f"{base_url}/rss",
+                f"{base_url}/index.xml"
+            ]
+
+            for rss_url in rss_urls:
+                try:
+                    self.logger.debug(f"Trying RSS feed: {rss_url}")
+                    response = self.session.get(rss_url, timeout=30)
+                    response.raise_for_status()
+
+                    # Parse RSS XML
+                    root = ET.fromstring(response.content)
+
+                    # Find the channel
+                    channel = root.find('channel')
+                    if not channel:
+                        continue
+
+                    # Find items
+                    items = channel.findall('item')
+                    if not items:
+                        continue
+
+                    # Look for our specific post by URL
+                    for item in items:
+                        link_elem = item.find('link')
+                        if link_elem is not None and link_elem.text:
+                            if blog_url.rstrip('/') in link_elem.text.rstrip('/'):
+                                # Found our post!
+                                title_elem = item.find('title')
+                                description_elem = item.find('description')
+
+                                # Look for full content in content:encoded or other namespaces
+                                content_elem = None
+                                for child in item:
+                                    if 'content' in child.tag.lower():
+                                        content_elem = child
+                                        break
+
+                                # Extract content
+                                title = title_elem.text if title_elem is not None else 'Unknown Title'
+                                description = description_elem.text if description_elem is not None else ''
+                                full_content = content_elem.text if content_elem is not None else ''
+
+                                # Use full content if available, otherwise description
+                                content_text = full_content if full_content else description
+
+                                if content_text:
+                                    # Parse HTML content
+                                    soup = BeautifulSoup(content_text, 'html.parser')
+
+                                    # Extract paragraphs
+                                    paragraphs = []
+                                    for p in soup.find_all('p'):
+                                        text = p.get_text().strip()
+                                        if len(text) > 50:
+                                            text = re.sub(r'\s+', ' ', text)
+                                            paragraphs.append(text)
+
+                                    # If no paragraphs found, use the whole text
+                                    if not paragraphs and content_text:
+                                        clean_text = soup.get_text().strip()
+                                        if len(clean_text) > 50:
+                                            paragraphs = [clean_text]
+
+                                    # Extract other elements
+                                    headings = self._extract_headings(soup)
+                                    images = self._extract_image_references(soup, blog_url)
+
+                                    content_data = {
+                                        'url': blog_url,
+                                        'title': title,
+                                        'paragraphs': paragraphs,
+                                        'images': images,
+                                        'headings': headings,
+                                        'meta_description': description,
+                                        'source': 'rss_feed'
+                                    }
+
+                                    self.logger.info(f"Successfully extracted RSS content: {len(paragraphs)} paragraphs, "
+                                                   f"{len(images)} image references")
+                                    return content_data
+
+                    # Post not found in this feed, try next RSS URL
+                    continue
+
+                except ET.ParseError as e:
+                    self.logger.debug(f"Failed to parse RSS XML from {rss_url}: {e}")
+                    continue
+                except requests.exceptions.RequestException as e:
+                    self.logger.debug(f"Failed to fetch RSS from {rss_url}: {e}")
+                    continue
+
+        except Exception as e:
+            self.logger.debug(f"RSS extraction failed for {blog_url}: {e}")
+
+        return None
+
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
-        Extract structured content from a blog post URL with WordPress API and HTML fallback.
+        Extract structured content from a blog post URL with WordPress API, RSS, and HTML fallbacks.
 
         Args:
             blog_url: URL of the blog post to analyze
@@ -218,7 +336,14 @@ class BlogContentExtractor:
             if wordpress_content:
                 return wordpress_content
 
-            self.logger.info("WordPress API extraction failed, falling back to HTML scraping")
+            self.logger.info("WordPress API extraction failed, trying RSS feed")
+
+            # Try RSS feed as second option
+            rss_content = self._extract_via_rss_feed(blog_url)
+            if rss_content:
+                return rss_content
+
+            self.logger.info("RSS extraction failed, falling back to HTML scraping")
 
         # Fallback to HTML scraping with bot detection bypass
         return self._extract_via_html_scraping(blog_url)
