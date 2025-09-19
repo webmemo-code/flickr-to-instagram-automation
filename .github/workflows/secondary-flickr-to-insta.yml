@@ -3,10 +3,10 @@ run-name: "Secondary Account - ${{ github.event_name == 'schedule' && 'Scheduled
 
 on:
   # Daily posting at 05:11 UTC (07:11 CEST)
-  schedule:
-  #  - cron: '11 5 * * *'
-  #  - cron: '15 11 * * *'  # Test run
-  
+  # schedule:
+  #   - cron: '11 5 * * *'
+  #   - cron: '15 11 * * *'  # Test run
+
   # Manual trigger with options
   workflow_dispatch:
     inputs:

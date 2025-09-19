@@ -3,10 +3,10 @@ run-name: "Primary Account - ${{ github.event_name == 'schedule' && 'Scheduled' 
 
 on:
   # Daily posting at 18:13 UTC (20:13 CEST)
-  schedule:
-   # - cron: '13 18 * * *'
-   # - cron: '43 09 * * *' # Posting only one Sardinia photo per day for now
-  
+  # schedule:
+  #   - cron: '13 18 * * *'
+  #   - cron: '43 09 * * *' # Posting only one Sardinia photo per day for now
+
   # Manual trigger with options
   workflow_dispatch:
     inputs:
