@@ -1,4 +1,4 @@
-name: Flickr to Instagram Automation
+name: Primary Flickr to Instagram Automation
 
 on:
   # Daily posting at 18:13 UTC (20:13 CEST)

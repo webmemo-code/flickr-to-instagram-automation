@@ -47,7 +47,7 @@ class StateManager:
                 return env_value
 
             # Keep the full variable name including album_id for proper isolation
-            # For new architecture: primary-account_LAST_POSTED_POSITION_72177720326837749
+            # Variables now use environment prefixes for account isolation
             variable_name = name
 
             # Fallback to GitHub CLI environment variables (may fail due to permissions)
@@ -114,9 +114,8 @@ class StateManager:
         we now use repository variables with environment prefixes for isolation.
         """
         environment_specific = [
-            "LAST_POSTED_POSITION_",
             "FAILED_POSITIONS_",
-            "INSTAGRAM_POSTS_"
+            "INSTA_POSTS_"
         ]
         # Changed from True to False - use repository variables with prefixes instead
         return False
@@ -125,7 +124,7 @@ class StateManager:
         """Set an environment-specific variable using GitHub CLI."""
         try:
             # Keep the full variable name including album_id for proper isolation
-            # For new architecture: primary-account_LAST_POSTED_POSITION_72177720326837749
+            # Variables now use environment prefixes for account isolation
             # This ensures multiple albums and accounts don't conflict
             variable_name = name
 
@@ -286,21 +285,24 @@ class StateManager:
         return True
     
     def get_last_posted_position(self) -> int:
-        """Get the position of the last successfully posted photo."""
+        """Get the position of the last successfully posted photo from Instagram posts array."""
         try:
-            # Use environment-prefixed repository variable for isolation
-            var_name = f"{self.environment_name}_LAST_POSTED_POSITION_{self.current_album_id}"
-            position_str = self._get_variable(var_name, "0")
-            return int(position_str)
-        except (ValueError, TypeError):
-            self.logger.warning(f"Invalid last posted position, defaulting to 0")
+            instagram_posts = self.get_instagram_posts()
+            if not instagram_posts:
+                return 0
+
+            # Find the highest position number from posted photos
+            max_position = max(post.get('position', 0) for post in instagram_posts)
+            self.logger.debug(f"Last posted position derived from Instagram posts: {max_position}")
+            return max_position
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Error deriving last posted position from Instagram posts: {e}, defaulting to 0")
             return 0
     
     def set_last_posted_position(self, position: int) -> bool:
-        """Set the position of the last successfully posted photo."""
-        # Use environment-prefixed repository variable for isolation
-        var_name = f"{self.environment_name}_LAST_POSTED_POSITION_{self.current_album_id}"
-        return self._set_variable(var_name, str(position))
+        """Deprecated: Position is now tracked via Instagram posts array only."""
+        self.logger.debug(f"set_last_posted_position({position}) - deprecated, position tracked in Instagram posts array")
+        return True  # Always return True since this is now handled by create_post_record
     
     def get_failed_positions(self) -> List[int]:
         """Get list of photo positions that have failed to post."""
@@ -337,7 +339,7 @@ class StateManager:
     def get_instagram_posts(self) -> List[Dict]:
         """Get all Instagram post records for the current album."""
         # Use environment-prefixed repository variable for isolation
-        var_name = f"{self.environment_name}_INSTAGRAM_POSTS_{self.current_album_id}"
+        var_name = f"{self.environment_name}_INSTA_POSTS_{self.current_album_id}"
         return self._get_json_variable(var_name, [])
     
     def get_posted_photo_ids(self) -> List[str]:
@@ -412,15 +414,12 @@ class StateManager:
             
             # For successful posts, update position tracking
             if instagram_post_id:
-                # Update last posted position
-                self.set_last_posted_position(position)
-                
                 # Remove from failed positions if it was there
                 self.remove_failed_position(position)
                 
                 # Store Instagram post ID in repository variable for reference
                 # Use environment-prefixed repository variable for isolation
-                var_name = f"{self.environment_name}_INSTAGRAM_POSTS_{self.current_album_id}"
+                var_name = f"{self.environment_name}_INSTA_POSTS_{self.current_album_id}"
                 instagram_posts = self._get_json_variable(var_name, [])
                 post_record = {
                     "position": position,

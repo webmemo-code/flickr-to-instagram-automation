@@ -451,10 +451,9 @@ python main.py --stats
 The system uses **Repository Variables** for scalable state tracking:
 
 ### State Variables Created
-- `LAST_POSTED_POSITION_{album_id}` - Current progression through album
 - `TOTAL_ALBUM_PHOTOS_{album_id}` - Total photos in album  
 - `FAILED_POSITIONS_{album_id}` - Failed positions for retry
-- `INSTAGRAM_POSTS_{album_id}` - Complete Instagram post audit trail
+- `INSTA_POSTS_{album_id}` - Complete Instagram post audit trail
 
 ### Optional Audit Issues
 Set `CREATE_AUDIT_ISSUES=true` in repository variables to create GitHub Issues for audit trail (disabled by default for scalability)
@@ -476,7 +475,7 @@ This shows:
 
 ### Check Individual Posts
 View repository variables or optional GitHub Issues (if enabled) to see:
-- Each photo that was posted (stored in `INSTAGRAM_POSTS_{album_id}` variable)
+- Each photo that was posted (stored in `INSTA_POSTS_{album_id}` variable)
 - Instagram post IDs and timestamps
 - Current position and failed positions
 - Complete audit trail without repository pollution

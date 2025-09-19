@@ -1,4 +1,4 @@
-name: Flickr to Instagram Automation Reisememo
+name: Secondary Flickr to Instagram Automation
 
 on:
   # Daily posting at 05:11 UTC (07:11 CEST)
@@ -85,7 +85,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -107,7 +106,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -182,7 +180,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -205,7 +202,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -233,7 +229,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -362,7 +357,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -385,7 +379,6 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          LAST_POSTED_POSITION: ${{ vars.LAST_POSTED_POSITION }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
