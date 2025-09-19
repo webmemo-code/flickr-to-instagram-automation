@@ -162,6 +162,22 @@ class BlogContentExtractor:
 
             # Check if we have a successful response
             if not success or not response or response.status_code != 200:
+                self.logger.warning("WordPress API completely failed - attempting direct page scraping as fallback")
+                # Try direct page scraping when API completely fails
+                fallback_data = self._try_direct_page_scraping_structured(blog_url)
+                if fallback_data and fallback_data.get('paragraphs'):
+                    self.logger.info(f"Direct page scraping successful as API fallback - got {len(fallback_data['paragraphs'])} paragraphs")
+                    content_data = {
+                        'url': blog_url,
+                        'title': fallback_data.get('title', 'Unknown Title'),
+                        'paragraphs': fallback_data['paragraphs'],
+                        'images': fallback_data.get('images', []),
+                        'headings': fallback_data.get('headings', []),
+                        'meta_description': '',
+                        'source': 'direct_scraping_api_fallback'
+                    }
+                    self.logger.info(f"Successfully extracted content via direct scraping API fallback: {len(content_data['paragraphs'])} paragraphs")
+                    return content_data
                 return None
 
             posts = response.json()
@@ -468,9 +484,19 @@ class BlogContentExtractor:
             # Extract images
             images = self._extract_image_references(soup, blog_url)
 
+            # Extract title from page
+            title = 'Unknown Title'
+            title_selectors = ['h1', 'title', '.entry-title', '.post-title', 'h1.title']
+            for selector in title_selectors:
+                element = soup.select_one(selector)
+                if element:
+                    title = element.get_text().strip()
+                    break
+
             if paragraphs:
                 self.logger.debug(f"Structured scraping extracted {len(paragraphs)} paragraphs, {len(headings)} headings, {len(images)} images")
                 return {
+                    'title': title,
                     'paragraphs': paragraphs,
                     'headings': headings,
                     'images': images
