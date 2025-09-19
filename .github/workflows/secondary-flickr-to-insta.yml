@@ -1,4 +1,5 @@
 name: Secondary Flickr to Instagram Automation
+run-name: "Secondary Account - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
 
 on:
   # Daily posting at 05:11 UTC (07:11 CEST)
