@@ -112,3 +112,7 @@ PLANNING.md
 TASKS.md
 TODO.md
 CLAUDE.md
+
+# WordPress plugin files (deployment templates)
+*.php
+*.zip

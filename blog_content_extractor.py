@@ -10,6 +10,7 @@ from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import base64
+from custom_endpoint_extractor import CustomEndpointExtractor
 
 
 class BlogContentExtractor:
@@ -20,6 +21,7 @@ class BlogContentExtractor:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.session = requests.Session()
+        self.custom_extractor = CustomEndpointExtractor(config)
 
         # Rotate through multiple realistic User-Agent strings
         self.user_agents = [
@@ -519,13 +521,20 @@ class BlogContentExtractor:
         """
         # Try WordPress REST API if this looks like a WordPress site
         if 'travelmemo.com' in blog_url or 'reisememo.ch' in blog_url:
-            self.logger.info(f"Attempting WordPress API extraction for: {blog_url}")
+            # First try custom endpoint (most reliable)
+            self.logger.info(f"Attempting custom endpoint extraction for: {blog_url}")
+            custom_content = self.custom_extractor.extract_via_custom_endpoint(blog_url)
+            if custom_content:
+                return custom_content
+
+            # Fallback to standard WordPress API
+            self.logger.info(f"Custom endpoint failed, trying standard WordPress API for: {blog_url}")
             wordpress_content = self._extract_via_wordpress_api(blog_url)
             if wordpress_content:
                 return wordpress_content
 
-            # If WordPress API completely failed, try direct page scraping as final fallback
-            self.logger.warning("WordPress API extraction failed - attempting direct page scraping as final fallback")
+            # If both APIs failed, try direct page scraping as final fallback
+            self.logger.warning("All API methods failed - attempting direct page scraping as final fallback")
             fallback_data = self._try_direct_page_scraping_structured(blog_url)
             if fallback_data and fallback_data.get('paragraphs'):
                 self.logger.info(f"Final fallback successful - got {len(fallback_data['paragraphs'])} paragraphs via direct scraping")
