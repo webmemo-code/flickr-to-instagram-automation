@@ -524,7 +524,24 @@ class BlogContentExtractor:
             if wordpress_content:
                 return wordpress_content
 
-            self.logger.info("WordPress API extraction failed. Caption generation will proceed without blog context.")
+            # If WordPress API completely failed, try direct page scraping as final fallback
+            self.logger.warning("WordPress API extraction failed - attempting direct page scraping as final fallback")
+            fallback_data = self._try_direct_page_scraping_structured(blog_url)
+            if fallback_data and fallback_data.get('paragraphs'):
+                self.logger.info(f"Final fallback successful - got {len(fallback_data['paragraphs'])} paragraphs via direct scraping")
+                content_data = {
+                    'url': blog_url,
+                    'title': fallback_data.get('title', 'Unknown Title'),
+                    'paragraphs': fallback_data['paragraphs'],
+                    'images': fallback_data.get('images', []),
+                    'headings': fallback_data.get('headings', []),
+                    'meta_description': '',
+                    'source': 'direct_scraping_final_fallback'
+                }
+                self.logger.info(f"Successfully extracted content via final fallback: {len(content_data['paragraphs'])} paragraphs")
+                return content_data
+
+            self.logger.warning("All extraction methods failed. Caption generation will proceed without blog context.")
 
         return None
 
