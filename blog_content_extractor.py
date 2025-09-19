@@ -5,6 +5,7 @@ Fetches and processes blog post content to provide context for photo captions.
 import requests
 import logging
 import re
+import random
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
