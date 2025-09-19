@@ -8,7 +8,7 @@ import re
 import random
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 import base64
 
 
@@ -103,11 +103,16 @@ class BlogContentExtractor:
                 self.logger.info("WordPress credentials available - will try with authentication")
 
             # First try with authentication if available, then without if it fails
+            response = None
+            success = False
+
             for attempt in ['with_auth', 'without_auth']:
                 if attempt == 'with_auth' and not use_auth:
+                    self.logger.debug("Skipping auth attempt - no credentials available")
                     continue  # Skip if no auth available
                 if attempt == 'without_auth' and not use_auth:
-                    break  # No need for second attempt if we never tried auth
+                    self.logger.debug("No auth available, trying without authentication")
+                    pass  # Continue with no-auth attempt
 
                 # Use browser-like headers to avoid Mod_Security blocking
                 api_headers = {
@@ -138,6 +143,7 @@ class BlogContentExtractor:
 
                     if response.status_code == 200:
                         self.logger.info(f"WordPress API successful ({attempt})")
+                        success = True
                         break
                     elif response.status_code == 403 and attempt == 'with_auth':
                         self.logger.warning(f"WordPress API authentication failed (403), trying without authentication")
@@ -154,8 +160,8 @@ class BlogContentExtractor:
                         return None
                     continue
 
-            # If we get here, we should have a successful response
-            if response.status_code != 200:
+            # Check if we have a successful response
+            if not success or not response or response.status_code != 200:
                 return None
 
             posts = response.json()
@@ -169,6 +175,44 @@ class BlogContentExtractor:
             raw_content = post.get('content', {}).get('rendered', '')
             title = post.get('title', {}).get('rendered', 'Unknown Title')
             excerpt = post.get('excerpt', {}).get('rendered', '')
+
+            # Check for Elementor read-more truncation
+            is_truncated = 'elementor-widget-read-more' in raw_content and len(raw_content) < 2000
+            if is_truncated:
+                self.logger.warning(f"Detected Elementor read-more widget - content appears truncated ({len(raw_content)} chars)")
+                self.logger.info("Attempting direct page scraping as fallback for truncated content")
+
+                # Try direct page scraping as fallback
+                fallback_data = self._try_direct_page_scraping_structured(blog_url)
+                if fallback_data and fallback_data.get('paragraphs'):
+                    total_fallback_chars = sum(len(p) for p in fallback_data['paragraphs'])
+                    if total_fallback_chars > len(raw_content):
+                        self.logger.info(f"Direct page scraping successful - got {total_fallback_chars} chars vs {len(raw_content)} from API")
+                        # Use the structured data directly instead of processing HTML again
+                        # Clean excerpt text
+                        excerpt_text = ''
+                        if excerpt:
+                            excerpt_soup = BeautifulSoup(excerpt, 'html.parser')
+                            excerpt_text = excerpt_soup.get_text().strip()
+
+                        content_data = {
+                            'url': blog_url,
+                            'title': title,
+                            'paragraphs': fallback_data['paragraphs'],
+                            'images': fallback_data.get('images', []),
+                            'headings': fallback_data.get('headings', []),
+                            'meta_description': excerpt_text,
+                            'source': 'direct_scraping'
+                        }
+                        self.logger.info(f"Successfully extracted content via direct scraping: {len(content_data['paragraphs'])} paragraphs")
+                        return content_data
+                else:
+                    # Fall back to excerpt if available and longer
+                    if excerpt and len(excerpt.strip()) > len(raw_content.strip()):
+                        self.logger.info("Using excerpt content as it's longer than truncated main content")
+                        raw_content = excerpt
+                    else:
+                        self.logger.warning("No better content source available - proceeding with truncated API content")
 
             # Clean HTML content
             if raw_content:
@@ -264,6 +308,178 @@ class BlogContentExtractor:
 
         return None
 
+    def _try_direct_page_scraping(self, blog_url: str) -> Optional[str]:
+        """
+        Try to scrape content directly from the blog page as fallback for Elementor read-more limitation.
+
+        Args:
+            blog_url: URL of the blog post
+
+        Returns:
+            Extracted text content or None if scraping fails
+        """
+        try:
+            self.logger.debug(f"Attempting direct page scraping for: {blog_url}")
+
+            # Use browser-like headers with cookie consent
+            scraping_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+                # Add cookies to bypass consent banners
+                'Cookie': 'cmplz_marketing=allow; cmplz_statistics=allow; cmplz_functional=allow; wp_has_consent=1'
+            }
+
+            response = self.session.get(blog_url, headers=scraping_headers, timeout=30)
+
+            if response.status_code != 200:
+                self.logger.debug(f"Direct page scraping failed with status {response.status_code}")
+                return None
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Try to find main content area with Elementor-specific selectors
+            content_selectors = [
+                '.elementor-widget-text-editor .elementor-widget-container',
+                '.elementor-text-editor',
+                '.entry-content',
+                '.post-content',
+                '.content',
+                'article',
+                'main'
+            ]
+
+            extracted_text = []
+
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                for element in elements:
+                    # Skip read-more widgets and other navigation elements
+                    if any(cls in element.get('class', []) for cls in ['read-more', 'navigation', 'menu']):
+                        continue
+
+                    text = element.get_text().strip()
+                    if len(text) > 50:  # Only substantial content
+                        # Clean up text
+                        text = re.sub(r'\s+', ' ', text)
+                        extracted_text.append(text)
+
+                # If we found content with this selector, no need to try others
+                if extracted_text:
+                    break
+
+            if extracted_text:
+                combined_text = ' '.join(extracted_text)
+                # Remove duplicates and clean up
+                combined_text = re.sub(r'\s+', ' ', combined_text).strip()
+
+                if len(combined_text) > 200:  # Minimum useful content length
+                    self.logger.debug(f"Direct scraping extracted {len(combined_text)} characters")
+                    return combined_text
+
+        except Exception as e:
+            self.logger.debug(f"Direct page scraping failed for {blog_url}: {e}")
+
+        return None
+
+    def _try_direct_page_scraping_structured(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """
+        Try to scrape and structure content directly from the blog page.
+
+        Args:
+            blog_url: URL of the blog post
+
+        Returns:
+            Structured content dict or None if scraping fails
+        """
+        try:
+            self.logger.debug(f"Attempting structured direct page scraping for: {blog_url}")
+
+            # Use browser-like headers with cookie consent
+            scraping_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+                # Add cookies to bypass consent banners
+                'Cookie': 'cmplz_marketing=allow; cmplz_statistics=allow; cmplz_functional=allow; wp_has_consent=1'
+            }
+
+            response = self.session.get(blog_url, headers=scraping_headers, timeout=30)
+
+            if response.status_code != 200:
+                self.logger.debug(f"Direct page scraping failed with status {response.status_code}")
+                return None
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Extract paragraphs using Elementor-specific selectors
+            paragraphs = []
+            content_selectors = [
+                '.elementor-widget-text-editor .elementor-widget-container p',
+                '.elementor-text-editor p',
+                '.entry-content p',
+                '.post-content p',
+                '.content p',
+                'article p',
+                'main p'
+            ]
+
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                for element in elements:
+                    text = element.get_text().strip()
+                    if len(text) > 50:  # Only substantial paragraphs
+                        # Clean up text
+                        text = re.sub(r'\s+', ' ', text)
+                        if text not in paragraphs:  # Avoid duplicates
+                            paragraphs.append(text)
+
+                # If we found content with this selector, use it
+                if paragraphs:
+                    break
+
+            # Extract headings
+            headings = []
+            for level in range(1, 7):
+                for heading in soup.find_all(f'h{level}'):
+                    text = heading.get_text().strip()
+                    if text:
+                        headings.append({
+                            'level': level,
+                            'text': text
+                        })
+
+            # Extract images
+            images = self._extract_image_references(soup, blog_url)
+
+            if paragraphs:
+                self.logger.debug(f"Structured scraping extracted {len(paragraphs)} paragraphs, {len(headings)} headings, {len(images)} images")
+                return {
+                    'paragraphs': paragraphs,
+                    'headings': headings,
+                    'images': images
+                }
+
+        except Exception as e:
+            self.logger.debug(f"Structured direct page scraping failed for {blog_url}: {e}")
+
+        return None
 
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
