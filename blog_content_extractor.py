@@ -5,12 +5,9 @@ Fetches and processes blog post content to provide context for photo captions.
 import requests
 import logging
 import re
-import time
-import random
-import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 import base64
 
 
@@ -95,40 +92,70 @@ class BlogContentExtractor:
 
             # Prepare authentication if available
             auth_headers = {}
+            use_auth = False
             if self.config.wordpress_username and self.config.wordpress_app_password:
                 # Create Basic Authentication header
                 credentials = f"{self.config.wordpress_username}:{self.config.wordpress_app_password}"
                 encoded_credentials = base64.b64encode(credentials.encode()).decode()
                 auth_headers['Authorization'] = f'Basic {encoded_credentials}'
-                self.logger.info("Using WordPress authentication for full content access")
+                use_auth = True
+                self.logger.info("WordPress credentials available - will try with authentication")
 
-            # Search for post by slug (with authentication if available)
-            # Use browser-like headers to avoid Mod_Security blocking
-            api_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Referer': blog_url,
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                **auth_headers
-            }
-            self.logger.debug(f"WordPress API request URL: {api_url}?slug={slug}")
-            self.logger.debug(f"WordPress API request headers: {dict(api_headers)}")
+            # First try with authentication if available, then without if it fails
+            for attempt in ['with_auth', 'without_auth']:
+                if attempt == 'with_auth' and not use_auth:
+                    continue  # Skip if no auth available
+                if attempt == 'without_auth' and not use_auth:
+                    break  # No need for second attempt if we never tried auth
 
-            response = self.session.get(api_url, params={'slug': slug}, headers=api_headers, timeout=30)
+                # Use browser-like headers to avoid Mod_Security blocking
+                api_headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json, text/plain, */*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Referer': blog_url,
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'same-origin'
+                }
 
-            self.logger.debug(f"WordPress API response status: {response.status_code}")
-            self.logger.debug(f"WordPress API response headers: {dict(response.headers)}")
+                # Add auth headers only on first attempt
+                if attempt == 'with_auth':
+                    api_headers.update(auth_headers)
+                    self.logger.info("Trying WordPress API with authentication")
+                else:
+                    self.logger.info("Trying WordPress API without authentication")
 
+                self.logger.debug(f"WordPress API request URL: {api_url}?slug={slug}")
+
+                try:
+                    response = self.session.get(api_url, params={'slug': slug}, headers=api_headers, timeout=30)
+
+                    self.logger.debug(f"WordPress API response status: {response.status_code}")
+
+                    if response.status_code == 200:
+                        self.logger.info(f"WordPress API successful ({attempt})")
+                        break
+                    elif response.status_code == 403 and attempt == 'with_auth':
+                        self.logger.warning(f"WordPress API authentication failed (403), trying without authentication")
+                        continue
+                    else:
+                        self.logger.error(f"WordPress API returned status {response.status_code}: {response.text[:200]}")
+                        if attempt == 'without_auth' or not use_auth:
+                            return None
+                        continue
+
+                except Exception as e:
+                    self.logger.warning(f"WordPress API error ({attempt}): {e}")
+                    if attempt == 'without_auth' or not use_auth:
+                        return None
+                    continue
+
+            # If we get here, we should have a successful response
             if response.status_code != 200:
-                self.logger.error(f"WordPress API returned status {response.status_code}: {response.text[:500]}")
                 return None
-
-            response.raise_for_status()
 
             posts = response.json()
             if not posts or len(posts) == 0:
@@ -236,126 +263,10 @@ class BlogContentExtractor:
 
         return None
 
-    def _extract_via_rss_feed(self, blog_url: str) -> Optional[Dict[str, any]]:
-        """
-        Extract content using RSS feed.
-
-        Args:
-            blog_url: URL of the blog post
-
-        Returns:
-            Dict containing extracted content or None if extraction fails
-        """
-        try:
-            # Try common RSS feed URLs
-            parsed_url = urlparse(blog_url)
-            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-
-            rss_urls = [
-                f"{base_url}/feed/",
-                f"{base_url}/feed",
-                f"{base_url}/rss/",
-                f"{base_url}/rss",
-                f"{base_url}/index.xml"
-            ]
-
-            for rss_url in rss_urls:
-                try:
-                    self.logger.debug(f"Trying RSS feed: {rss_url}")
-                    response = self.session.get(rss_url, timeout=30)
-                    response.raise_for_status()
-
-                    # Parse RSS XML
-                    root = ET.fromstring(response.content)
-
-                    # Find the channel
-                    channel = root.find('channel')
-                    if not channel:
-                        continue
-
-                    # Find items
-                    items = channel.findall('item')
-                    if not items:
-                        continue
-
-                    # Look for our specific post by URL
-                    for item in items:
-                        link_elem = item.find('link')
-                        if link_elem is not None and link_elem.text:
-                            if blog_url.rstrip('/') in link_elem.text.rstrip('/'):
-                                # Found our post!
-                                title_elem = item.find('title')
-                                description_elem = item.find('description')
-
-                                # Look for full content in content:encoded or other namespaces
-                                content_elem = None
-                                for child in item:
-                                    if 'content' in child.tag.lower():
-                                        content_elem = child
-                                        break
-
-                                # Extract content
-                                title = title_elem.text if title_elem is not None else 'Unknown Title'
-                                description = description_elem.text if description_elem is not None else ''
-                                full_content = content_elem.text if content_elem is not None else ''
-
-                                # Use full content if available, otherwise description
-                                content_text = full_content if full_content else description
-
-                                if content_text:
-                                    # Parse HTML content
-                                    soup = BeautifulSoup(content_text, 'html.parser')
-
-                                    # Extract paragraphs
-                                    paragraphs = []
-                                    for p in soup.find_all('p'):
-                                        text = p.get_text().strip()
-                                        if len(text) > 50:
-                                            text = re.sub(r'\s+', ' ', text)
-                                            paragraphs.append(text)
-
-                                    # If no paragraphs found, use the whole text
-                                    if not paragraphs and content_text:
-                                        clean_text = soup.get_text().strip()
-                                        if len(clean_text) > 50:
-                                            paragraphs = [clean_text]
-
-                                    # Extract other elements
-                                    headings = self._extract_headings(soup)
-                                    images = self._extract_image_references(soup, blog_url)
-
-                                    content_data = {
-                                        'url': blog_url,
-                                        'title': title,
-                                        'paragraphs': paragraphs,
-                                        'images': images,
-                                        'headings': headings,
-                                        'meta_description': description,
-                                        'source': 'rss_feed'
-                                    }
-
-                                    self.logger.info(f"Successfully extracted RSS content: {len(paragraphs)} paragraphs, "
-                                                   f"{len(images)} image references")
-                                    return content_data
-
-                    # Post not found in this feed, try next RSS URL
-                    continue
-
-                except ET.ParseError as e:
-                    self.logger.debug(f"Failed to parse RSS XML from {rss_url}: {e}")
-                    continue
-                except requests.exceptions.RequestException as e:
-                    self.logger.debug(f"Failed to fetch RSS from {rss_url}: {e}")
-                    continue
-
-        except Exception as e:
-            self.logger.debug(f"RSS extraction failed for {blog_url}: {e}")
-
-        return None
 
     def extract_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
-        Extract structured content from a blog post URL with WordPress API, RSS, and HTML fallbacks.
+        Extract structured content from a blog post URL using WordPress API.
 
         Args:
             blog_url: URL of the blog post to analyze
@@ -363,116 +274,17 @@ class BlogContentExtractor:
         Returns:
             Dict containing extracted content or None if extraction fails
         """
-        # First, try WordPress REST API if this looks like a WordPress site
+        # Try WordPress REST API if this looks like a WordPress site
         if 'travelmemo.com' in blog_url or 'reisememo.ch' in blog_url:
             self.logger.info(f"Attempting WordPress API extraction for: {blog_url}")
             wordpress_content = self._extract_via_wordpress_api(blog_url)
             if wordpress_content:
                 return wordpress_content
 
-            self.logger.info("WordPress API extraction failed, trying RSS feed")
+            self.logger.info("WordPress API extraction failed. Caption generation will proceed without blog context.")
 
-            # Try RSS feed as second option
-            rss_content = self._extract_via_rss_feed(blog_url)
-            if rss_content:
-                return rss_content
-
-            self.logger.info("RSS extraction failed, falling back to HTML scraping")
-
-        # Fallback to HTML scraping with bot detection bypass
-        return self._extract_via_html_scraping(blog_url)
-
-    def _extract_via_html_scraping(self, blog_url: str) -> Optional[Dict[str, any]]:
-        """
-        Extract content via HTML scraping with bot detection bypass.
-
-        Args:
-            blog_url: URL of the blog post to analyze
-
-        Returns:
-            Dict containing extracted content or None if extraction fails
-        """
-        max_retries = 3
-
-        for attempt in range(max_retries):
-            try:
-                self.logger.info(f"Extracting content from blog URL: {blog_url} (attempt {attempt + 1}/{max_retries})")
-
-                # Update headers with random user agent for each attempt
-                self._update_headers()
-
-                # Add human-like delay between requests
-                if attempt > 0:
-                    delay = random.uniform(2, 5)  # 2-5 second delay
-                    self.logger.debug(f"Waiting {delay:.1f} seconds before retry...")
-                    time.sleep(delay)
-
-                # Store URL for referrer header
-                self._last_url = blog_url
-
-                # Fetch the blog post content with extended timeout
-                response = self.session.get(blog_url, timeout=45)
-                response.raise_for_status()
-
-                # Parse HTML content
-                soup = BeautifulSoup(response.content, 'html.parser')
-
-                # Extract structured content
-                content_data = {
-                    'url': blog_url,
-                    'title': self._extract_title(soup),
-                    'paragraphs': self._extract_paragraphs(soup),
-                    'images': self._extract_image_references(soup, blog_url),
-                    'headings': self._extract_headings(soup),
-                    'meta_description': self._extract_meta_description(soup),
-                    'source': 'html_scraping'
-                }
-
-                self.logger.info(f"Successfully extracted HTML content: {len(content_data['paragraphs'])} paragraphs, "
-                               f"{len(content_data['images'])} image references")
-
-                return content_data
-            
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 403:
-                    if attempt < max_retries - 1:
-                        self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url} on attempt {attempt + 1}. "
-                                          f"Retrying with different headers...")
-                        continue
-                    else:
-                        self.logger.warning(f"Blog content blocked (403 Forbidden) from {blog_url} after {max_retries} attempts. "
-                                          f"This may be due to bot detection, cookie consent, or Cloudflare protection. "
-                                          f"Caption generation will proceed without blog context.")
-                elif e.response.status_code == 404:
-                    self.logger.warning(f"Blog post not found (404) at {blog_url}")
-                    break  # Don't retry 404s
-                elif e.response.status_code in [429, 503]:  # Rate limiting or service unavailable
-                    if attempt < max_retries - 1:
-                        delay = (2 ** attempt) + random.uniform(1, 3)  # Exponential backoff
-                        self.logger.warning(f"Rate limited or service unavailable ({e.response.status_code}) from {blog_url}. "
-                                          f"Waiting {delay:.1f} seconds before retry...")
-                        time.sleep(delay)
-                        continue
-                    else:
-                        self.logger.error(f"HTTP error fetching blog content from {blog_url} after {max_retries} attempts: {e}")
-                else:
-                    self.logger.error(f"HTTP error fetching blog content from {blog_url}: {e}")
-                    break  # Don't retry other HTTP errors
-                return None
-            except requests.exceptions.RequestException as e:
-                if attempt < max_retries - 1:
-                    self.logger.warning(f"Network error fetching blog content from {blog_url} on attempt {attempt + 1}: {e}. Retrying...")
-                    continue
-                else:
-                    self.logger.error(f"Failed to fetch blog content from {blog_url} after {max_retries} attempts: {e}")
-                return None
-            except Exception as e:
-                self.logger.error(f"Error processing blog content: {e}")
-                return None
-
-        # If we get here, all retries failed
         return None
-    
+
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Extract the blog post title."""
         # Try multiple selectors for title
