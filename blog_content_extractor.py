@@ -103,8 +103,31 @@ class BlogContentExtractor:
                 self.logger.info("Using WordPress authentication for full content access")
 
             # Search for post by slug (with authentication if available)
-            headers = {**self.session.headers, **auth_headers}
-            response = self.session.get(api_url, params={'slug': slug}, headers=headers, timeout=30)
+            # Use browser-like headers to avoid Mod_Security blocking
+            api_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Referer': blog_url,
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                **auth_headers
+            }
+            self.logger.debug(f"WordPress API request URL: {api_url}?slug={slug}")
+            self.logger.debug(f"WordPress API request headers: {dict(api_headers)}")
+
+            response = self.session.get(api_url, params={'slug': slug}, headers=api_headers, timeout=30)
+
+            self.logger.debug(f"WordPress API response status: {response.status_code}")
+            self.logger.debug(f"WordPress API response headers: {dict(response.headers)}")
+
+            if response.status_code != 200:
+                self.logger.error(f"WordPress API returned status {response.status_code}: {response.text[:500]}")
+                return None
+
             response.raise_for_status()
 
             posts = response.json()
