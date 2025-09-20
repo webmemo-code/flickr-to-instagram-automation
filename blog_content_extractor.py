@@ -5,7 +5,6 @@ Fetches and processes blog post content to provide context for photo captions.
 import requests
 import logging
 import re
-import random
 from typing import Optional, List, Dict
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
@@ -23,21 +22,14 @@ class BlogContentExtractor:
         self.session = requests.Session()
         self.custom_extractor = CustomEndpointExtractor(config)
 
-        # Rotate through multiple realistic User-Agent strings
-        self.user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
-        ]
+        # Use consistent User-Agent to avoid Cloudflare bot detection
+        self.user_agent = 'TravelMemo-ContentFetcher/1.0'
 
         self._update_headers()
     
     def _update_headers(self):
-        """Update session headers with browser-like values."""
-        user_agent = random.choice(self.user_agents)
+        """Update session headers with consistent user-agent."""
+        user_agent = self.user_agent
 
         self.session.headers.update({
             'User-Agent': user_agent,
@@ -116,9 +108,9 @@ class BlogContentExtractor:
                     self.logger.debug("No auth available, trying without authentication")
                     pass  # Continue with no-auth attempt
 
-                # Use browser-like headers to avoid Mod_Security blocking
+                # Use consistent user-agent to avoid Cloudflare blocking
                 api_headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'User-Agent': 'TravelMemo-ContentFetcher/1.0',
                     'Accept': 'application/json, text/plain, */*',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
@@ -339,9 +331,9 @@ class BlogContentExtractor:
         try:
             self.logger.debug(f"Attempting direct page scraping for: {blog_url}")
 
-            # Use browser-like headers with cookie consent
+            # Use consistent user-agent with cookie consent
             scraping_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'TravelMemo-ContentFetcher/1.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
@@ -421,9 +413,9 @@ class BlogContentExtractor:
         try:
             self.logger.debug(f"Attempting structured direct page scraping for: {blog_url}")
 
-            # Use browser-like headers with cookie consent
+            # Use consistent user-agent with cookie consent
             scraping_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'TravelMemo-ContentFetcher/1.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
