@@ -96,6 +96,27 @@ TOTAL_ALBUM_PHOTOS_{album_id}          # Shared across accounts
 
 ## NEXT SESSION PRIORITIES
 
+### 🔧 IMMEDIATE: Git-Based State Management Issues
+**Objective**: Complete transition to Git-based storage and resolve missing method errors
+
+#### Critical Issues:
+1. **Manual State Initialization Required**:
+   - Manually set the last posted photo position in new Git-based database
+   - Determine current progress in album to avoid reposting photos
+   - Initialize state files with proper album metadata
+
+2. **EnhancedStateManager Method Issues**:
+   - Debug persistent "create_post_record" method not found errors despite method existing in code
+   - Issue: Method exists at line 545 in state_manager_v2.py but runtime still reports missing
+   - Investigate potential causes:
+     * Python import caching preventing new method detection
+     * Module reload issues in production environment
+     * Class instantiation using old cached version
+     * Deployment synchronization between local and remote
+   - Verify all orchestration compatibility methods are properly loaded
+   - Ensure Git storage backend is correctly initialized
+   - Test method resolution order and class inheritance
+
 ### 🏗️ HIGH PRIORITY: Code Architecture & Refactoring (Codex Focus)
 **Objective**: Improve code maintainability, testability, and modularity
 
