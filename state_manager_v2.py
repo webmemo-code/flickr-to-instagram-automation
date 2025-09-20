@@ -541,3 +541,73 @@ class EnhancedStateManager:
 
         except Exception as e:
             self.logger.error(f"Failed to log automation run: {e}")
+
+    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None,
+                          is_dry_run: bool = False, create_audit_issue: bool = False) -> Optional[str]:
+        """
+        Record a successful post using enhanced state management.
+
+        Args:
+            photo_data: Photo data dictionary from Flickr
+            instagram_post_id: Instagram post ID if successful, None if failed
+            is_dry_run: Whether this was a dry run
+            create_audit_issue: Whether to create audit issues (compatibility parameter)
+
+        Returns:
+            Post record ID or None if failed
+        """
+        try:
+            # Extract photo information
+            flickr_photo_id = photo_data.get('id', '')
+            album_position = photo_data.get('album_position', 0)
+            title = photo_data.get('title', 'Unknown')
+            flickr_url = photo_data.get('url', '')
+
+            if is_dry_run:
+                # For dry runs, just log - don't create actual records
+                self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")
+                return "dry_run"
+
+            # Determine post status
+            if instagram_post_id:
+                status = PostStatus.POSTED
+                posted_at = datetime.now().isoformat()
+                self.logger.info(f"✅ Recording successful post for photo #{album_position}")
+            else:
+                status = PostStatus.FAILED
+                posted_at = None
+                self.logger.warning(f"⚠️ Recording failed post for photo #{album_position}")
+
+            # Create Instagram post record
+            post = InstagramPost(
+                flickr_photo_id=flickr_photo_id,
+                instagram_post_id=instagram_post_id or "",
+                album_position=album_position,
+                posted_at=posted_at or datetime.now().isoformat(),
+                flickr_url=flickr_url,
+                instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
+                caption_preview=photo_data.get('title', '')[:100],
+                retry_count=0,
+                is_dry_run=is_dry_run,
+                status=status
+            )
+
+            # Save the post record
+            success = self.record_instagram_post(post)
+
+            if success:
+                # Update album metadata
+                metadata = self.get_album_metadata()
+                metadata.last_update = datetime.now().isoformat()
+                if instagram_post_id:
+                    metadata.last_posted_at = posted_at
+                self._save_album_metadata(metadata)
+
+                return flickr_photo_id
+            else:
+                self.logger.error(f"Failed to save post record for photo #{album_position}")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to create post record: {e}")
+            return None
