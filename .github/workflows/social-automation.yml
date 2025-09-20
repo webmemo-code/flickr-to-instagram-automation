@@ -1,0 +1,329 @@
+name: Social Media Automation (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      account_id:
+        description: 'Account identifier for logging and identification'
+        required: true
+        type: string
+      environment_name:
+        description: 'GitHub environment name for secrets scope'
+        required: true
+        type: string
+      account_flag:
+        description: 'CLI account flag (empty for primary, "reisememo" for secondary)'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Run in dry-run mode (no actual posting)'
+        required: false
+        type: boolean
+        default: false
+      show_stats:
+        description: 'Show statistics only (no automation run)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  social-automation:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate environment variables
+        run: |
+          echo "Checking required environment variables for ${{ inputs.account_id }} account..."
+          python -c "
+          import os
+          # Validate repository-level variables
+          required = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'OPENAI_API_KEY']
+          missing = [var for var in required if not os.getenv(var)]
+          if missing:
+              print(f'Missing required repository-level environment variables: {missing}')
+              exit(1)
+          print('All required repository-level environment variables are set for ${{ inputs.account_id }} account')
+
+          # Show API versions being used
+          graph_version = os.getenv('GRAPH_API_VERSION', 'v18.0')
+          openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+          print(f'Using Graph API version: {graph_version}')
+          print(f'Using OpenAI model: {openai_model}')
+          print(f'Account: ${{ inputs.account_id }}')
+          print('Note: Instagram credentials will be validated in environment scope')
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Account-specific variables (may be empty for primary)
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
+
+      - name: Show statistics
+        if: ${{ inputs.show_stats == true }}
+        run: |
+          ACCOUNT_FLAG=""
+          if [ -n "${{ inputs.account_flag }}" ]; then
+            ACCOUNT_FLAG="--account ${{ inputs.account_flag }}"
+          fi
+
+          echo "Showing statistics for ${{ inputs.account_id }} account..."
+          python main.py --stats $ACCOUNT_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Account-specific variables (may be empty for primary)
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
+
+      - name: Check if album is complete
+        id: check_complete
+        run: |
+          python -c "
+          import sys
+          import os
+          import traceback
+
+          try:
+              sys.path.append('.')
+              from config import Config
+              from state_manager import StateManager
+              from flickr_api import FlickrAPI
+
+              print('Initializing components for ${{ inputs.account_id }} account...')
+
+              # Initialize config with account parameter if provided
+              account_param = '${{ inputs.account_flag }}' if '${{ inputs.account_flag }}' else None
+              config = Config(account=account_param)
+
+              repo_name = os.getenv('GITHUB_REPOSITORY')
+              if not repo_name:
+                  raise ValueError('GITHUB_REPOSITORY environment variable not set')
+
+              # Use environment_name for state manager
+              state_manager = StateManager(config, repo_name, environment_name='${{ inputs.environment_name }}')
+              flickr_api = FlickrAPI(config)
+
+              print('Getting photos from Flickr...')
+              photos = flickr_api.get_unposted_photos()
+              total_photos = len(photos) if photos else 0
+              print(f'Found {total_photos} photos in ${{ inputs.account_id }} album')
+
+              print('Checking album completion status...')
+              is_complete = state_manager.is_album_complete(total_photos)
+
+              github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              if is_complete:
+                  print('${{ inputs.account_id }} album is complete!')
+                  with open(github_output, 'a') as f:
+                      f.write('album_complete=true\\n')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=true\\n')
+              else:
+                  print('${{ inputs.account_id }} album has remaining photos to post')
+                  with open(github_output, 'a') as f:
+                      f.write('album_complete=false\\n')
+                  with open(github_env, 'a') as f:
+                      f.write('ALBUM_COMPLETE=false\\n')
+          except Exception as e:
+              print(f'Error checking album completion: {e}')
+              traceback.print_exc()
+              # Default to not complete on error to allow automation to run
+              github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
+              github_env = os.environ.get('GITHUB_ENV', '/dev/null')
+              with open(github_output, 'a') as f:
+                  f.write('album_complete=false\\n')
+              with open(github_env, 'a') as f:
+                  f.write('ALBUM_COMPLETE=false\\n')
+              sys.exit(1)
+          "
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Account-specific variables (may be empty for primary)
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
+
+      - name: Run automation (scheduled)
+        if: ${{ github.event_name == 'schedule' && steps.check_complete.outputs.album_complete != 'true' }}
+        run: |
+          ACCOUNT_FLAG=""
+          if [ -n "${{ inputs.account_flag }}" ]; then
+            ACCOUNT_FLAG="--account ${{ inputs.account_flag }}"
+          fi
+
+          echo "Running scheduled automation for ${{ inputs.account_id }}..."
+          python main.py $ACCOUNT_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Account-specific variables (may be empty for primary)
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
+
+      - name: Run automation (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && steps.check_complete.outputs.album_complete != 'true' }}
+        run: |
+          ACCOUNT_FLAG=""
+          if [ -n "${{ inputs.account_flag }}" ]; then
+            ACCOUNT_FLAG="--account ${{ inputs.account_flag }}"
+          fi
+
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          echo "Running manual automation for ${{ inputs.account_id }}..."
+          python main.py $ACCOUNT_FLAG $DRY_RUN_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Account-specific variables (may be empty for primary)
+          FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
+          INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
+
+      - name: Album complete notification
+        if: ${{ steps.check_complete.outputs.album_complete == 'true' }}
+        run: |
+          echo "🎉 ${{ inputs.account_id }} album is complete! All photos have been posted to Instagram."
+          echo "The automation will not run until you configure a new album."
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-logs-${{ inputs.account_id }}-${{ github.run_id }}
+          path: |
+            automation_*.log
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: warn
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## 🤖 Social Media Automation Summary - ${{ inputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Account:** ${{ inputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Show Stats Only:** ${{ inputs.show_stats }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.check_complete.outputs.album_complete }}" = "true" ]; then
+            echo "### ✅ Album Status: Complete" >> $GITHUB_STEP_SUMMARY
+            echo "All photos have been posted. No automation run needed." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 📸 Album Status: Active" >> $GITHUB_STEP_SUMMARY
+            echo "Photos remaining to post. Automation executed." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Workflow Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
