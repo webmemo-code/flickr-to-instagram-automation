@@ -60,7 +60,14 @@ class Config:
         # Email notification settings (optional)
         self.notification_email = os.getenv('NOTIFICATION_EMAIL')  # Manager's email address
         self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')  # SMTP server
-        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))  # SMTP port
+
+        # Handle SMTP_PORT safely - default to 587 if empty or invalid
+        smtp_port_str = os.getenv('SMTP_PORT', '587').strip()
+        try:
+            self.smtp_port = int(smtp_port_str) if smtp_port_str else 587
+        except ValueError:
+            self.smtp_port = 587
+
         self.smtp_username = os.getenv('SMTP_USERNAME')  # Email account for sending
         self.smtp_password = os.getenv('SMTP_PASSWORD')  # Email password/app password
         

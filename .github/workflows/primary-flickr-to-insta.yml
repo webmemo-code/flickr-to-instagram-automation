@@ -82,12 +82,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Show statistics
         if: ${{ inputs.show_stats == true }}
@@ -107,12 +107,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Check if album is complete
         id: check_complete
@@ -185,12 +185,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Run automation (scheduled)
         if: ${{ github.event_name == 'schedule' && steps.check_complete.outputs.album_complete != 'true' }}
@@ -211,12 +211,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Run automation (manual)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.show_stats == false && steps.check_complete.outputs.album_complete != 'true' }}
@@ -242,12 +242,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Album complete notification
         if: ${{ steps.check_complete.outputs.album_complete == 'true' }}
@@ -373,12 +373,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Retry automation
         if: ${{ steps.check_complete_retry.outputs.album_complete != 'true' }}
@@ -399,12 +399,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
-          # Email notification settings (optional)
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          # Email notification settings (optional - only set if configured)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || '' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
       
       - name: Upload retry logs
         if: always()
