@@ -37,6 +37,69 @@ However, I don't take the time to post them on Instagram. This automation helps 
 - 🔀 **Independent State**: Each account maintains separate posting progress and failed photo tracking
 - 📝 **Enhanced Content**: WordPress authentication for full blog post content extraction
 - 🎯 **Smart Context**: Blog content matched with photos for richer AI captions
+- 🧩 **Modular Architecture**: Clean separation of concerns with testable orchestration modules
+
+## Architecture
+
+### Modular Orchestration Design
+
+The automation system uses a modular orchestration architecture that breaks down the complex posting workflow into discrete, testable phases:
+
+#### Core Orchestration Modules
+
+| Module | Purpose | Key Classes |
+|--------|---------|-------------|
+| **`orchestration/photo_selection.py`** | Photo selection and validation | `PhotoSelector`, `PhotoValidator` |
+| **`orchestration/caption_orchestration.py`** | Caption generation workflow | `CaptionOrchestrator`, `CaptionPreprocessor` |
+| **`orchestration/posting_orchestration.py`** | Instagram posting and progress | `InstagramPoster`, `PostingOrchestrator` |
+| **`orchestration/state_orchestration.py`** | State management and notifications | `StateOrchestrator`, `ValidationStateHandler` |
+
+#### Workflow Phases
+
+```mermaid
+graph TD
+    A[Photo Selection] --> B[Photo Validation]
+    B --> C[Caption Generation]
+    C --> D[Caption Validation]
+    D --> E[Instagram Posting]
+    E --> F[State Recording]
+    F --> G[Progress Tracking]
+    G --> H[Completion Handling]
+```
+
+#### Benefits of Modular Design
+
+- **🧪 Testability**: Each module can be unit tested with mocked dependencies
+- **🔧 Maintainability**: Clear separation of concerns makes code easier to understand and modify
+- **🔄 Reusability**: Modules can be reused across different automation scenarios
+- **📈 Extensibility**: New features can be added without modifying existing workflow logic
+- **🐛 Debugging**: Issues can be isolated to specific workflow phases
+- **⚡ Performance**: Dependency injection allows for optimized implementations
+
+#### Dependency Injection Pattern
+
+The system uses factory functions to create orchestrator instances with injected dependencies:
+
+```python
+# Initialize orchestration modules
+photo_selector = create_photo_selector(flickr_api, state_manager)
+caption_orchestrator = create_caption_orchestrator(caption_generator)
+posting_orchestrator = create_posting_orchestrator(instagram_api)
+state_orchestrator = create_state_orchestrator(state_manager, email_notifier)
+```
+
+This pattern enables:
+- **Mock injection** for unit testing
+- **Configuration flexibility** for different environments
+- **Clean interfaces** between components
+
+### Testing Strategy
+
+The modular architecture enables comprehensive testing at multiple levels:
+
+- **Unit Tests**: Individual orchestrator modules (`test_suite/test_orchestration.py`)
+- **Integration Tests**: End-to-end workflow testing (`test_suite/test_integration.py`)
+- **Mock-based Testing**: No live API credentials required for most tests
 
 ## Quick Start
 
