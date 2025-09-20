@@ -1,0 +1,327 @@
+"""
+Enhanced data models for state management.
+
+This module defines the data structures used by the new Git-based storage system,
+providing rich metadata and better tracking capabilities.
+"""
+
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Optional, Any
+from datetime import datetime
+from enum import Enum
+
+
+class PostStatus(Enum):
+    """Status of an Instagram post."""
+    PENDING = "pending"
+    POSTED = "posted"
+    FAILED = "failed"
+    RETRYING = "retrying"
+
+
+class AlbumStatus(Enum):
+    """Status of an album."""
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    PAUSED = "paused"
+    ERROR = "error"
+
+
+@dataclass
+class RetryAttempt:
+    """Information about a retry attempt."""
+    timestamp: str
+    error_message: str
+    workflow_run_id: Optional[str] = None
+    retry_count: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'RetryAttempt':
+        """Create from dictionary (JSON deserialization)."""
+        return cls(**data)
+
+
+@dataclass
+class InstagramPost:
+    """Enhanced Instagram post record with rich metadata."""
+    position: int
+    photo_id: str
+    instagram_post_id: Optional[str] = None
+    posted_at: Optional[str] = None
+    title: Optional[str] = None
+    status: PostStatus = PostStatus.PENDING
+    retry_count: int = 0
+    retry_history: List[RetryAttempt] = None
+    workflow_run_id: Optional[str] = None
+    account: Optional[str] = None
+    created_at: Optional[str] = None
+    last_update: Optional[str] = None
+    flickr_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    caption_length: Optional[int] = None
+    hashtags_count: Optional[int] = None
+
+    def __post_init__(self):
+        """Initialize default values after creation."""
+        if self.retry_history is None:
+            self.retry_history = []
+        if self.created_at is None:
+            self.created_at = datetime.now().isoformat()
+        if self.last_update is None:
+            self.last_update = datetime.now().isoformat()
+
+    def add_retry_attempt(self, error_message: str, workflow_run_id: Optional[str] = None):
+        """Add a retry attempt to the history."""
+        self.retry_count += 1
+        self.status = PostStatus.RETRYING
+        self.last_update = datetime.now().isoformat()
+
+        retry_attempt = RetryAttempt(
+            timestamp=datetime.now().isoformat(),
+            error_message=error_message,
+            workflow_run_id=workflow_run_id,
+            retry_count=self.retry_count
+        )
+        self.retry_history.append(retry_attempt)
+
+    def mark_as_posted(self, instagram_post_id: str, instagram_url: Optional[str] = None):
+        """Mark the post as successfully posted."""
+        self.status = PostStatus.POSTED
+        self.instagram_post_id = instagram_post_id
+        self.posted_at = datetime.now().isoformat()
+        self.last_update = datetime.now().isoformat()
+        if instagram_url:
+            self.instagram_url = instagram_url
+
+    def mark_as_failed(self, error_message: str, workflow_run_id: Optional[str] = None):
+        """Mark the post as failed."""
+        self.status = PostStatus.FAILED
+        self.last_update = datetime.now().isoformat()
+        self.add_retry_attempt(error_message, workflow_run_id)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        data = asdict(self)
+        # Convert enum to string
+        data['status'] = self.status.value
+        # Convert retry history
+        data['retry_history'] = [attempt.to_dict() for attempt in self.retry_history]
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'InstagramPost':
+        """Create from dictionary (JSON deserialization)."""
+        # Convert status string to enum
+        if 'status' in data:
+            data['status'] = PostStatus(data['status'])
+
+        # Convert retry history
+        if 'retry_history' in data and data['retry_history']:
+            data['retry_history'] = [
+                RetryAttempt.from_dict(attempt) for attempt in data['retry_history']
+            ]
+
+        return cls(**data)
+
+    @classmethod
+    def from_legacy_dict(cls, data: Dict[str, Any]) -> 'InstagramPost':
+        """Create from legacy repository variable format."""
+        return cls(
+            position=data.get('position', 0),
+            photo_id=data.get('photo_id', ''),
+            instagram_post_id=data.get('instagram_post_id'),
+            posted_at=data.get('posted_at'),
+            title=data.get('title'),
+            status=PostStatus.POSTED if data.get('instagram_post_id') else PostStatus.PENDING,
+            account=data.get('account'),
+            created_at=data.get('posted_at'),  # Use posted_at as created_at for legacy data
+            last_update=data.get('posted_at')
+        )
+
+
+@dataclass
+class AlbumMetadata:
+    """Enhanced album metadata with comprehensive tracking."""
+    album_id: str
+    account: str
+    created_at: str
+    last_update: str
+    total_photos: int = 0
+    posted_count: int = 0
+    failed_count: int = 0
+    pending_count: int = 0
+    retrying_count: int = 0
+    completion_status: AlbumStatus = AlbumStatus.ACTIVE
+    completion_percentage: float = 0.0
+    last_posted_position: Optional[int] = None
+    last_posted_at: Optional[str] = None
+    next_scheduled_position: Optional[int] = None
+    estimated_completion_date: Optional[str] = None
+    workflow_runs_count: int = 0
+    last_workflow_run_id: Optional[str] = None
+    error_count: int = 0
+    last_error_message: Optional[str] = None
+    last_error_at: Optional[str] = None
+    migrated_from: Optional[str] = None
+    migration_date: Optional[str] = None
+
+    def update_counts(self, posts: List[InstagramPost]):
+        """Update statistics based on current post data."""
+        self.posted_count = len([p for p in posts if p.status == PostStatus.POSTED])
+        self.failed_count = len([p for p in posts if p.status == PostStatus.FAILED])
+        self.pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
+        self.retrying_count = len([p for p in posts if p.status == PostStatus.RETRYING])
+
+        # Update completion percentage
+        if self.total_photos > 0:
+            self.completion_percentage = (self.posted_count / self.total_photos) * 100
+        else:
+            self.completion_percentage = 0.0
+
+        # Update completion status
+        if self.posted_count == self.total_photos and self.total_photos > 0:
+            self.completion_status = AlbumStatus.COMPLETED
+        elif self.failed_count > 0:
+            self.completion_status = AlbumStatus.ERROR
+        else:
+            self.completion_status = AlbumStatus.ACTIVE
+
+        # Update last posted information
+        posted_posts = [p for p in posts if p.status == PostStatus.POSTED and p.posted_at]
+        if posted_posts:
+            latest_post = max(posted_posts, key=lambda p: p.posted_at)
+            self.last_posted_position = latest_post.position
+            self.last_posted_at = latest_post.posted_at
+
+        # Update next scheduled position
+        if self.completion_status == AlbumStatus.ACTIVE:
+            pending_posts = [p for p in posts if p.status == PostStatus.PENDING]
+            if pending_posts:
+                self.next_scheduled_position = min(pending_posts, key=lambda p: p.position).position
+
+        self.last_update = datetime.now().isoformat()
+
+    def add_workflow_run(self, workflow_run_id: str):
+        """Record a new workflow run."""
+        self.workflow_runs_count += 1
+        self.last_workflow_run_id = workflow_run_id
+        self.last_update = datetime.now().isoformat()
+
+    def add_error(self, error_message: str):
+        """Record an error."""
+        self.error_count += 1
+        self.last_error_message = error_message
+        self.last_error_at = datetime.now().isoformat()
+        self.last_update = datetime.now().isoformat()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        data = asdict(self)
+        # Convert enum to string
+        data['completion_status'] = self.completion_status.value
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'AlbumMetadata':
+        """Create from dictionary (JSON deserialization)."""
+        # Convert status string to enum
+        if 'completion_status' in data:
+            data['completion_status'] = AlbumStatus(data['completion_status'])
+
+        return cls(**data)
+
+    @classmethod
+    def create_new(cls, album_id: str, account: str, total_photos: int = 0) -> 'AlbumMetadata':
+        """Create new album metadata."""
+        now = datetime.now().isoformat()
+        return cls(
+            album_id=album_id,
+            account=account,
+            created_at=now,
+            last_update=now,
+            total_photos=total_photos
+        )
+
+
+@dataclass
+class FailedPosition:
+    """Enhanced failed position record with context."""
+    position: int
+    photo_id: Optional[str] = None
+    failed_at: Optional[str] = None
+    error_message: Optional[str] = None
+    workflow_run_id: Optional[str] = None
+    retry_count: int = 0
+    resolved: bool = False
+    resolved_at: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize default values after creation."""
+        if self.failed_at is None:
+            self.failed_at = datetime.now().isoformat()
+
+    def mark_resolved(self):
+        """Mark the failed position as resolved."""
+        self.resolved = True
+        self.resolved_at = datetime.now().isoformat()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'FailedPosition':
+        """Create from dictionary (JSON deserialization)."""
+        return cls(**data)
+
+    @classmethod
+    def from_position(cls, position: int, photo_id: Optional[str] = None,
+                     error_message: Optional[str] = None,
+                     workflow_run_id: Optional[str] = None) -> 'FailedPosition':
+        """Create from basic position information."""
+        return cls(
+            position=position,
+            photo_id=photo_id,
+            error_message=error_message,
+            workflow_run_id=workflow_run_id
+        )
+
+
+def migrate_legacy_data(legacy_posts: List[Dict], legacy_failed: List[int],
+                       account: str, album_id: str) -> tuple[List[InstagramPost], List[FailedPosition], AlbumMetadata]:
+    """
+    Migrate legacy repository variable data to new enhanced models.
+
+    Args:
+        legacy_posts: List of post dictionaries from repository variables
+        legacy_failed: List of failed position integers
+        account: Account name
+        album_id: Album ID
+
+    Returns:
+        Tuple of (enhanced posts, enhanced failed positions, album metadata)
+    """
+    # Convert legacy posts
+    enhanced_posts = []
+    for post_data in legacy_posts:
+        enhanced_post = InstagramPost.from_legacy_dict(post_data)
+        enhanced_post.account = account
+        enhanced_posts.append(enhanced_post)
+
+    # Convert legacy failed positions
+    enhanced_failed = []
+    for position in legacy_failed:
+        failed_pos = FailedPosition.from_position(position)
+        enhanced_failed.append(failed_pos)
+
+    # Create album metadata
+    metadata = AlbumMetadata.create_new(album_id, account)
+    metadata.update_counts(enhanced_posts)
+    metadata.migrated_from = "repository_variables"
+    metadata.migration_date = datetime.now().isoformat()
+
+    return enhanced_posts, enhanced_failed, metadata
