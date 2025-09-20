@@ -160,6 +160,11 @@ class CaptionGenerator:
         
         # Add blog post URL if available
         if self.config.blog_post_url:
+            # Add travel tip text before URL based on account
+            if self.config.account == 'reisememo':
+                caption_parts.append("Lies den Reisetipp unter")
+            else:
+                caption_parts.append("Read the travel tip at")
             caption_parts.append(self.config.blog_post_url)
         
         # Add hashtags
