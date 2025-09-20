@@ -467,3 +467,77 @@ class EnhancedStateManager:
         except Exception as e:
             self.logger.error(f"Migration failed: {e}")
             return {"error": str(e)}
+
+    def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
+        """
+        Get the next photo to post from the provided photos list.
+
+        Args:
+            photos: List of photo dictionaries from Flickr
+            include_dry_runs: Whether to consider dry run photos as posted
+
+        Returns:
+            Next photo to post or None if all are posted
+        """
+        try:
+            if not photos:
+                self.logger.warning("No photos provided to get_next_photo_to_post")
+                return None
+
+            # Get posted photos
+            posted_photos = self.get_instagram_posts()
+            posted_ids = {post.flickr_photo_id for post in posted_photos
+                         if not include_dry_runs or not post.is_dry_run}
+
+            # Get failed positions that should be retried
+            failed_positions = self.get_enhanced_failed_positions()
+            failed_ids = {f.flickr_photo_id for f in failed_positions if not f.resolved}
+
+            # Find next unposted photo
+            for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
+                photo_id = photo.get('id')
+                if photo_id and photo_id not in posted_ids and photo_id not in failed_ids:
+                    return photo
+
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Error in get_next_photo_to_post: {e}")
+            return None
+
+    def log_automation_run(self, success: bool, details: str = "", account_name: str = "",
+                          album_name: str = "", album_url: str = "") -> None:
+        """
+        Log an automation run result.
+
+        Args:
+            success: Whether the automation run was successful
+            details: Additional details about the run
+            account_name: Name of the account
+            album_name: Name of the album
+            album_url: URL of the album
+        """
+        try:
+            # Update album metadata with run information
+            metadata = self.get_album_metadata()
+            metadata.workflow_runs_count += 1
+            metadata.last_update = datetime.now().isoformat()
+
+            if not success:
+                metadata.error_count += 1
+
+            # Save updated metadata
+            self._save_album_metadata(metadata)
+
+            # Log the run
+            status = "SUCCESS" if success else "FAILED"
+            self.logger.info(f"Automation run {status}: {details}")
+            if account_name:
+                self.logger.info(f"Account: {account_name}")
+            if album_name:
+                self.logger.info(f"Album: {album_name}")
+            if album_url:
+                self.logger.info(f"Album URL: {album_url}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to log automation run: {e}")
