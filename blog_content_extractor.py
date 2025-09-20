@@ -22,6 +22,14 @@ class BlogContentExtractor:
         self.session = requests.Session()
         self.custom_extractor = CustomEndpointExtractor(config)
 
+        # Initialize email notifier for API failure alerts
+        self.email_notifier = None
+        try:
+            from email_notifier import EmailNotifier
+            self.email_notifier = EmailNotifier(config)
+        except ImportError:
+            self.logger.debug("Email notifier not available")
+
         # Use consistent User-Agent to avoid Cloudflare bot detection
         self.user_agent = 'TravelMemo-ContentFetcher/1.0'
 
@@ -511,22 +519,33 @@ class BlogContentExtractor:
         Returns:
             Dict containing extracted content or None if extraction fails
         """
+        # Track attempted methods and errors for notification
+        attempted_methods = []
+        last_error = None
+        last_http_status = None
+
         # Try WordPress REST API if this looks like a WordPress site
         if 'travelmemo.com' in blog_url or 'reisememo.ch' in blog_url:
             # First try custom endpoint (most reliable)
             self.logger.info(f"Attempting custom endpoint extraction for: {blog_url}")
+            attempted_methods.append("Custom WordPress API Endpoint")
+
             custom_content = self.custom_extractor.extract_via_custom_endpoint(blog_url)
             if custom_content:
                 return custom_content
 
             # Fallback to standard WordPress API
             self.logger.info(f"Custom endpoint failed, trying standard WordPress API for: {blog_url}")
+            attempted_methods.append("Standard WordPress REST API")
+
             wordpress_content = self._extract_via_wordpress_api(blog_url)
             if wordpress_content:
                 return wordpress_content
 
             # If both APIs failed, try direct page scraping as final fallback
             self.logger.warning("All API methods failed - attempting direct page scraping as final fallback")
+            attempted_methods.append("Direct Page Scraping")
+
             fallback_data = self._try_direct_page_scraping_structured(blog_url)
             if fallback_data and fallback_data.get('paragraphs'):
                 self.logger.info(f"Final fallback successful - got {len(fallback_data['paragraphs'])} paragraphs via direct scraping")
@@ -540,11 +559,62 @@ class BlogContentExtractor:
                     'source': 'direct_scraping_final_fallback'
                 }
                 self.logger.info(f"Successfully extracted content via final fallback: {len(content_data['paragraphs'])} paragraphs")
+
+                # Even though we got content via fallback, this indicates API access issues
+                # Send a notification if all API methods failed
+                self._send_api_failure_notification(
+                    blog_url,
+                    attempted_methods,
+                    last_error or "All WordPress API methods failed",
+                    last_http_status,
+                    fallback_used=True
+                )
+
                 return content_data
 
+            # Complete failure - send notification
             self.logger.warning("All extraction methods failed. Caption generation will proceed without blog context.")
+            self._send_api_failure_notification(
+                blog_url,
+                attempted_methods,
+                last_error or "All extraction methods (API and scraping) failed",
+                last_http_status,
+                fallback_used=False
+            )
 
         return None
+
+    def _send_api_failure_notification(self,
+                                     blog_url: str,
+                                     attempted_methods: List[str],
+                                     error_message: str,
+                                     http_status: Optional[int],
+                                     fallback_used: bool) -> None:
+        """Send email notification about API access failure."""
+        if not self.email_notifier:
+            self.logger.debug("Email notifier not available - skipping API failure notification")
+            return
+
+        # Determine account name from URL
+        account_name = "Primary"
+        if 'reisememo.ch' in blog_url:
+            account_name = "Secondary (Reisememo)"
+        elif 'travelmemo.com' in blog_url:
+            account_name = "Primary (TravelMemo)"
+
+        # Prepare error details
+        error_details = {
+            'http_status': http_status or 'Unknown',
+            'error_message': error_message,
+            'attempted_methods': attempted_methods,
+            'fallback_used': fallback_used
+        }
+
+        try:
+            self.email_notifier.send_api_failure_alert(blog_url, error_details, account_name)
+            self.logger.info("API failure notification sent successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to send API failure notification: {e}")
 
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Extract the blog post title."""

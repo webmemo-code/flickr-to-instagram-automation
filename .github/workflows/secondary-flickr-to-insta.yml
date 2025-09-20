@@ -86,6 +86,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -107,6 +113,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -181,6 +193,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -203,6 +221,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -230,6 +254,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -358,6 +388,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       
@@ -380,6 +416,12 @@ jobs:
           BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
           WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
           WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Email notification settings (optional)
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS }}
       

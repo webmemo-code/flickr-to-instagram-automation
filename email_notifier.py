@@ -174,29 +174,234 @@ Generated automatically on {completion_date}
             self.logger.error(f"Unexpected error sending email: {e}")
             return False
     
+    def send_api_failure_alert(self,
+                                blog_url: str,
+                                error_details: dict,
+                                account_name: str = "Unknown") -> bool:
+        """
+        Send email alert for WordPress API access failure.
+
+        Args:
+            blog_url: The blog URL that failed to load
+            error_details: Dictionary containing error information
+            account_name: Name of the account (primary/secondary)
+
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        if not self.config.email_notifications_enabled:
+            self.logger.debug("Email notifications not configured - skipping API failure alert")
+            return True  # Return True to not block automation
+
+        try:
+            # Create the API failure email message
+            msg = self._create_api_failure_email(blog_url, error_details, account_name)
+
+            # Send the email
+            success = self._send_email(msg)
+
+            if success:
+                self.logger.info(f"📧 API failure alert sent to {self.config.notification_email}")
+                return True
+            else:
+                self.logger.error("❌ Failed to send API failure alert")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"💥 API failure email notification failed: {e}")
+            return False
+
+    def _create_api_failure_email(self,
+                                 blog_url: str,
+                                 error_details: dict,
+                                 account_name: str) -> MIMEMultipart:
+        """Create the API failure notification email."""
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"🚨 WordPress API Access Failure - {account_name} Account"
+        msg['From'] = self.config.smtp_username
+        msg['To'] = self.config.notification_email
+
+        # Create both text and HTML versions
+        text_content = self._create_api_failure_text_content(blog_url, error_details, account_name)
+        html_content = self._create_api_failure_html_content(blog_url, error_details, account_name)
+
+        # Create MIMEText objects
+        text_part = MIMEText(text_content, 'plain')
+        html_part = MIMEText(html_content, 'html')
+
+        # Attach parts
+        msg.attach(text_part)
+        msg.attach(html_part)
+
+        return msg
+
+    def _create_api_failure_text_content(self,
+                                        blog_url: str,
+                                        error_details: dict,
+                                        account_name: str) -> str:
+        """Create plain text email content for API failure."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+
+        # Extract error information
+        http_status = error_details.get('http_status', 'Unknown')
+        error_message = error_details.get('error_message', 'No specific error message')
+        attempted_methods = error_details.get('attempted_methods', [])
+        fallback_used = error_details.get('fallback_used', False)
+
+        return f"""WordPress API Access Failure Alert
+
+ACCOUNT: {account_name}
+TIME: {timestamp}
+BLOG URL: {blog_url}
+
+ERROR DETAILS:
+- HTTP Status: {http_status}
+- Error Message: {error_message}
+- Attempted Methods: {', '.join(attempted_methods) if attempted_methods else 'Not specified'}
+- Fallback Used: {'Yes' if fallback_used else 'No'}
+
+IMPACT:
+- Enhanced captions are not available for this posting session
+- Basic captions (photo metadata only) are being used as fallback
+- Blog content context is missing from Instagram posts
+
+INVESTIGATION STEPS:
+1. Check Cloudflare security rules for bot protection settings
+2. Verify WordPress REST API is enabled on {blog_url}
+3. Check if user-agent 'TravelMemo-ContentFetcher/1.0' needs whitelisting
+4. Review server logs for blocked requests
+5. Test API endpoint manually: {blog_url}
+
+CLOUDFLARE TROUBLESHOOTING:
+- Review Bot Fight Mode settings in Cloudflare dashboard
+- Check Page Rules for WordPress API endpoints (/wp-json/*)
+- Verify Rate Limiting isn't blocking automation requests
+- Consider adding user-agent bypass rule for 'TravelMemo-ContentFetcher/1.0'
+- Check if IP whitelisting is needed for GitHub Actions runners
+
+The automation will continue with basic captions until this issue is resolved.
+
+---
+Flickr to Instagram Automation System
+Generated automatically on {timestamp}
+"""
+
+    def _create_api_failure_html_content(self,
+                                        blog_url: str,
+                                        error_details: dict,
+                                        account_name: str) -> str:
+        """Create HTML email content for API failure."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+
+        # Extract error information
+        http_status = error_details.get('http_status', 'Unknown')
+        error_message = error_details.get('error_message', 'No specific error message')
+        attempted_methods = error_details.get('attempted_methods', [])
+        fallback_used = error_details.get('fallback_used', False)
+
+        return f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f44336; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+              <h1 style="margin: 0;">🚨 WordPress API Access Failure</h1>
+              <p style="margin: 10px 0 0 0; font-size: 18px;">{account_name} Account</p>
+            </div>
+
+            <div style="padding: 20px; background-color: #ffebee; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f44336;">
+              <h2 style="color: #c62828; margin-top: 0;">Error Details</h2>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 8px; font-weight: bold;">Time:</td>
+                  <td style="padding: 8px;">{timestamp}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 8px; font-weight: bold;">Blog URL:</td>
+                  <td style="padding: 8px;"><a href="{blog_url}" style="color: #1976D2;">{blog_url}</a></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 8px; font-weight: bold;">HTTP Status:</td>
+                  <td style="padding: 8px;"><code>{http_status}</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 8px; font-weight: bold;">Error Message:</td>
+                  <td style="padding: 8px;"><code>{error_message}</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 8px; font-weight: bold;">Attempted Methods:</td>
+                  <td style="padding: 8px;">{', '.join(attempted_methods) if attempted_methods else 'Not specified'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; font-weight: bold;">Fallback Used:</td>
+                  <td style="padding: 8px;">{'✅ Yes' if fallback_used else '❌ No'}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="padding: 20px; background-color: #fff3e0; border-radius: 8px; border-left: 4px solid #ff9800;">
+              <h3 style="color: #ef6c00; margin-top: 0;">Impact</h3>
+              <ul style="color: #333; line-height: 1.6;">
+                <li>Enhanced captions are not available for this posting session</li>
+                <li>Basic captions (photo metadata only) are being used as fallback</li>
+                <li>Blog content context is missing from Instagram posts</li>
+              </ul>
+            </div>
+
+            <div style="padding: 20px; background-color: #e8f5e8; border-radius: 8px; border-left: 4px solid #4caf50;">
+              <h3 style="color: #2e7d32; margin-top: 0;">Investigation Steps</h3>
+              <ol style="color: #333; line-height: 1.6;">
+                <li><strong>Cloudflare Security:</strong> Check bot protection settings in Cloudflare dashboard</li>
+                <li><strong>WordPress API:</strong> Verify REST API is enabled on <a href="{blog_url}">{blog_url}</a></li>
+                <li><strong>User-Agent Whitelist:</strong> Check if 'TravelMemo-ContentFetcher/1.0' needs whitelisting</li>
+                <li><strong>Server Logs:</strong> Review server logs for blocked requests</li>
+                <li><strong>Manual Test:</strong> Test API endpoint manually</li>
+              </ol>
+            </div>
+
+            <div style="padding: 20px; background-color: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
+              <h3 style="color: #1976d2; margin-top: 0;">Cloudflare Troubleshooting</h3>
+              <ul style="color: #333; line-height: 1.6;">
+                <li>Review <strong>Bot Fight Mode</strong> settings</li>
+                <li>Check <strong>Page Rules</strong> for WordPress API endpoints (/wp-json/*)</li>
+                <li>Verify <strong>Rate Limiting</strong> isn't blocking automation requests</li>
+                <li>Consider adding <strong>user-agent bypass rule</strong> for 'TravelMemo-ContentFetcher/1.0'</li>
+                <li>Check if <strong>IP whitelisting</strong> is needed for GitHub Actions runners</li>
+              </ul>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 1px solid #ddd;">
+              <p style="color: #666; font-size: 14px;">
+                The automation will continue with basic captions until this issue is resolved.<br>
+                Generated automatically by Flickr to Instagram Automation System<br>
+                <em>{timestamp}</em>
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
     def test_email_configuration(self) -> bool:
         """Test email configuration by sending a test message."""
         if not self.config.email_notifications_enabled:
             self.logger.warning("Email notifications not configured")
             return False
-        
+
         try:
             # Create a simple test message
             msg = MIMEText("This is a test message from the Flickr to Instagram automation system.")
             msg['Subject'] = "Email Configuration Test"
             msg['From'] = self.config.smtp_username
             msg['To'] = self.config.notification_email
-            
+
             # Send the test email
             success = self._send_email(msg)
-            
+
             if success:
                 self.logger.info("Test email sent successfully")
                 return True
             else:
                 self.logger.error("Test email failed")
                 return False
-                
+
         except Exception as e:
             self.logger.error(f"Test email failed: {e}")
             return False
