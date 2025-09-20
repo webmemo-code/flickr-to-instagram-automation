@@ -46,145 +46,150 @@ def setup_logging(level: str = "INFO") -> None:
 
 
 def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, account: str = 'primary') -> bool:
-    """Post the next available photo from the configured album."""
+    """Post the next available photo from the configured album using modular orchestration."""
     logger = logging.getLogger(__name__)
-    
+
     try:
         # Initialize components
         config = Config(account=account)
         flickr_api = FlickrAPI(config)
         caption_generator = CaptionGenerator(config)
         instagram_api = InstagramAPI(config)
-        
+        email_notifier = EmailNotifier(config)
+
         # Get repository name from environment
         repo_name = os.getenv('GITHUB_REPOSITORY')
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
-        
+
         state_manager = StateManager(config, repo_name)
-        
+
+        # Initialize orchestration modules
+        from orchestration import (
+            create_photo_selector,
+            create_photo_validator,
+            create_caption_orchestrator,
+            create_caption_preprocessor,
+            create_posting_orchestrator,
+            create_state_orchestrator,
+            create_validation_state_handler
+        )
+
+        photo_selector = create_photo_selector(flickr_api, state_manager)
+        photo_validator = create_photo_validator(instagram_api)
+        caption_orchestrator = create_caption_orchestrator(caption_generator)
+        caption_preprocessor = create_caption_preprocessor()
+        posting_orchestrator = create_posting_orchestrator(instagram_api)
+        state_orchestrator = create_state_orchestrator(state_manager, email_notifier)
+        validation_state_handler = create_validation_state_handler(state_manager)
+
         logger.info(f"Starting automation for album: {config.album_name}")
         logger.info(f"Album URL: {config.album_url}")
         if dry_run:
             logger.info("🧪 Running in DRY RUN mode")
             if include_dry_runs:
                 logger.info("📝 Including previous dry run selections in photo selection")
-        
-        # Get photos from Flickr
-        photos = flickr_api.get_unposted_photos()
-        if not photos:
-            logger.warning("No photos found in the album")
+
+        # Photo Selection Phase
+        selection_result = photo_selector.get_next_photo_to_post(include_dry_runs, dry_run)
+
+        if not selection_result.success:
+            logger.warning(selection_result.message)
             account_display = account.capitalize() if account != 'primary' else 'Primary'
-            state_manager.log_automation_run(False, "No photos found in album", account_display, config.album_name, config.album_url)
+            state_orchestrator.log_automation_run(
+                False, selection_result.message, account_display, config.album_name, config.album_url
+            )
             return False
-        
-        logger.info(f"Retrieved {len(photos)} photos from album")
-        
-        # Debug: Log all photos and their positions
-        for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
-            logger.debug(f"Album photo #{photo.get('album_position', '?')}: {photo['id']} - {photo['title']}")
-        
-        # Check if album is complete (only count actual posts, not dry runs)
-        if state_manager.is_album_complete(len(photos)):
-            logger.info("🎉 Album complete! All photos have been posted to Instagram.")
-            
-            # Send completion notification email
-            email_notifier = EmailNotifier(config)
-            email_notifier.send_completion_notification(len(photos), config.album_name)
-            
+
+        if selection_result.is_album_complete:
+            logger.info(f"🎉 {selection_result.message}")
+
+            # Handle album completion
+            state_orchestrator.handle_album_completion(selection_result.photos_total, config.album_name)
+
             account_display = account.capitalize() if account != 'primary' else 'Primary'
-            state_manager.log_automation_run(True, "Album complete - all photos posted", account_display, config.album_name, config.album_url)
+            completion_message = "Album complete - all photos posted" if selection_result.photos_total > 0 else "No more photos to process"
+            state_orchestrator.log_automation_run(
+                True, completion_message, account_display, config.album_name, config.album_url
+            )
             return True
-        
-        # Get next photo to post
-        next_photo = state_manager.get_next_photo_to_post(photos, include_dry_runs=include_dry_runs and dry_run)
-        if not next_photo:
-            if dry_run and include_dry_runs:
-                logger.info("🎉 All photos have been selected in dry runs! Use --reset-dry-runs to start over.")
-            else:
-                logger.info("🎉 Album complete! All photos have been posted to Instagram.")
+
+        # We have a photo to process
+        selected_photo = selection_result.photo
+        position = selected_photo.get('album_position', 'unknown')
+
+        # Photo Validation Phase
+        is_valid, validation_error = photo_validator.validate_photo_for_posting(selected_photo)
+
+        if not is_valid:
+            logger.error(f"❌ Photo validation failed: {validation_error}")
+
+            # Handle validation failure
+            validation_state_handler.handle_validation_failure(selected_photo, validation_error, dry_run)
+
             account_display = account.capitalize() if account != 'primary' else 'Primary'
-            state_manager.log_automation_run(True, "No more photos to process", account_display, config.album_name, config.album_url)
-            return True
-        
-        position = next_photo.get('album_position', 'unknown')
-        logger.info(f"📸 Processing photo #{position}: {next_photo['title']} (ID: {next_photo['id']})")
-        
-        # Validate image URL (includes retry logic with 1-minute delay)
-        logger.info(f"🔍 Validating image URL (includes retry if needed)...")
-        if not instagram_api.validate_image_url(next_photo['url']):
-            logger.error(f"❌ Invalid or inaccessible image URL after retries: {next_photo['url']}")
-            logger.info(f"⏭️ Skipping photo #{position} and marking as failed to continue with next photo")
-            state_manager.create_post_record(next_photo, None, is_dry_run=dry_run)
-            account_display = account.capitalize() if account != 'primary' else 'Primary'
-            state_manager.log_automation_run(True, f"Skipped photo #{position} due to invalid image URL (after retries)", account_display, config.album_name, config.album_url)
-            return True  # Return True to continue with next photo
-        
-        # Generate caption with GPT-4 Vision
-        logger.info("🤖 Generating enhanced caption with GPT-4 Vision...")
-        generated_caption = caption_generator.generate_with_retry(next_photo)
-        
-        if not generated_caption:
-            logger.warning("⚠️ Failed to generate caption, using fallback")
-            generated_caption = "Beautiful moment captured during our travels."
-        
-        # Build full caption
-        full_caption = caption_generator.build_full_caption(next_photo, generated_caption)
-        
-        logger.info(f"📝 Generated caption: {full_caption[:100]}...")
-        
-        if dry_run:
-            logger.info("🧪 DRY RUN: Would post to Instagram")
-            logger.info(f"Image URL: {next_photo['url']}")
-            logger.info(f"Caption: {full_caption}")
-            
-            # Create dry run record (just logs, no issues created)
-            state_manager.create_post_record(next_photo, None, is_dry_run=True)
-            logger.info(f"✅ Dry run completed for photo #{position}")
-            return True
-        
-        # Post to Instagram (state will be updated after successful post)
-        
-        # Post to Instagram
-        logger.info("📱 Posting to Instagram...")
-        instagram_post_id = instagram_api.post_with_retry(next_photo['url'], full_caption)
-        
-        if instagram_post_id:
-            logger.info(f"✅ Successfully posted to Instagram: {instagram_post_id}")
-            
-            # Record successful post (updates position tracking, optionally creates audit issue)
-            state_manager.create_post_record(next_photo, instagram_post_id, create_audit_issue=config.create_audit_issues)
+            state_orchestrator.log_automation_run(
+                True, f"Skipped photo #{position} due to validation failure",
+                account_display, config.album_name, config.album_url
+            )
+            return True  # Continue with next photo
 
-            # Log progress (use current position since we just posted it)
-            total_count = len(photos)
+        # Caption Generation Phase
+        preprocessed_photo = caption_preprocessor.preprocess_photo_data(selected_photo)
+        caption_result = caption_orchestrator.generate_full_caption(preprocessed_photo)
 
-            logger.info(f"📊 Progress: Posted {position}/{total_count} photos (just posted #{position})")
+        if not caption_result.success:
+            logger.error(f"❌ Caption generation failed: {caption_result.message}")
+            return False
 
-            if position >= total_count:
-                logger.info("🎉 Album complete! All photos have been posted.")
-                
-                # Send completion notification email
-                email_notifier = EmailNotifier(config)
-                email_notifier.send_completion_notification(total_count, config.album_name)
-            
-            return True
-        else:
-            logger.error("❌ Failed to post to Instagram")
-            logger.info(f"⏭️ Marking photo #{position} as failed and continuing with next photo")
+        if caption_result.used_fallback:
+            logger.warning(f"⚠️ Used fallback caption: {caption_result.message}")
 
-            # Record failed post (adds to failed positions for retry)
-            success = state_manager.create_post_record(next_photo, None)
+        # Posting Phase
+        posting_workflow_result = posting_orchestrator.execute_posting_workflow(
+            selected_photo,
+            caption_result.caption,
+            selection_result.photos_total,
+            dry_run
+        )
 
-            # If we can't even record the failure, that's a critical error
-            if not success:
+        if not posting_workflow_result['workflow_success']:
+            logger.error(f"❌ Posting workflow failed: {posting_workflow_result['posting_message']}")
+
+            # Record the failed post
+            state_result = state_orchestrator.record_post_outcome(
+                selected_photo, None, dry_run, config.create_audit_issues
+            )
+
+            if state_result.critical_failure:
                 logger.error("💥 Critical error: Cannot record failed post - stopping automation")
                 return False
 
-            # Photo failed but state management succeeded - this is a partial failure
-            # We can continue automation but should log it as a processing issue
             logger.warning("⚠️ Photo processing failed but automation can continue")
-            return True  # Return True to continue with next photo
-    
+            return True  # Continue with next photo
+
+        # State Recording Phase
+        state_result = state_orchestrator.record_post_outcome(
+            selected_photo,
+            posting_workflow_result['instagram_post_id'],
+            dry_run,
+            config.create_audit_issues
+        )
+
+        if not state_result.success:
+            if state_result.critical_failure:
+                logger.error(f"💥 Critical state management error: {state_result.message}")
+                return False
+            else:
+                logger.warning(f"⚠️ State management warning: {state_result.message}")
+
+        # Check for album completion after successful posting
+        progress_info = posting_workflow_result['progress_info']
+        if progress_info.get('is_complete', False):
+            state_orchestrator.handle_album_completion(selection_result.photos_total, config.album_name)
+
+        return True
+
     except Exception as e:
         logger.error(f"💥 Automation failed: {e}")
         return False
