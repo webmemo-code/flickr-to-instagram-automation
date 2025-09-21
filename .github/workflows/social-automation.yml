@@ -1,4 +1,4 @@
-name: Shared Workflow Items
+name: Shared Workflow Items (do not run)
 
 # Centralized reusable workflow for Flickr to Instagram automation
 # Eliminates code duplication between primary and secondary account workflows
