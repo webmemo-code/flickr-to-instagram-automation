@@ -37,6 +37,7 @@ class CriticalFailureNotifier:
         try:
             self.smtp_port = int(smtp_port_str) if smtp_port_str else 587
         except ValueError:
+            self.logger.debug("Invalid SMTP_PORT value, defaulting to 587")
             self.smtp_port = 587
 
         self.email_user = os.getenv('SMTP_USERNAME')
