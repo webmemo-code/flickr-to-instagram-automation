@@ -164,7 +164,7 @@ class StateManager:
             )
 
     def record_post(self, position: int, photo_data: dict, instagram_post_id: str,
-                   title: str = "", create_audit_issue: bool = False) -> Optional[int]:
+                   title: str = "", create_audit_issue: bool = False) -> bool:
         """
         Record a successful Instagram post.
 
@@ -176,7 +176,7 @@ class StateManager:
             create_audit_issue: Whether to create audit issue (legacy compatibility)
 
         Returns:
-            Issue number if audit issue created, None otherwise
+            True if post was successfully recorded, False otherwise
         """
         try:
             # Get current posts
@@ -235,14 +235,14 @@ class StateManager:
 
 
                 self.logger.info(f"Recorded post for position {position} (Instagram ID: {instagram_post_id})")
-                return None  # Issue creation not implemented in enhanced version
+                return True  # Post successfully recorded
             else:
                 self.logger.error(f"Failed to write post record for position {position}")
-                return None
+                return False
 
         except Exception as e:
             self.logger.error(f"Failed to record post for position {position}: {e}")
-            return None
+            return False
 
     def record_failed_position(self, position: int, photo_id: str = None,
                              error_message: str = None) -> bool:
