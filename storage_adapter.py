@@ -135,7 +135,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
         """Write JSON data to repository file."""
         try:
             content = json.dumps(data, indent=2, default=str)
-            content_encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+            # GitHub Contents API automatically handles base64 encoding - don't encode manually
 
             # Check if file exists to determine if we're creating or updating
             try:
@@ -144,7 +144,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
                 self.repo.update_file(
                     path=file_path,
                     message=commit_message,
-                    content=content_encoded,
+                    content=content,
                     sha=existing_file.sha,
                     branch=self.branch
                 )
@@ -155,7 +155,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
                     self.repo.create_file(
                         path=file_path,
                         message=commit_message,
-                        content=content_encoded,
+                        content=content,
                         branch=self.branch
                     )
                     self.logger.debug(f"Created file {file_path}")
