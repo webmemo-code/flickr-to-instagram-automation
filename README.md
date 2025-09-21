@@ -126,7 +126,7 @@ SMTP_PASSWORD=your_gmail_app_password
 Add these **repository variables** (`Settings > Secrets and variables > Actions > Repository variables`):
 ```
 FLICKR_USERNAME=your_flickr_username
-GRAPH_API_VERSION=v18.0
+GRAPH_API_VERSION=v23.0
 OPENAI_MODEL=gpt-4o-mini
 ```
 > **Security Note**: Use a fine-grained Personal Access Token with **only** `contents:write` permission instead of the broad `repo` scope for enhanced security.
@@ -202,17 +202,17 @@ The system supports running multiple Instagram accounts independently from the s
 - Maintains separate posting progress and state
 - Uses different Instagram credentials
 - Can use different Flickr albums
-### Configuration for Reisememo Account
+### Configuration for Secondary Account
 The secondary account uses **environment-specific configuration**. Configure the `secondary-account` environment with:
 **Environment Variables:**
 ```
-FLICKR_ALBUM_ID=your_reisememo_flickr_album_id
-BLOG_POST_URL=https://reisememo.ch/your-blog-post-url
+FLICKR_ALBUM_ID=your_secondary_flickr_album_id
+BLOG_POST_URL=https://your-secondary-blog.com/your-blog-post-url
 ```
 **Environment Secrets:**
 ```  
-INSTAGRAM_ACCESS_TOKEN=your_reisememo_instagram_access_token
-INSTAGRAM_ACCOUNT_ID=your_reisememo_instagram_account_id
+INSTAGRAM_ACCESS_TOKEN=your_secondary_instagram_access_token
+INSTAGRAM_ACCOUNT_ID=your_secondary_instagram_account_id
 ```
 ### Manual Testing for Each Account
 **Primary Account:**
@@ -220,14 +220,14 @@ INSTAGRAM_ACCOUNT_ID=your_reisememo_instagram_account_id
 python main.py --account primary --dry-run
 python main.py --account primary --stats
 ```
-**Reisememo Account:**
+**Secondary Account:**
 ```bash
-python main.py --account reisememo --dry-run
-python main.py --account reisememo --stats
+python main.py --account secondary --dry-run
+python main.py --account secondary --stats
 ```
 ### Automation Schedules
 - **Primary Account**: Daily at 18:13 UTC (20:13 CEST)
-- **Reisememo Account**: Daily at 19:13 UTC (21:13 CEST)
+- **Secondary Account**: Daily at 19:13 UTC (21:13 CEST)
 Both automations run independently with separate state management and retry logic.
 ## Architecture Overview
 The automation system follows a modular architecture with clear separation of concerns, robust error handling, and comprehensive state management.
@@ -244,7 +244,7 @@ graph TB
     subgraph "GitHub Infrastructure"
         GR[📁 GitHub Repository<br/>Code & Configuration]
         GA[⚙️ GitHub Actions<br/>Workflow Engine]
-        GI[📋 GitHub Issues<br/>State Management]
+        GI[📋 GitHub Storage<br/>State Management]
         GS[🔐 GitHub Secrets<br/>Credential Storage]
     end
     %% Core Application
