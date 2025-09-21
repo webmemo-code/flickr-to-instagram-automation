@@ -64,7 +64,7 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
 
         environment_name = account_manager.get_environment_name(account)
-        state_manager = StateManager(config, repo_name, environment_name=environment_name, storage_backend="git")
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
 
         # Initialize orchestration modules
         from orchestration import (
@@ -208,7 +208,7 @@ def reset_dry_runs(account: str = 'primary') -> None:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
         environment_name = account_manager.get_environment_name(account)
-        state_manager = StateManager(config, repo_name, environment_name=environment_name, storage_backend="git")
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
         cleared_count = state_manager.clear_dry_run_records()
         
         print(f"✅ Cleared {cleared_count} dry run records")
@@ -230,7 +230,7 @@ def show_stats(account: str = 'primary') -> None:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
         environment_name = account_manager.get_environment_name(account)
-        state_manager = StateManager(config, repo_name, environment_name=environment_name, storage_backend="git")
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
         flickr_api = FlickrAPI(config)
         
         # Get total photos in album
