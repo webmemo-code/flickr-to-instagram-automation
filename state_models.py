@@ -5,7 +5,7 @@ This module defines the data structures used by the new Git-based storage system
 providing rich metadata and better tracking capabilities.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from enum import Enum
@@ -216,11 +216,19 @@ class AlbumMetadata:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'AlbumMetadata':
         """Create from dictionary (JSON deserialization)."""
-        # Convert status string to enum
-        if 'completion_status' in data:
-            data['completion_status'] = AlbumStatus(data['completion_status'])
+        payload = data.copy()
 
-        return cls(**data)
+        # Normalize completion status
+        if 'completion_status' in payload:
+            payload['completion_status'] = AlbumStatus(payload['completion_status'])
+
+        # Drop unknown legacy fields
+        allowed = {field.name for field in fields(cls)}
+        for key in list(payload.keys()):
+            if key not in allowed:
+                payload.pop(key)
+
+        return cls(**payload)
 
     @classmethod
     def create_new(cls, album_id: str, account: str, total_photos: int = 0) -> 'AlbumMetadata':
