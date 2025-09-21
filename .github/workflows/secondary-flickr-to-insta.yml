@@ -1,4 +1,4 @@
-name: Secondary Flickr to Instagram Automation
+name: Secondary Flickr to Insta Automation
 run-name: "Secondary Account - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
 
 # Secondary Instagram account automation workflow
