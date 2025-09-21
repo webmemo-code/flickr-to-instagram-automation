@@ -115,17 +115,23 @@ class InstagramPost:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'InstagramPost':
         """Create from dictionary (JSON deserialization)."""
+        payload = data.copy()
+
+        # Normalize legacy keys
+        if 'photo_id' not in payload and 'flickr_photo_id' in payload:
+            payload['photo_id'] = payload.pop('flickr_photo_id')
+
         # Convert status string to enum
-        if 'status' in data:
-            data['status'] = PostStatus(data['status'])
+        if 'status' in payload:
+            payload['status'] = PostStatus(payload['status'])
 
         # Convert retry history
-        if 'retry_history' in data and data['retry_history']:
-            data['retry_history'] = [
-                RetryAttempt.from_dict(attempt) for attempt in data['retry_history']
+        if 'retry_history' in payload and payload['retry_history']:
+            payload['retry_history'] = [
+                RetryAttempt.from_dict(attempt) for attempt in payload['retry_history']
             ]
 
-        return cls(**data)
+        return cls(**payload)
 
 @dataclass
 class AlbumMetadata:
@@ -150,8 +156,6 @@ class AlbumMetadata:
     error_count: int = 0
     last_error_message: Optional[str] = None
     last_error_at: Optional[str] = None
-    migrated_from: Optional[str] = None
-    migration_date: Optional[str] = None
 
     def update_counts(self, posts: List[InstagramPost]):
         """Update statistics based on current post data."""
@@ -260,7 +264,10 @@ class FailedPosition:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'FailedPosition':
         """Create from dictionary (JSON deserialization)."""
-        return cls(**data)
+        payload = data.copy()
+        if 'photo_id' not in payload and 'flickr_photo_id' in payload:
+            payload['photo_id'] = payload.pop('flickr_photo_id')
+        return cls(**payload)
 
     @classmethod
     def from_position(cls, position: int, photo_id: Optional[str] = None,

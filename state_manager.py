@@ -438,12 +438,12 @@ class StateManager:
 
             # Get posted photos
             posted_photos = self.get_instagram_posts()
-            posted_ids = {post.flickr_photo_id for post in posted_photos
-                         if not include_dry_runs or not post.is_dry_run}
+            posted_ids = {post.photo_id for post in posted_photos if post.photo_id
+                         if not include_dry_runs or not getattr(post, 'is_dry_run', False)}
 
             # Get failed positions that should be retried
             failed_positions = self.get_enhanced_failed_positions()
-            failed_ids = {f.flickr_photo_id for f in failed_positions if not f.resolved}
+            failed_ids = {f.photo_id for f in failed_positions if not f.resolved and f.photo_id}
 
             # Find next unposted photo
             for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
