@@ -5,22 +5,24 @@ All sensitive credentials are loaded from environment variables.
 import os
 from typing import Dict, Optional
 from dotenv import load_dotenv
+from account_config import get_account_config, is_secondary_account, get_secondary_account_id
 
 # Load environment variables from .env file
 load_dotenv()
 
 class Config:
     """Configuration class for social media automation."""
-    
+
     def __init__(self, account: str = 'primary', email_test_mode: bool = False, skip_environment_validation: bool = False):
         """Initialize configuration for specified account.
 
         Args:
-            account: Account type - 'primary' (default) or 'reisememo'
+            account: Account type - 'primary' (default) or secondary account ID
             email_test_mode: Skip validation for email testing mode
-            skip_environment_validation: Skip validation of environment-specific variables (for reisememo workflow validation step)
+            skip_environment_validation: Skip validation of environment-specific variables (for secondary account workflow validation step)
         """
         self.account = account
+        self.account_config = get_account_config(account)
         
         # Common configuration (shared between accounts)
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
@@ -34,11 +36,12 @@ class Config:
         self.wordpress_app_password = os.getenv('WORDPRESS_APP_PASSWORD')
         
         # Account-specific configuration
-        if account == 'reisememo':
+        if is_secondary_account(account):
+            # Secondary account - use environment-specific variables
             self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
             self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
             self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
-            self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID_REISEMEMO')  # Optional
+            self.instagram_app_id = os.getenv(f'INSTAGRAM_APP_ID_{account.upper()}')  # Optional
         else:  # primary account (default)
             self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
             self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
@@ -93,7 +96,7 @@ class Config:
         }
 
         # Account-specific required variables
-        # For reisememo, these are environment-specific and might not be available during early workflow validation
+        # For secondary accounts, these are environment-specific and might not be available during early workflow validation
         account_specific_vars = {
             'FLICKR_ALBUM_ID': self.flickr_album_id,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
@@ -114,8 +117,8 @@ class Config:
             if len(missing_account_specific) == len(account_specific_vars):
                 # All account-specific variables are missing - this might be expected during validation step
                 import os
-                if os.getenv('GITHUB_ACTIONS') and self.account == 'reisememo':
-                    # We're in GitHub Actions for reisememo and all account-specific vars are missing
+                if os.getenv('GITHUB_ACTIONS') and is_secondary_account(self.account):
+                    # We're in GitHub Actions for secondary account and all account-specific vars are missing
                     # This is expected for the validation step that runs outside environment scope
                     print(f"Warning: Account-specific variables not available yet for {self.account} account (expected during validation step)")
                     return
@@ -132,10 +135,11 @@ class Config:
     @property
     def album_name(self) -> str:
         """Get the album name for logging and state management."""
-        if self.account == 'reisememo':
-            return 'Reisememo'
-        
-        # For primary account, try to get dynamic album name
+        # Use configured display name for secondary accounts
+        if is_secondary_account(self.account):
+            return self.account_config.display_name
+
+        # For primary account, try to get dynamic album name from Flickr
         try:
             from flickr_api import FlickrAPI
             flickr_api = FlickrAPI(self)
@@ -144,8 +148,9 @@ class Config:
                 return photoset_info['photoset']['title']['_content']
         except:
             pass  # Fall back to default if API call fails
-        
-        return 'Istrien'
+
+        # Default fallback for primary account
+        return 'Primary Album'
     
     @property
     def album_url(self) -> str:

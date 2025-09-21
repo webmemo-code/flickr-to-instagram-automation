@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       account_flag:
-        description: 'CLI account flag passed to main.py (empty for primary, "reisememo" for secondary)'
+        description: 'CLI account flag passed to main.py (empty for primary, secondary account ID for secondary accounts)'
         required: false
         type: string
         default: ''
@@ -141,7 +141,7 @@ jobs:
           try:
               sys.path.append('.')
               from config import Config
-              from state_manager import StateManager
+              from state_manager_legacy import StateManager
               from flickr_api import FlickrAPI
 
               print('Initializing components for ${{ inputs.account_id }} account...')

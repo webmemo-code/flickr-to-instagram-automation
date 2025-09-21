@@ -14,8 +14,8 @@ from datetime import datetime
 from typing import Dict, Any
 from config import Config
 from storage_adapter import GitFileStorageAdapter, RepositoryVariableStorageAdapter
+from state_manager_legacy import StateManager as LegacyStateManager
 from state_manager import StateManager
-from state_manager_v2 import EnhancedStateManager
 from state_models import InstagramPost, FailedPosition, AlbumMetadata, migrate_legacy_data
 
 

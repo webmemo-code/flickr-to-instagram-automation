@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Dict, List, Optional, Tuple
 from config import Config
+from account_config import get_account_config
 
 
 class FlickrAPI:
@@ -151,9 +152,13 @@ class FlickrAPI:
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\],.]'
             urls = re.findall(url_pattern, description)
             
-            # Filter for blog URLs (travelmemo.com, reisememo.ch, etc.)
+            # Filter for blog URLs using account configuration
+            account_config = get_account_config(self.config.account)
+            configured_domains = account_config.blog_domains if account_config else ['travelmemo.com']
+            all_domains = configured_domains + ['blog']  # Include 'blog' as fallback
+
             for url in urls:
-                if any(domain in url.lower() for domain in ['travelmemo.com', 'reisememo.ch', 'blog']):
+                if any(domain in url.lower() for domain in all_domains):
                     return url
             
             # Return first URL if no blog-specific URL found

@@ -159,9 +159,13 @@ OPENAI_API_KEY=your_openai_api_key
 PERSONAL_ACCESS_TOKEN=your_github_pat_with_contents_write_permission
 WORDPRESS_USERNAME=your_wordpress_username
 WORDPRESS_APP_PASSWORD=your_wordpress_app_password
-NOTIFICATION_EMAIL=your_notification_email
-SMTP_USERNAME=your_smtp_username
-SMTP_PASSWORD=your_smtp_password
+
+# Critical Failure Notification System (REQUIRED for fail-safe automation)
+NOTIFICATION_EMAIL=your-alert-email@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
 ```
 
 Add these **repository variables** (`Settings > Secrets and variables > Actions > Repository variables`):
@@ -187,6 +191,42 @@ Create GitHub environments (`Settings > Environments`) and configure:
 - **Environment secrets**: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`
 
 ⚠️ **Important**: Configure WordPress Application Password for authenticated blog content access.
+
+#### Gmail App Password Setup (Required for Critical Notifications)
+
+The fail-safe notification system requires a Gmail App Password for secure email authentication. **Never use your regular Gmail password.**
+
+**Step 1: Enable 2-Factor Authentication**
+1. Go to [Google Account Security](https://myaccount.google.com/security)
+2. Under "Signing in to Google", enable **2-Step Verification**
+3. Complete the 2FA setup process
+
+**Step 2: Generate App Password**
+1. Go to [Google Account Security](https://myaccount.google.com/security)
+2. Under "Signing in to Google", click **2-Step Verification**
+3. Scroll down and click **App passwords**
+4. Select **Mail** as the app
+5. Enter a descriptive name like "Flickr Instagram Automation"
+6. Click **Generate**
+7. Copy the **16-character password** (Gmail shows it with spaces: `abcd efgh ijkl mnop`)
+
+**Step 3: Configure GitHub Secrets**
+⚠️ **IMPORTANT**: Remove all spaces from the app password before storing it.
+
+Use the generated app password (not your regular password) for:
+- `SMTP_PASSWORD=abcdefghijklmnop` (16 characters, **NO SPACES**)
+- `SMTP_USERNAME=your-email@gmail.com` (your Gmail address)
+- `NOTIFICATION_EMAIL=your-alert-email@gmail.com` (where to receive alerts)
+
+**App Password Format:**
+- ❌ **Wrong**: `abcd efgh ijkl mnop` (with spaces - will fail authentication)
+- ✅ **Correct**: `abcdefghijklmnop` (no spaces - required for SMTP)
+
+**Security Notes:**
+- ✅ App passwords are safer than regular passwords for automation
+- ✅ You can revoke app passwords anytime without affecting your account
+- ❌ Never store passwords in repository variables (always use secrets)
+- ❌ Never use your regular Gmail password for automation
 
 ### 3. First Run
 
@@ -690,6 +730,16 @@ Error: Rate limit exceeded
 - Check OpenAI account credits and usage limits
 - Verify GPT-4 Vision model access
 - Consider using GPT-4o-mini for lower costs
+
+**Email Notification Errors**
+```
+Error: SMTP authentication failed
+```
+- **Most common cause**: App password contains spaces
+- **Solution**: Remove all spaces from `SMTP_PASSWORD` (use `abcdefghijklmnop`, not `abcd efgh ijkl mnop`)
+- Verify `SMTP_USERNAME` is your complete Gmail address
+- Ensure 2-factor authentication is enabled on Gmail
+- Check that you generated an **App Password**, not using your regular password
 
 **Flickr API Errors**
 ```

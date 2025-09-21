@@ -1,9 +1,9 @@
 name: Secondary Flickr to Instagram Automation
 run-name: "Secondary Account - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
 
-# Secondary Instagram account automation workflow (Reisememo)
+# Secondary Instagram account automation workflow
 # Uses the centralized reusable workflow with secondary-account environment
-# Posts photos from Flickr album with German travel-focused captions
+# Posts photos from Flickr album with account-specific language and branding
 
 on:
   # Scheduled automation - Currently disabled, enable by uncommenting
@@ -40,7 +40,7 @@ jobs:
     with:
       account_id: reisememo
       environment_name: secondary-account     # Uses secondary-account GitHub environment
-      account_flag: reisememo                 # Triggers German language mode and Reisememo branding
+      account_flag: reisememo                 # Triggers secondary account configuration (language, branding, etc.)
       dry_run: ${{ inputs.dry_run || false }}
       show_stats: ${{ inputs.show_stats || false }}
     secrets: inherit                         # Pass all repository and environment secrets
