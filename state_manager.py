@@ -1,8 +1,7 @@
 """
-Enhanced state management with pluggable storage backends.
+Modern state management using Git-based file storage.
 
-This is an evolution of the original StateManager that supports both legacy repository
-variables and the new Git-based file storage system.
+Provides scalable, reliable state management using Git files with fail-safe error handling.
 """
 
 import json
@@ -12,84 +11,47 @@ from datetime import datetime
 from typing import List, Optional, Dict, Union
 from github import Github
 from config import Config
-from storage_adapter import StateStorageAdapter, GitFileStorageAdapter, RepositoryVariableStorageAdapter
-from state_models import InstagramPost, AlbumMetadata, FailedPosition, PostStatus, AlbumStatus, migrate_legacy_data
+from storage_adapter import GitFileStorageAdapter
+from state_models import InstagramPost, AlbumMetadata, FailedPosition, PostStatus, AlbumStatus
 from notification_system import notifier, CriticalStateFailure
 from account_config import account_manager
 
 
 class StateManager:
-    """Modern state manager with pluggable storage backends, rich metadata support, and fail-safe error handling."""
+    """Modern state manager using Git-based file storage with rich metadata support and fail-safe error handling."""
 
-    def __init__(self, config: Config, repo_name: str, environment_name: str = None,
-                 storage_backend: str = "auto", enable_parallel_writes: bool = False):
+    def __init__(self, config: Config, repo_name: str, environment_name: str = None):
         """
-        Initialize enhanced state manager.
+        Initialize Git-based state manager.
 
         Args:
             config: Configuration object
             repo_name: GitHub repository name (owner/repo)
             environment_name: Environment name for account isolation
-            storage_backend: Storage backend to use ("git", "repository_variables", "auto")
-            enable_parallel_writes: Write to both storage systems during migration
         """
         self.config = config
         self.repo_name = repo_name
         self.logger = logging.getLogger(__name__)
         self.current_album_id = config.flickr_album_id
         self.environment_name = environment_name or self._detect_environment_name(config.account)
-        self.enable_parallel_writes = enable_parallel_writes
 
-        # Initialize GitHub client for legacy operations
+        # Initialize GitHub client for Git operations
         self.github = Github(config.github_token)
         self.repo = self.github.get_repo(repo_name)
 
-        # Initialize storage adapters
-        self.storage_adapter = self._initialize_storage_adapter(storage_backend)
-
-        # Initialize legacy adapter if parallel writes are enabled
-        self.legacy_adapter = None
-        if enable_parallel_writes:
-            from state_manager_legacy import StateManager  # Import legacy StateManager
-            legacy_state_manager = StateManager(config, repo_name, environment_name)
-            self.legacy_adapter = RepositoryVariableStorageAdapter(legacy_state_manager)
+        # Initialize Git-based storage adapter
+        self.storage_adapter = GitFileStorageAdapter(
+            repo_name=self.repo_name,
+            github_token=self.config.github_token
+        )
 
         self.logger.info(f"StateManager initialized for account: {self.environment_name}")
-        self.logger.info(f"Storage backend: {type(self.storage_adapter).__name__}")
-        if self.enable_parallel_writes:
-            self.logger.info("Parallel writes enabled (writing to both storage systems)")
+        self.logger.info("Using Git-based file storage")
 
     def _detect_environment_name(self, account: str) -> str:
         """Detect environment name based on account configuration."""
         return account_manager.get_environment_name(account)
 
-    def _initialize_storage_adapter(self, storage_backend: str) -> StateStorageAdapter:
-        """Initialize the appropriate storage adapter."""
-        if storage_backend == "git":
-            return GitFileStorageAdapter(
-                repo_name=self.repo_name,
-                github_token=self.config.github_token
-            )
-        elif storage_backend == "repository_variables":
-            from state_manager_legacy import StateManager  # Import legacy StateManager
-            legacy_state_manager = StateManager(self.config, self.repo_name, self.environment_name)
-            return RepositoryVariableStorageAdapter(legacy_state_manager)
-        elif storage_backend == "auto":
-            # Try Git storage first, fall back to repository variables
-            git_adapter = GitFileStorageAdapter(
-                repo_name=self.repo_name,
-                github_token=self.config.github_token
-            )
-            if git_adapter.is_available():
-                self.logger.info("Using Git-based storage (auto-detected)")
-                return git_adapter
-            else:
-                self.logger.info("Git storage not available, falling back to repository variables")
-                from state_manager_legacy import StateManager
-                legacy_state_manager = StateManager(self.config, self.repo_name, self.environment_name)
-                return RepositoryVariableStorageAdapter(legacy_state_manager)
-        else:
-            raise ValueError(f"Unknown storage backend: {storage_backend}")
 
     def get_account_normalized(self) -> str:
         """Get normalized account name for storage."""
@@ -271,21 +233,6 @@ class StateManager:
                 # Remove from failed positions if it was there
                 self.remove_failed_position(position)
 
-                # Parallel write to legacy system if enabled
-                if self.enable_parallel_writes and self.legacy_adapter:
-                    try:
-                        # Convert to legacy format for parallel write
-                        legacy_record = {
-                            "position": position,
-                            "photo_id": photo_data.get('id', ''),
-                            "instagram_post_id": instagram_post_id,
-                            "posted_at": datetime.now().isoformat(),
-                            "title": title
-                        }
-                        # Note: Legacy system doesn't support bulk updates
-                        self.logger.debug("Parallel write to legacy system (record_post)")
-                    except Exception as e:
-                        self.logger.warning(f"Parallel write to legacy system failed: {e}")
 
                 self.logger.info(f"Recorded post for position {position} (Instagram ID: {instagram_post_id})")
                 return None  # Issue creation not implemented in enhanced version
@@ -344,16 +291,6 @@ class StateManager:
                     metadata.to_dict()
                 )
 
-                # Parallel write to legacy system if enabled
-                if self.enable_parallel_writes and self.legacy_adapter:
-                    try:
-                        # Legacy system uses simple integer list
-                        legacy_failed = self.get_failed_positions()
-                        if position not in legacy_failed:
-                            legacy_failed.append(position)
-                        self.logger.debug("Parallel write to legacy system (record_failed_position)")
-                    except Exception as e:
-                        self.logger.warning(f"Parallel write to legacy system failed: {e}")
 
                 self.logger.info(f"Recorded failed position {position}")
                 return True
@@ -386,16 +323,6 @@ class StateManager:
                     failed_data
                 )
 
-                # Parallel write to legacy system if enabled
-                if self.enable_parallel_writes and self.legacy_adapter:
-                    try:
-                        # Legacy system removes from list
-                        legacy_failed = self.get_failed_positions()
-                        if position in legacy_failed:
-                            legacy_failed.remove(position)
-                        self.logger.debug("Parallel write to legacy system (remove_failed_position)")
-                    except Exception as e:
-                        self.logger.warning(f"Parallel write to legacy system failed: {e}")
 
                 return success
             return True
@@ -465,19 +392,6 @@ class StateManager:
                 "storage_backend": type(self.storage_adapter).__name__
             }
 
-    def migrate_from_legacy(self) -> Dict:
-        """Migrate data from legacy repository variables to new storage."""
-        if not isinstance(self.storage_adapter, GitFileStorageAdapter):
-            return {"error": "Migration only supported for Git storage backend"}
-
-        try:
-            # Get migration adapter
-            git_adapter = self.storage_adapter
-            return git_adapter.migrate_from_repository_variables(None)
-
-        except Exception as e:
-            self.logger.error(f"Migration failed: {e}")
-            return {"error": str(e)}
 
     def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
         """

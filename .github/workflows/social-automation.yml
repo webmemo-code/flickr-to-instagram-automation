@@ -141,7 +141,7 @@ jobs:
           try:
               sys.path.append('.')
               from config import Config
-              from state_manager_legacy import StateManager
+              from state_manager import StateManager
               from flickr_api import FlickrAPI
 
               print('Initializing components for ${{ inputs.account_id }} account...')

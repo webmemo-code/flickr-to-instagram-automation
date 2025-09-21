@@ -115,6 +115,7 @@ TASKS.md
 TODO.md
 CLAUDE.md
 test_account_config.py
+migrate_state_storage.py
 
 # WordPress plugin files (deployment templates)
 *.php
