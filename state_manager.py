@@ -510,16 +510,18 @@ class StateManager:
 
             # Create Instagram post record
             post = InstagramPost(
-                flickr_photo_id=flickr_photo_id,
+                position=album_position,
+                photo_id=flickr_photo_id,
                 instagram_post_id=instagram_post_id or "",
-                album_position=album_position,
                 posted_at=posted_at or datetime.now().isoformat(),
+                title=photo_data.get('title', 'Unknown'),
+                status=status,
+                retry_count=0,
+                workflow_run_id=os.getenv('GITHUB_RUN_ID'),
+                account=self.config.account,
                 flickr_url=flickr_url,
                 instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
-                caption_preview=photo_data.get('title', '')[:100],
-                retry_count=0,
-                is_dry_run=is_dry_run,
-                status=status
+                caption_length=len(photo_data.get('title', '')[:100])
             )
 
             # Save the post record using existing method
