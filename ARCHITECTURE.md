@@ -176,121 +176,6 @@ def create_state_orchestrator(state_manager: StateManager, email_notifier: Email
 - **Flexibility**: Different implementations for different environments
 - **Maintainability**: Clear dependency relationships
 
-## State Management Evolution
-
-### Legacy System (Repository Variables)
-
-**Issues**:
-- Required broad `repo` PAT scope for security
-- Limited to 256 characters per variable
-- No structured data support
-- Difficult to audit and track changes
-
-### Modern System (Git-based Storage)
-
-**Architecture**:
-```mermaid
-graph LR
-    subgraph "State Storage Adapter"
-        SA[📊 Storage Adapter]
-        GF[📁 Git File Operations]
-        JSON[📋 JSON Serialization]
-    end
-
-    subgraph "Enhanced Data Models"
-        IP[📸 Instagram Post]
-        FP[❌ Failed Position]
-        AM[📊 Album Metadata]
-    end
-
-    subgraph "Git Repository"
-        SB[🌿 automation-state branch]
-        SF[📁 state/ directory]
-        subgraph "Account Structure"
-            PA[👤 primary/]
-            SA2[👤 secondary/]
-        end
-    end
-
-    SA --> GF
-    SA --> JSON
-    SA --> IP
-    SA --> FP
-    SA --> AM
-
-    GF --> SB
-    SB --> SF
-    SF --> PA
-    SF --> SA2
-```
-
-**Benefits**:
-- **Security**: Only requires `contents:write` PAT permission
-- **Scalability**: No size limits on state data
-- **Auditability**: Full Git history of state changes
-- **Reliability**: Atomic operations with conflict resolution
-- **Structure**: Rich data models with validation
-
-### State File Structure
-
-```
-state/
-├── primary/
-│   └── 72177720326826937/
-│       ├── posts.json          # Posted photo records
-│       ├── failed.json         # Failed posting attempts
-│       └── metadata.json       # Album statistics
-└── secondary/
-    └── 72177720326826938/
-        ├── posts.json
-        ├── failed.json
-        └── metadata.json
-```
-
-### Enhanced Data Models
-
-#### Instagram Post Model
-```python
-@dataclass
-class InstagramPost:
-    flickr_photo_id: str
-    instagram_post_id: str
-    album_position: int
-    posted_at: str
-    flickr_url: str
-    instagram_url: Optional[str] = None
-    caption_preview: Optional[str] = None
-    retry_count: int = 0
-    is_dry_run: bool = False
-```
-
-#### Failed Position Model
-```python
-@dataclass
-class FailedPosition:
-    album_position: int
-    flickr_photo_id: str
-    failed_at: str
-    error_message: str
-    retry_count: int = 0
-    last_retry_at: Optional[str] = None
-    resolved: bool = False
-```
-
-#### Album Metadata Model
-```python
-@dataclass
-class AlbumMetadata:
-    album_id: str
-    total_photos: int
-    posted_count: int
-    failed_count: int
-    completion_percentage: float
-    last_updated: str
-    last_post_date: Optional[str] = None
-    success_rate: float = 0.0
-```
-
 ## Workflow System
 
 ### Reusable Workflow Architecture
@@ -416,8 +301,7 @@ graph TB
 
     UT1 --> IT1
     UT2 --> IT1
-    UT3 --> IT1
-    UT4 --> IT2
+        UT4 --> IT2
 
     IT1 --> ST1
     IT2 --> ST2
@@ -445,68 +329,10 @@ def test_photo_selection_success(self, mock_get_next, mock_get_photos):
 - **Happy Path**: Complete workflow from photo selection to posting
 - **Error Recovery**: API failures, network issues, validation errors
 - **State Consistency**: Concurrent access, conflict resolution
-- **Migration**: Legacy to modern state system transition
-
-## Migration Guide
-
-### Migrating from Repository Variables to Git Storage
-
-The system includes comprehensive migration tools for seamless transition:
-
-#### Migration Process
-
-```mermaid
-graph LR
-    subgraph "Migration Phases"
-        P1[🔍 Detection<br/>Check for Legacy Data]
-        P2[📥 Extraction<br/>Read Repository Variables]
-        P3[🔄 Transformation<br/>Convert to Enhanced Models]
-        P4[💾 Storage<br/>Write to Git Files]
-        P5[✅ Validation<br/>Verify Data Integrity]
-    end
-
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
-```
-
-#### Migration Tool Usage
-
-```bash
-# Run migration with validation
-python migrate_state_storage.py --validate
-
-# Execute migration
-python migrate_state_storage.py --execute
-
-# Parallel write mode (during transition)
-python migrate_state_storage.py --parallel-write
-```
-
-#### Migration Safety Features
-
-- **Dry-run Mode**: Test migration without making changes
-- **Data Validation**: Comprehensive integrity checks
-- **Parallel Write**: Support both systems during transition
-- **Rollback Capability**: Maintain legacy data during migration
-- **Conflict Resolution**: Handle concurrent access scenarios
-
-### Post-Migration Cleanup
-
-After successful migration:
-
-1. **Verify Git State**: Confirm all data migrated correctly
-2. **Test Workflows**: Run automation in both dry-run and live modes
-3. **Update PAT**: Replace broad-scope PAT with fine-grained version
-4. **Clean Variables**: Remove legacy repository variables
-5. **Update Documentation**: Reflect new state management approach
-
----
 
 ## Conclusion
 
-This architecture provides a robust, secure, and maintainable foundation for automated social media posting. The modular design enables easy testing and extension, while the Git-based state management offers superior security and auditability compared to the legacy system.
+This architecture provides a robust, secure, and maintainable foundation for automated social media posting. The modular design enables easy testing and extension, while the Git-based state management offers superior security and auditability.
 
 The reusable workflow pattern eliminates code duplication and simplifies maintenance across multiple accounts. The comprehensive testing strategy ensures reliability, and the migration tools provide a safe path for transitioning existing deployments.
 

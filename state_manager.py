@@ -67,22 +67,18 @@ class StateManager:
                 self.current_album_id
             )
 
-            # Convert to InstagramPost objects
-            posts = []
+            posts: List[InstagramPost] = []
             for post_data in posts_data:
-                if isinstance(post_data, dict):
-                    # Handle both legacy and new format
-                    if 'status' in post_data:
-                        # New format
-                        posts.append(InstagramPost.from_dict(post_data))
-                    else:
-                        # Legacy format
-                        posts.append(InstagramPost.from_legacy_dict(post_data))
+                try:
+                    posts.append(InstagramPost.from_dict(post_data))
+                except Exception as conversion_error:
+                    self.logger.error(
+                        f"Failed to load stored post record: {conversion_error} | data={post_data}"
+                    )
 
             return posts
 
         except Exception as e:
-            # Check if this is a critical permission issue
             if "403" in str(e) or "permission" in str(e).lower() or "forbidden" in str(e).lower():
                 error_msg = f"CRITICAL: Cannot access Instagram posts data - STOPPING to prevent wrong photo posting: {e}"
                 self.logger.critical(error_msg)
@@ -97,20 +93,18 @@ class StateManager:
             return []
 
     def get_failed_positions(self) -> List[int]:
-        """Get list of failed positions (for backward compatibility)."""
+        """Get list of failed positions that still require attention."""
         try:
             failed_data = self.storage_adapter.read_failed_positions(
                 self.get_account_normalized(),
                 self.current_album_id
             )
 
-            # Handle both enhanced and legacy format
-            if failed_data and isinstance(failed_data[0], dict):
-                # Enhanced format with FailedPosition objects
-                return [pos['position'] for pos in failed_data if not pos.get('resolved', False)]
-            else:
-                # Legacy format with just position integers
-                return failed_data
+            return [
+                pos['position']
+                for pos in failed_data
+                if isinstance(pos, dict) and not pos.get('resolved', False)
+            ]
 
         except Exception as e:
             self.logger.error(f"Failed to get failed positions: {e}")
@@ -124,16 +118,7 @@ class StateManager:
                 self.current_album_id
             )
 
-            # Convert to FailedPosition objects
-            failed_positions = []
-            for item in failed_data:
-                if isinstance(item, dict):
-                    failed_positions.append(FailedPosition.from_dict(item))
-                else:
-                    # Legacy integer format
-                    failed_positions.append(FailedPosition.from_position(item))
-
-            return failed_positions
+            return [FailedPosition.from_dict(item) for item in failed_data]
 
         except Exception as e:
             self.logger.error(f"Failed to get enhanced failed positions: {e}")
@@ -173,7 +158,7 @@ class StateManager:
             photo_data: Photo data from Flickr
             instagram_post_id: Instagram post ID
             title: Post title
-            create_audit_issue: Whether to create audit issue (legacy compatibility)
+            create_audit_issue: Whether to create audit issue for additional auditing
 
         Returns:
             True if post was successfully recorded, False otherwise
@@ -243,6 +228,48 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to record post for position {position}: {e}")
             return False
+
+    def clear_dry_run_records(self) -> int:
+        """Clear dry-run post records from Git-based storage."""
+        try:
+            posts = self.get_instagram_posts()
+            if not posts:
+                self.logger.info("No post records found; nothing to clear")
+                return 0
+
+            remaining_posts = [
+                post for post in posts
+                if not bool(getattr(post, "is_dry_run", False))
+            ]
+            cleared_count = len(posts) - len(remaining_posts)
+
+            if cleared_count == 0:
+                self.logger.info("No dry run records to clear")
+                return 0
+
+            if not self.storage_adapter.write_posts(
+                self.get_account_normalized(),
+                self.current_album_id,
+                [post.to_dict() for post in remaining_posts]
+            ):
+                self.logger.error("Failed to persist updated post records after clearing dry runs")
+                return 0
+
+            metadata = self.get_album_metadata()
+            metadata.update_counts(remaining_posts)
+            self.storage_adapter.write_metadata(
+                self.get_account_normalized(),
+                self.current_album_id,
+                metadata.to_dict()
+            )
+
+            self.logger.info(f"Cleared {cleared_count} dry run records")
+            return cleared_count
+
+        except Exception as e:
+            self.logger.error(f"Failed to clear dry run records: {e}")
+            return 0
+
 
     def record_failed_position(self, position: int, photo_id: str = None,
                              error_message: str = None) -> bool:
