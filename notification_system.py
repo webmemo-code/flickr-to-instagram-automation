@@ -31,7 +31,14 @@ class CriticalFailureNotifier:
 
         # Email configuration from environment variables (using existing config)
         self.smtp_server = os.getenv('SMTP_HOST', os.getenv('SMTP_SERVER', 'smtp.gmail.com'))
-        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
+
+        # Handle SMTP_PORT safely - default to 587 if empty or invalid
+        smtp_port_str = os.getenv('SMTP_PORT', '587').strip()
+        try:
+            self.smtp_port = int(smtp_port_str) if smtp_port_str else 587
+        except ValueError:
+            self.smtp_port = 587
+
         self.email_user = os.getenv('SMTP_USERNAME')
         self.email_password = os.getenv('SMTP_PASSWORD')
         self.notification_recipient = os.getenv('NOTIFICATION_EMAIL')
