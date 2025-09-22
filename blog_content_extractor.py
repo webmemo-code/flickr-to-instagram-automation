@@ -625,8 +625,11 @@ class BlogContentExtractor:
         }
 
         try:
-            self.email_notifier.send_api_failure_alert(blog_url, error_details, account_name)
-            self.logger.info("API failure notification sent successfully")
+            success = self.email_notifier.send_api_failure_alert(blog_url, error_details, account_name)
+            if success:
+                self.logger.info("API failure notification sent successfully")
+            else:
+                self.logger.warning("API failure notification could not be sent")
         except Exception as e:
             self.logger.error(f"Failed to send API failure notification: {e}")
 
