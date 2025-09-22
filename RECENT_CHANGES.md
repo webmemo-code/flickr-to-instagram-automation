@@ -1,5 +1,10 @@
 # Recent Changes Documentation
 
+## September 23, 2025 - Account-Specific Blog URL Preference
+
+- **ENHANCED**: Caption generator now orders candidate blog URLs using account-configured domain preferences to ensure the primary account links to travelmemo.com and secondary to reisememo.ch.
+- **CONFIG**: Default `blog_domains` ordering updated in `account_config.py` to illustrate domain priority; implementers can override via `PRIMARY_BLOG_DOMAINS` / `SECONDARY_BLOG_DOMAINS` environment variables by listing preferred domains first.
+
 ## September 22, 2025 - Major Architecture and Feature Updates
 
 This document covers the significant changes made in commits from d828f2b to HEAD (8554828) that were committed without proper commit messages.

@@ -49,7 +49,7 @@ class AccountConfigManager:
             environment_name='primary-account',
             language='en',
             caption_style='travel',
-            blog_domains=self._get_domains('PRIMARY_BLOG_DOMAINS', ['travelmemo.com'])
+            blog_domains=self._get_domains('PRIMARY_BLOG_DOMAINS', ['travelmemo.com', 'reisememo.ch'])
         )
 
         # Secondary account (configurable)
@@ -59,7 +59,7 @@ class AccountConfigManager:
         secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE', 'en')
         secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE', 'travel')
         secondary_signature = os.getenv('SECONDARY_BRAND_SIGNATURE')
-        secondary_domains = self._get_domains('SECONDARY_BLOG_DOMAINS', [])
+        secondary_domains = self._get_domains('SECONDARY_BLOG_DOMAINS', ['reisememo.ch', 'travelmemo.com'])
 
         accounts[secondary_id] = AccountConfig(
             account_id=secondary_id,

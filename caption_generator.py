@@ -216,6 +216,20 @@ class CaptionGenerator:
             photo_data['source_url'] = candidate_url
 
 
+    def _sort_urls_by_domain_preference(self, urls: List[str], preferred_domains: List[str]) -> List[str]:
+        """Sort URLs so account-preferred domains are evaluated first."""
+        if not urls or not preferred_domains:
+            return urls
+
+        def priority(url: str):
+            lower_url = url.lower()
+            for idx, domain in enumerate(preferred_domains):
+                if domain and domain.lower() in lower_url:
+                    return (0, idx, -len(url))
+            return (1, len(preferred_domains), -len(url))
+
+        return sorted(urls, key=priority)
+
 
     def _load_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """Fetch blog content with caching."""
@@ -261,6 +275,9 @@ class CaptionGenerator:
             append_url(url)
 
         candidate_urls = prioritized_urls
+        account_config = get_account_config(self.config.account)
+        preferred_domains = account_config.blog_domains if account_config else []
+        candidate_urls = self._sort_urls_by_domain_preference(candidate_urls, preferred_domains)
 
         if not candidate_urls:
             return None
