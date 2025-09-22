@@ -1,20 +1,21 @@
 # Architecture Documentation
 
-This document provides a comprehensive overview of the Flickr to Instagram automation system architecture, including the modular orchestration design, state management systems, and security considerations.
+This document provides a comprehensive overview of the Flickr to Instagram automation system architecture, including the multi-account configuration system, enhanced content integration, state management, and security considerations.
 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Multi-Account Configuration System](#multi-account-configuration-system)
+- [Enhanced Content Integration](#enhanced-content-integration)
 - [Modular Orchestration System](#modular-orchestration-system)
-- [State Management Evolution](#state-management-evolution)
+- [State Management System](#state-management-system)
 - [Workflow System](#workflow-system)
 - [Security Architecture](#security-architecture)
 - [Testing Strategy](#testing-strategy)
-- [Migration Guide](#migration-guide)
 
 ## Architecture Overview
 
-The system follows a modern, modular architecture with clear separation of concerns:
+The system follows a modern, modular architecture with multi-account support, enhanced content integration, and clear separation of concerns:
 
 ```mermaid
 graph TB
@@ -23,60 +24,172 @@ graph TB
         IA[📱 Instagram Graph API]
         OA[🤖 OpenAI GPT-4 Vision]
         WP[📝 WordPress API]
+        BE[🌐 Blog Content Extractor]
     end
 
     subgraph "GitHub Infrastructure"
         GH[🔧 GitHub Actions]
         GS[🔐 GitHub Secrets]
         GR[📁 Git Repository]
-        GB[🌿 State Branch]
+        GE[🌍 GitHub Environments]
+    end
+
+    subgraph "Account Configuration Layer"
+        AC[⚙️ Account Config]
+        ML[🌐 Multi-Language Support]
+        AB[🎨 Account Branding]
     end
 
     subgraph "Application Core"
         MC[🎮 Main Controller]
 
-        subgraph "Orchestration Modules"
-            PS[📸 Photo Selection]
-            CO[✏️ Caption Orchestration]
-            PO[📱 Posting Orchestration]
-            SO[📊 State Orchestration]
+        subgraph "Content Integration"
+            BCE[📝 Blog Content Extractor]
+            EUP[🔗 EXIF URL Prioritization]
+            KM[🔍 Keyword Matching]
         end
 
-        subgraph "State Management"
-            SM[📊 State Manager V2]
-            SA[💾 Storage Adapter]
-            MD[📋 State Models]
+        subgraph "Caption Generation"
+            CG[🤖 Caption Generator]
+            MLP[🌐 Multi-Language Prompts]
+            BC[📚 Blog Context Integration]
         end
 
         subgraph "API Integrations"
             FL[📷 Flickr Integration]
-            CG[🤖 Caption Generator]
             IG[📱 Instagram Integration]
+        end
+
+        subgraph "State Management"
+            SM[📊 State Manager]
+            SA[💾 Storage Adapter]
+            MD[📋 State Models]
         end
     end
 
     FA --> FL
     IA --> IG
     OA --> CG
-    WP --> CG
+    WP --> BCE
+    BE --> BCE
 
     GH --> MC
-    GS --> MC
+    GS --> AC
     GR --> SA
-    GB --> SA
+    GE --> AC
 
-    MC --> PS
-    MC --> CO
-    MC --> PO
-    MC --> SO
+    AC --> ML
+    AC --> AB
+    AC --> CG
 
-    PS --> FL
-    CO --> CG
-    PO --> IG
-    SO --> SM
+    MC --> BCE
+    MC --> CG
+    MC --> FL
+    MC --> IG
+    MC --> SM
+
+    BCE --> EUP
+    BCE --> KM
+    BCE --> BC
+
+    CG --> MLP
+    CG --> BC
+    BC --> CG
 
     SM --> SA
     SA --> MD
+```
+
+## Multi-Account Configuration System
+
+### Account-Based Architecture
+
+The system supports multiple Instagram accounts with independent configurations through the `account_config.py` module:
+
+**Key Components**:
+- `AccountConfig`: Centralized account management
+- `MultiLanguageSupport`: German and English configurations
+- `AccountBranding`: Account-specific branding and signatures
+- `LanguageAwareGeneration`: Swiss German and English caption conventions
+
+**Configuration Structure**:
+```python
+# Account-specific configuration
+ACCOUNT_CONFIGS = {
+    'primary': {
+        'brand_name': 'YourBrand',
+        'language': 'en',
+        'signature': 'Your English brand signature',
+        'blog_domain': 'your-english-blog.com',
+        'prompt_style': 'english_travel_influencer'
+    },
+    'secondary': {
+        'brand_name': 'IhreBrand',
+        'language': 'de',
+        'signature': 'Ihre deutsche Marken-Signatur',
+        'blog_domain': 'ihre-deutsche-blog.de',
+        'prompt_style': 'german_travel_influencer'
+    }
+}
+```
+
+**Benefits**:
+- **Language Isolation**: Each account uses its native language and cultural conventions
+- **Brand Consistency**: Account-specific branding and messaging
+- **Independent Operation**: Separate state management and workflow execution
+- **Scalable Design**: Easy addition of new accounts and languages
+
+## Enhanced Content Integration
+
+### Blog Content Extraction System
+
+The enhanced `blog_content_extractor.py` provides intelligent content matching and extraction:
+
+**Key Features**:
+- **WordPress Authentication**: Full content access with application passwords
+- **Keyword Matching**: Structured matching algorithms for content relevance
+- **EXIF URL Prioritization**: Enhanced source URL tracking and prioritization
+- **Content Scoring**: Advanced algorithms for content quality assessment
+
+**Content Extraction Workflow**:
+```mermaid
+graph LR
+    A[Photo EXIF Data] --> B[Extract Source URL]
+    B --> C[WordPress Authentication]
+    C --> D[Full Content Access]
+    D --> E[Keyword Matching]
+    E --> F[Content Scoring]
+    F --> G[Rich Context]
+    G --> H[Caption Generation]
+```
+
+**Content Prioritization**:
+1. **EXIF URL Priority**: Photos with source URLs get priority content matching
+2. **Keyword Relevance**: Content scored based on location, activity, and description keywords
+3. **Editorial Quality**: Full blog content provides richer context than excerpts
+4. **Contextual Enhancement**: Blog content enhances AI caption generation
+
+### Multi-Language Caption Generation
+
+The `caption_generator.py` now supports sophisticated multi-language operations:
+
+**Language-Specific Features**:
+- **German Prompts**: Swiss German conventions and cultural context
+- **English Prompts**: International travel influencer style
+- **Cultural Adaptation**: Language-appropriate expressions and hashtag styles
+- **Brand Integration**: Account-specific branding in native languages
+
+**Enhanced Context Integration**:
+```python
+# Context building with blog content
+context_parts = [
+    f"Photo Title: {photo_data.get('title', 'N/A')}",
+    f"Description: {photo_data.get('description', 'N/A')}",
+    f"Location: {location_string}",
+    f"Camera: {camera_info}",
+    f"Blog Context: {blog_context[:500]}...",  # Rich editorial content
+    f"Source: {source_url}"
+]
 ```
 
 ## Modular Orchestration System
@@ -221,9 +334,15 @@ The reusable workflow accepts these inputs:
 
 ### Environment Isolation
 
-Each account uses a separate GitHub environment:
-- **primary-account**: Primary Instagram account configuration
-- **secondary-account**: Secondary Instagram account configuration
+Each account uses a separate GitHub environment with enhanced configuration:
+- **primary-account**: Primary account configuration (typically English)
+- **secondary-account**: Secondary account configuration (typically German)
+
+**Environment-Specific Variables**:
+- `FLICKR_ALBUM_ID`: Account-specific photo source
+- `BLOG_POST_URL`: Account-specific blog content source
+- `INSTAGRAM_ACCESS_TOKEN`: Account-specific Instagram credentials
+- `INSTAGRAM_ACCOUNT_ID`: Account-specific Instagram account
 
 ## Security Architecture
 
@@ -276,32 +395,38 @@ graph TB
 
 ## Testing Strategy
 
-### Multi-level Testing Approach
+### Comprehensive Testing Framework
+
+The testing suite has been expanded to cover new functionality:
 
 ```mermaid
 graph TB
     subgraph "Unit Tests"
-        UT1[🧪 Photo Selection Tests<br/>Mock Flickr API]
-        UT2[🧪 Caption Generation Tests<br/>Mock OpenAI API]
-        UT3[🧪 Posting Tests<br/>Mock Instagram API]
-        UT4[🧪 State Management Tests<br/>Mock Git Operations]
+        UT1[🧪 Account Config Tests<br/>Multi-language Support]
+        UT2[🧪 Blog Content Tests<br/>WordPress Authentication]
+        UT3[🧪 Caption Generation Tests<br/>Multi-language Prompts]
+        UT4[🧪 EXIF URL Tests<br/>Prioritization Logic]
+        UT5[🧪 State Management Tests<br/>Enhanced Models]
     end
 
     subgraph "Integration Tests"
-        IT1[🔗 End-to-End Workflow<br/>Real API Integration]
-        IT2[🔗 State Persistence<br/>Git Storage Validation]
-        IT3[🔗 Error Recovery<br/>Failure Scenarios]
+        IT1[🔗 Multi-Account Workflow<br/>Environment Isolation]
+        IT2[🔗 Content Integration<br/>Blog to Caption Flow]
+        IT3[🔗 Language Processing<br/>German/English Captions]
+        IT4[🔗 Error Recovery<br/>Enhanced Failure Handling]
     end
 
     subgraph "System Tests"
-        ST1[🏗️ Workflow Execution<br/>GitHub Actions Testing]
-        ST2[🏗️ Multi-account Setup<br/>Environment Isolation]
-        ST3[🏗️ Migration Testing<br/>Legacy to Modern Transition]
+        ST1[🏗️ Multi-Account Deployment<br/>Independent Workflows]
+        ST2[🏗️ Content Authentication<br/>WordPress Integration]
+        ST3[🏗️ Language Validation<br/>Cultural Appropriateness]
     end
 
     UT1 --> IT1
-    UT2 --> IT1
-        UT4 --> IT2
+    UT2 --> IT2
+    UT3 --> IT3
+    UT4 --> IT2
+    UT5 --> IT4
 
     IT1 --> ST1
     IT2 --> ST2
@@ -310,30 +435,78 @@ graph TB
 
 ### Testing Infrastructure
 
-#### Mock-based Unit Tests
+#### Enhanced Testing Coverage
+
+**Account Configuration Testing**:
 ```python
-# Example: Photo selection testing
-@patch('flickr_api.FlickrAPI.get_unposted_photos')
-@patch('state_manager.StateManager.get_next_photo_to_post')
-def test_photo_selection_success(self, mock_get_next, mock_get_photos):
-    mock_get_photos.return_value = [test_photo_data]
-    mock_get_next.return_value = test_photo_data
+# Multi-language caption generation
+@patch('caption_generator.CaptionGenerator.generate_caption')
+def test_multi_language_caption_generation(self, mock_generate):
+    # Test German account configuration
+    german_config = get_account_config('secondary')
+    assert german_config['language'] == 'de'
+    assert 'Reisememo' in german_config['signature']
 
-    result = photo_selector.get_next_photo_to_post()
+    # Test English account configuration
+    english_config = get_account_config('primary')
+    assert english_config['language'] == 'en'
+    assert 'Travelmemo' in english_config['signature']
+```
 
-    assert result.success
-    assert result.photo['id'] == 'test_photo_id'
+**Blog Content Integration Testing**:
+```python
+# WordPress authentication and content extraction
+@patch('blog_content_extractor.BlogContentExtractor.extract_content')
+def test_wordpress_authenticated_content(self, mock_extract):
+    mock_extract.return_value = full_blog_content
+
+    result = extractor.get_blog_context(photo_with_exif_url)
+
+    assert len(result) > 1000  # Full content vs excerpt
+    assert 'editorial_content' in result
+```
+
+**EXIF URL Prioritization Testing**:
+```python
+# Test EXIF URL prioritization logic
+def test_exif_url_prioritization():
+    photos_with_urls = filter_photos_with_exif_urls(all_photos)
+    assert all('source_url' in photo for photo in photos_with_urls)
+    assert photos_with_urls[0]['priority_score'] > 0.8
 ```
 
 #### Integration Test Scenarios
-- **Happy Path**: Complete workflow from photo selection to posting
-- **Error Recovery**: API failures, network issues, validation errors
-- **State Consistency**: Concurrent access, conflict resolution
+- **Multi-Account Operations**: Independent workflow execution
+- **Content Authentication**: WordPress credential validation
+- **Language Processing**: Cultural and linguistic appropriateness
+- **Enhanced Error Recovery**: Account-specific failure handling
+- **State Isolation**: Account-separated state management
 
 ## Conclusion
 
-This architecture provides a robust, secure, and maintainable foundation for automated social media posting. The modular design enables easy testing and extension, while the Git-based state management offers superior security and auditability.
+This architecture provides a robust, scalable, and multilingual foundation for automated social media posting across multiple accounts. The enhanced system delivers:
 
-The reusable workflow pattern eliminates code duplication and simplifies maintenance across multiple accounts. The comprehensive testing strategy ensures reliability, and the migration tools provide a safe path for transitioning existing deployments.
+**Core Improvements**:
+- **Multi-Account Support**: Independent Instagram accounts with language-specific configurations
+- **Enhanced Content Integration**: Rich blog content with WordPress authentication
+- **Intelligent Caption Generation**: Multi-language AI prompts with cultural awareness
+- **Improved State Management**: Account-isolated progress tracking and failure handling
+- **Security Enhancement**: Fine-grained permissions with environment isolation
 
-For questions about the architecture or implementation details, refer to the inline code documentation and test suites.
+**Technical Benefits**:
+- **Modular Design**: Clear separation of concerns with testable components
+- **Language Awareness**: Native German and English support with cultural adaptation
+- **Content Intelligence**: EXIF URL prioritization and keyword matching for richer context
+- **Scalable Architecture**: Easy addition of new accounts, languages, and features
+- **Comprehensive Testing**: Multi-level testing strategy covering all major components
+
+**Operational Advantages**:
+- **Independent Operation**: Each account runs autonomously with separate configurations
+- **Rich Context**: Blog content integration provides more engaging captions
+- **Cultural Appropriateness**: Language-specific prompts and branding
+- **Enhanced Reliability**: Improved error handling and state validation
+- **Security First**: Minimal permissions with encrypted credential management
+
+The system successfully evolved from a single-account automation to a sophisticated multi-account, multilingual platform while maintaining backward compatibility and operational reliability.
+
+For questions about the architecture or implementation details, refer to the inline code documentation, test suites, and the comprehensive RECENT_CHANGES.md documentation.

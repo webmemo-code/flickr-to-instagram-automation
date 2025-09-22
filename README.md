@@ -17,60 +17,65 @@ However, I don't take the time to post them on Instagram. This automation helps 
 ## Features
 - 📅 **Daily Posting**: Posts one photo per day until the album is complete
 - 🎯 **Single Album Focus**: Processes one specific Flickr album per Instagram account
-- 🏢 **Multiple Account Support**: Independent automation for primary and Reisememo Instagram accounts
-- 🤖 **AI-Generated Captions**: Uses OpenAI GPT-4 Vision for engaging Instagram captions
+- 🏢 **Multi-Account Support**: Independent automation for primary and secondary accounts
+- 🌐 **Multi-Language AI Captions**: German and English caption generation with cultural awareness
+- 🎨 **Account-Specific Branding**: Custom signatures and messaging per account
 - 📊 **Git-Based State Management**: Secure, scalable state storage using Git files with fine-grained PAT permissions
 - 🔄 **Reusable Workflows**: Centralized GitHub Actions workflow eliminates code duplication across accounts
 - 🔧 **Manual Control**: Run automation manually with different options for each account
 - 🛡️ **Smart Stopping**: Automatically stops when all photos are posted
-- 📈 **Enhanced Context**: Incorporates EXIF data, location info, and blog URLs for richer AI captions
+- 📈 **Enhanced Blog Integration**: WordPress authentication for full editorial content access
+- 🔗 **EXIF URL Prioritization**: Intelligent source URL tracking and content matching
 - 🔄 **Retry Logic**: Automatically retries failed posts and validates image URLs
 - 🔀 **Independent State**: Each account maintains separate posting progress and failed photo tracking
-- 📝 **Enhanced Content**: WordPress authentication for full blog post content extraction
-- 🎯 **Smart Context**: Blog content matched with photos for richer AI captions
+- 📝 **Rich Content Context**: Blog content extraction with keyword matching for engaging captions
+- 🎯 **Smart Content Scoring**: Advanced algorithms for content relevance assessment
 - 🧩 **Modular Architecture**: Clean separation of concerns with testable orchestration modules
 - 🔒 **Security-First**: Fine-grained PAT permissions, encrypted secrets, minimal access principle
 ## Architecture
-### Modular Orchestration Design
-The automation system uses a modular orchestration architecture that breaks down the complex posting workflow into discrete, testable phases:
-#### Core Orchestration Modules
-| Module | Purpose | Key Classes |
-|--------|---------|-------------|
-| **`orchestration/photo_selection.py`** | Photo selection and validation | `PhotoSelector`, `PhotoValidator` |
-| **`orchestration/caption_orchestration.py`** | Caption generation workflow | `CaptionOrchestrator`, `CaptionPreprocessor` |
-| **`orchestration/posting_orchestration.py`** | Instagram posting and progress | `InstagramPoster`, `PostingOrchestrator` |
-| **`orchestration/state_orchestration.py`** | State management and notifications | `StateOrchestrator`, `ValidationStateHandler` |
-#### Workflow Phases
+### Multi-Account Architecture Design
+The automation system uses a sophisticated multi-account architecture with enhanced content integration and language-aware processing:
+#### Core System Components
+| Component | Purpose | Key Features |
+|-----------|---------|--------------|
+| **`account_config.py`** | Multi-account configuration | Language-specific settings, branding, prompts |
+| **`blog_content_extractor.py`** | Enhanced content integration | WordPress auth, keyword matching, EXIF URL prioritization |
+| **`caption_generator.py`** | Multi-language caption generation | German/English prompts, cultural awareness, blog context |
+| **`state_manager.py`** | Account-isolated state management | Independent progress tracking, enhanced models |
+#### Enhanced Workflow Phases
 ```mermaid
 graph TD
-    A[Photo Selection] --> B[Photo Validation]
-    B --> C[Caption Generation]
-    C --> D[Caption Validation]
-    D --> E[Instagram Posting]
-    E --> F[State Recording]
-    F --> G[Progress Tracking]
-    G --> H[Completion Handling]
+    A[Account Configuration] --> B[Photo Selection]
+    B --> C[EXIF URL Extraction]
+    C --> D[Blog Content Matching]
+    D --> E[Multi-Language Caption Generation]
+    E --> F[Account Branding Integration]
+    F --> G[Instagram Posting]
+    G --> H[Account-Isolated State Recording]
+    H --> I[Progress Tracking]
+    I --> J[Completion Handling]
 ```
-#### Benefits of Modular Design
-- **🧪 Testability**: Each module can be unit tested with mocked dependencies
-- **🔧 Maintainability**: Clear separation of concerns makes code easier to understand and modify
-- **🔄 Reusability**: Modules can be reused across different automation scenarios
-- **📈 Extensibility**: New features can be added without modifying existing workflow logic
-- **🐛 Debugging**: Issues can be isolated to specific workflow phases
-- **⚡ Performance**: Dependency injection allows for optimized implementations
-#### Dependency Injection Pattern
-The system uses factory functions to create orchestrator instances with injected dependencies:
+#### Benefits of Enhanced Architecture
+- **🌐 Multi-Language Support**: Native German and English processing with cultural awareness
+- **🏢 Account Isolation**: Independent configurations and state management per account
+- **📝 Rich Content Integration**: WordPress authentication for full editorial content access
+- **🎯 Smart Content Matching**: EXIF URL prioritization and keyword-based relevance scoring
+- **🧪 Comprehensive Testing**: Multi-level testing covering account configs, content integration, and language processing
+- **🔧 Enhanced Maintainability**: Clear separation between account logic, content processing, and caption generation
+- **📈 Scalable Design**: Easy addition of new accounts, languages, and content sources
+#### Account-Based Configuration Pattern
+The system uses account-specific configuration to enable multi-language, multi-brand operations:
 ```python
-# Initialize orchestration modules
-photo_selector = create_photo_selector(flickr_api, state_manager)
-caption_orchestrator = create_caption_orchestrator(caption_generator)
-posting_orchestrator = create_posting_orchestrator(instagram_api)
-state_orchestrator = create_state_orchestrator(state_manager, email_notifier)
+# Account-specific initialization
+account_config = get_account_config(account_name)
+caption_generator = CaptionGenerator(config, account_config)
+blog_extractor = BlogContentExtractor(config, account_config)
+state_manager = StateManager(config, account_name)
 ```
 This pattern enables:
-- **Mock injection** for unit testing
-- **Configuration flexibility** for different environments
-- **Clean interfaces** between components
+- **Language isolation** with account-specific prompts and cultural conventions
+- **Brand consistency** through account-specific signatures and messaging
+- **Independent operation** with isolated state management per account
 ### Reusable Workflow System
 The system uses a centralized reusable workflow approach that eliminates code duplication:
 ```mermaid
@@ -210,10 +215,11 @@ FLICKR_ALBUM_ID=your_secondary_flickr_album_id
 BLOG_POST_URL=https://your-secondary-blog.com/your-blog-post-url
 ```
 **Environment Secrets:**
-```  
+```
 INSTAGRAM_ACCESS_TOKEN=your_secondary_instagram_access_token
 INSTAGRAM_ACCOUNT_ID=your_secondary_instagram_account_id
 ```
+**Note**: The system automatically applies account-specific language settings and branding for the secondary account.
 ### Manual Testing for Each Account
 **Primary Account:**
 ```bash
@@ -228,7 +234,7 @@ python main.py --account secondary --stats
 ### Automation Schedules
 - **Primary Account**: Daily at 18:13 UTC (20:13 CEST)
 - **Secondary Account**: Daily at 19:13 UTC (21:13 CEST)
-Both automations run independently with separate state management and retry logic.
+Both automations run independently with language-specific processing, account-specific branding, and separate state management.
 ## Architecture Overview
 The automation system follows a modular architecture with clear separation of concerns, robust error handling, and comprehensive state management.
 ```mermaid
@@ -514,25 +520,22 @@ When all photos in your album have been posted:
 4. 🔄 To start a new album, update the `FLICKR_ALBUM_ID` variable in GitHub repository settings
 ## Project Structure
 ```
-├── main.py                    # Main automation script with modular orchestration
+├── main.py                    # Main automation script with multi-account support
 ├── config.py                 # Configuration management (environment variables)
-├── orchestration/            # Modular orchestration components
-│   ├── __init__.py          # Factory functions and dependency injection
-│   ├── photo_selection.py   # Photo selection and validation logic
-│   ├── caption_orchestration.py  # Caption generation workflow
-│   ├── posting_orchestration.py  # Instagram posting and progress tracking
-│   └── state_orchestration.py    # State management and notifications
+├── account_config.py         # Multi-account configuration with language support
+├── blog_content_extractor.py # Enhanced blog content integration with WordPress auth
+├── caption_generator.py     # Multi-language caption generation with cultural awareness
 ├── flickr_api.py            # Flickr API integration
-├── caption_generator.py     # OpenAI caption generation with enhanced context
 ├── instagram_api.py         # Instagram posting with retry logic
-├── state_manager.py         # Legacy state management (for compatibility)
-├── storage_adapter.py       # Git-based storage adapter
+├── state_manager.py         # Account-isolated state management
+├── storage_adapter.py       # Git-based storage adapter with enhanced models
 ├── state_models.py          # Enhanced data models for state management
-├── migrate_state_storage.py # Migration tools for transitioning storage systems
 ├── test_suite/             # Comprehensive testing framework
-│   ├── test_orchestration.py    # Unit tests for orchestration modules
-│   ├── test_integration.py      # End-to-end integration tests
-│   └── test_caption_generator.py # Caption generation tests
+│   ├── test_account_config.py   # Multi-language account configuration tests
+│   ├── test_blog_content.py     # Blog content extraction and WordPress auth tests
+│   ├── test_caption_generator.py # Multi-language caption generation tests
+│   ├── test_exif_prioritization.py # EXIF URL prioritization tests
+│   └── test_integration.py      # End-to-end multi-account integration tests
 ├── requirements.txt         # Python dependencies
 └── .github/
     └── workflows/
