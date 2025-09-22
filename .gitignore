@@ -119,3 +119,5 @@ CLAUDE.md
 TRAVELMEMO_CONTENT_API.md
 STORAGE_MIGRATION.md
 test_new_storage.py
+config.py.bak
+_tmp_test_caption.py

@@ -3,8 +3,9 @@ Configuration management for Flickr to Instagram automation.
 All sensitive credentials are loaded from environment variables.
 """
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from dotenv import load_dotenv
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -56,6 +57,9 @@ class Config:
         
         # Optional blog post URL for enhanced caption generation
         self.blog_post_url = os.getenv('BLOG_POST_URL')  # Optional: URL to blog post with photo descriptions
+        raw_blog_urls = os.getenv('BLOG_POST_URLS', '')
+        self.blog_post_urls = self._parse_blog_post_urls(raw_blog_urls)
+
         
         # Email notification settings (optional)
         self.notification_email = os.getenv('NOTIFICATION_EMAIL')  # Manager's email address
@@ -124,6 +128,30 @@ class Config:
             account_info = f" for {self.account} account" if self.account != 'primary' else ""
             raise ValueError(f"Missing required account-specific environment variables{account_info}: {', '.join(missing_account_specific)}")
     
+    def _parse_blog_post_urls(self, raw_urls: str) -> List[str]:
+        """Parse multi-value blog post URLs from configuration."""
+        if not raw_urls:
+            return []
+
+        parts = re.split(r'[;,\n]', raw_urls)
+        cleaned = []
+        seen = set()
+        for part in parts:
+            url = part.strip()
+            if not url:
+                continue
+            if url in seen:
+                continue
+            cleaned.append(url)
+            seen.add(url)
+        return cleaned
+
+    def get_default_blog_post_url(self) -> Optional[str]:
+        """Return the primary blog post URL if available."""
+        if self.blog_post_urls:
+            return self.blog_post_urls[0]
+        return None
+
     @property
     def graph_endpoint_base(self) -> str:
         """Get the complete Graph API endpoint base URL."""

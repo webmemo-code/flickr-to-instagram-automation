@@ -5,11 +5,24 @@ Fetches and processes blog post content to provide context for photo captions.
 import requests
 import logging
 import re
-from typing import Optional, List, Dict
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Tuple
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import base64
 from custom_endpoint_extractor import CustomEndpointExtractor
+
+
+
+
+@dataclass(frozen=True)
+class BlogContextMatch:
+    """Container for the best matching blog context snippet."""
+
+    url: str
+    context: str
+    score: int
+    matched_terms: Tuple[str, ...]
 
 
 class BlogContentExtractor:
@@ -21,6 +34,7 @@ class BlogContentExtractor:
         self.logger = logging.getLogger(__name__)
         self.session = requests.Session()
         self.custom_extractor = CustomEndpointExtractor(config)
+        self._content_cache: Dict[str, Optional[Dict[str, any]]] = {}
 
         # Initialize email notifier for API failure alerts
         self.email_notifier = None
@@ -755,123 +769,234 @@ class BlogContentExtractor:
         
         return None
     
-    def find_relevant_content(self, blog_content: Dict[str, any], photo_context: Dict[str, any]) -> Optional[str]:
-        """
-        Find blog content sections most relevant to the photo being processed.
-        
-        Args:
-            blog_content: Extracted blog content structure
-            photo_context: Photo metadata (title, description, location, etc.)
-            
-        Returns:
-            Most relevant text content for caption generation
-        """
+    def get_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """Retrieve blog content with caching to avoid duplicate fetches."""
+        if not blog_url:
+            return None
+
+        if blog_url in self._content_cache:
+            return self._content_cache[blog_url]
+
+        content = self.extract_blog_content(blog_url)
+        self._content_cache[blog_url] = content
+        return content
+
+    def find_relevant_content(self, blog_content: Dict[str, any], photo_context: Dict[str, any]) -> Optional[BlogContextMatch]:
+        """Find the best matching blog content snippet for a given photo."""
         if not blog_content or not photo_context:
             return None
-        
+
         try:
-            # Extract searchable terms from photo context
             search_terms = self._extract_photo_keywords(photo_context)
-            
+
             if not search_terms:
                 self.logger.debug("No search terms extracted from photo context")
                 return None
-            
+
             self.logger.debug(f"Searching blog content for terms: {search_terms}")
-            
-            # Score paragraphs based on keyword matches
+
             scored_content = []
-            
+
             for paragraph in blog_content.get('paragraphs', []):
-                score = self._score_text_relevance(paragraph, search_terms)
+                score, matched_terms = self._score_text_relevance(paragraph, search_terms)
                 if score > 0:
-                    scored_content.append((score, paragraph))
-            
-            # Also check image captions and context
+                    scored_content.append((score, paragraph, matched_terms))
+
             for img in blog_content.get('images', []):
                 for field in ['alt', 'caption', 'context']:
-                    text = img.get(field, '')
-                    if text:
-                        score = self._score_text_relevance(text, search_terms)
+                    text_value = img.get(field, '')
+                    if text_value:
+                        score, matched_terms = self._score_text_relevance(text_value, search_terms)
                         if score > 0:
-                            scored_content.append((score, text))
-            
+                            scored_content.append((score, text_value, matched_terms))
+
             if not scored_content:
                 self.logger.debug("No relevant content found in blog post")
                 return None
-            
-            # Sort by relevance score and combine top matches
+
             scored_content.sort(reverse=True, key=lambda x: x[0])
-            
-            # Take top 3 most relevant pieces of content
-            relevant_texts = [content for score, content in scored_content[:3]]
-            
-            # Combine and clean up
+            top_entries = scored_content[:3]
+            relevant_texts = [content for score, content, _ in top_entries]
+
             combined_content = " ".join(relevant_texts)
             combined_content = re.sub(r'\s+', ' ', combined_content).strip()
-            
-            # Limit length for prompt efficiency
+
             max_length = 1000
             if len(combined_content) > max_length:
                 combined_content = combined_content[:max_length] + "..."
-            
-            self.logger.info(f"Found relevant blog content ({len(combined_content)} chars)")
-            return combined_content
-            
+
+            total_score = sum(score for score, _, __ in top_entries)
+            matched_terms = sorted({term for _, __, terms in top_entries for term in terms})
+
+            self.logger.info(f"Found relevant blog content ({len(combined_content)} chars) with score {total_score}")
+            return BlogContextMatch(
+                url=blog_content.get('url', ''),
+                context=combined_content,
+                score=total_score,
+                matched_terms=tuple(matched_terms)
+            )
+
         except Exception as e:
             self.logger.error(f"Error finding relevant content: {e}")
             return None
-    
-    def _extract_photo_keywords(self, photo_context: Dict[str, any]) -> List[str]:
-        """Extract searchable keywords from photo metadata."""
-        keywords = []
-        
-        # Extract from title
-        title = photo_context.get('title', '')
-        if title:
-            # Clean and split title
-            title_words = re.findall(r'\b[a-zA-Z]+\b', title.lower())
-            keywords.extend([word for word in title_words if len(word) > 3])
-        
-        # Extract from description
-        description = photo_context.get('description', '')
-        if description:
-            desc_words = re.findall(r'\b[a-zA-Z]+\b', description.lower())
-            keywords.extend([word for word in desc_words if len(word) > 3])
-        
-        # Extract from location
-        location_data = photo_context.get('location_data', {})
-        for field in ['city', 'region', 'country']:
-            value = location_data.get(field, '')
-            if value and len(value) > 2:
-                keywords.append(value.lower())
-        
-        # Remove duplicates and very common words
+
+
+
+
+
+
+    def _extract_photo_keywords(self, photo_context: Dict[str, any]) -> List[Dict[str, any]]:
+        """Extract searchable keywords and phrases from photo metadata."""
+        keywords: List[Dict[str, any]] = []
+        seen = set()
+
+        def add_term(term: str, *, weight: int = 1, is_phrase: bool = False, source: str = 'generic') -> None:
+            if not term:
+                return
+            normalized = re.sub(r"\s+", " ", term.strip().lower())
+            if not normalized:
+                return
+            key = (normalized, is_phrase, source)
+            if key in seen:
+                return
+            keywords.append({
+                'term': normalized,
+                'weight': weight,
+                'is_phrase': is_phrase or ' ' in normalized,
+                'source': source
+            })
+            seen.add(key)
+
         stop_words = {'photo', 'image', 'picture', 'with', 'from', 'this', 'that', 'have', 'been', 'were', 'they'}
-        keywords = list(set(keywords))
-        keywords = [k for k in keywords if k not in stop_words]
-        
+
+        title = photo_context.get('title') or ''
+        if title:
+            add_term(title, weight=2, is_phrase=True, source='title')
+            title_words = re.findall(r"[A-Za-z'-]+", title)
+            normalized_words = [w.lower() for w in title_words if len(w) > 1]
+            for word in normalized_words:
+                if word in stop_words:
+                    continue
+                add_term(word, weight=1, source='title_word')
+            for size in range(2, min(4, len(normalized_words) + 1)):
+                for idx in range(len(normalized_words) - size + 1):
+                    phrase = ' '.join(normalized_words[idx:idx + size])
+                    if phrase in stop_words:
+                        continue
+                    add_term(phrase, weight=3, is_phrase=True, source='title_phrase')
+
+        description = photo_context.get('description') or ''
+        if description:
+            desc_words = re.findall(r"[A-Za-z'-]+", description)
+            for word in desc_words:
+                word_lower = word.lower()
+                if len(word_lower) <= 2 or word_lower in stop_words:
+                    continue
+                add_term(word_lower, weight=1, source='description')
+
+        location_data = photo_context.get('location_data', {}) or {}
+        possible_locations = []
+        if isinstance(location_data, dict):
+            for key in ['city', 'region', 'country', 'locality']:
+                value = location_data.get(key) or ''
+                if isinstance(value, dict):
+                    value = value.get('_content', '')
+                if value:
+                    possible_locations.append(value)
+            photo_location = location_data.get('photo') or {}
+            if isinstance(photo_location, dict):
+                location = photo_location.get('location') or {}
+                if isinstance(location, dict):
+                    for key in ['locality', 'region', 'country']:
+                        value = location.get(key) or {}
+                        if isinstance(value, dict):
+                            value = value.get('_content', '')
+                        if value:
+                            possible_locations.append(value)
+        for value in possible_locations:
+            add_term(value, weight=2, is_phrase=True, source='location')
+
+        tag_sources = []
+        for key in ['tags', 'meta_keywords', 'keywords']:
+            if key in photo_context and photo_context[key]:
+                tag_sources.append(photo_context[key])
+        for source_entries in tag_sources:
+            if isinstance(source_entries, str):
+                entries = re.split(r'[;,]', source_entries)
+            else:
+                entries = source_entries if isinstance(source_entries, (list, tuple, set)) else []
+            for entry in entries:
+                if not isinstance(entry, str):
+                    continue
+                cleaned = entry.strip()
+                if not cleaned:
+                    continue
+                cleaned_normalized = cleaned.replace('-', ' ')
+                add_term(cleaned_normalized, weight=5, is_phrase=True, source='meta')
+                tag_words = re.findall(r"[A-Za-z'-]+", cleaned_normalized)
+                for word in tag_words:
+                    word_lower = word.lower()
+                    if len(word_lower) <= 2 or word_lower in stop_words:
+                        continue
+                    add_term(word_lower, weight=3, source='meta_word')
+
+        exif_hints = photo_context.get('exif_hints') or {}
+        for url in exif_hints.get('source_urls', []):
+            add_term(url, weight=10, is_phrase=True, source='exif_source')
+        for phrase in exif_hints.get('phrases', []):
+            add_term(phrase, weight=6, is_phrase=True, source='exif_phrase')
+            phrase_words = re.findall(r"[A-Za-z'-]+", phrase)
+            for word in phrase_words:
+                word_lower = word.lower()
+                if len(word_lower) <= 2 or word_lower in stop_words:
+                    continue
+                add_term(word_lower, weight=2, source='exif_phrase_word')
+        for keyword in exif_hints.get('keywords', []):
+            add_term(keyword, weight=4, source='exif_keyword')
+
         return keywords
-    
-    def _score_text_relevance(self, text: str, search_terms: List[str]) -> int:
-        """Score text relevance based on keyword matches."""
+
+    def _score_text_relevance(self, text: str, search_terms: List[Dict[str, any]]) -> Tuple[int, List[str]]:
+        """Score text relevance, heavily rewarding exact matches for meta tags."""
         if not text or not search_terms:
-            return 0
-        
+            return 0, []
+
         text_lower = text.lower()
         score = 0
-        
-        for term in search_terms:
-            # Exact matches get higher score
-            exact_matches = text_lower.count(term)
-            score += exact_matches * 3
-            
-            # Partial matches get lower score
-            if term in text_lower and exact_matches == 0:
-                score += 1
-        
-        # Bonus for longer, more descriptive text
+        matched_terms: List[str] = []
+
+        for term_info in search_terms:
+            term = term_info.get("term")
+            if not term:
+                continue
+            weight = term_info.get("weight", 1)
+            is_phrase = term_info.get("is_phrase", False)
+            source = term_info.get("source", "generic")
+
+            if " " in term:
+                parts = [re.escape(p) for p in term.split()]
+                pattern = r"\b" + r"\s+".join(parts) + r"\b"
+            else:
+                pattern = r"\b" + re.escape(term) + r"\b"
+
+            exact_matches = len(re.findall(pattern, text_lower))
+
+            if exact_matches > 0:
+                if source == "meta":
+                    base_score = 8
+                elif is_phrase:
+                    base_score = 6
+                else:
+                    base_score = 4
+                score += exact_matches * base_score * weight
+                if term not in matched_terms:
+                    matched_terms.append(term)
+            elif term in text_lower:
+                score += weight
+
         if len(text) > 200:
             score += 1
-        
-        return score
+
+        return score, matched_terms
+
+
