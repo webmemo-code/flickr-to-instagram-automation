@@ -51,6 +51,9 @@ class TestBlogContentExtractor:
     def test_extract_photo_keywords_mauritius_context(self, extractor):
         """Test keyword extraction from Mauritius photo context."""
         # Sample photo context that might come from Flickr
+
+
+
         photo_context = {
             'title': 'Le Morne Brabant Beach Mauritius',
             'description': 'Beautiful beach at Le Morne with crystal clear water and mountain views',
@@ -58,22 +61,50 @@ class TestBlogContentExtractor:
                 'city': 'Le Morne',
                 'region': 'Black River',
                 'country': 'Mauritius'
-            }
+            },
+            'tags': ['Li Finistreddi', 'luxury hotel', 'Mauritius beach']
         }
         
+
+
+
+
         keywords = extractor._extract_photo_keywords(photo_context)
-        
+
         assert len(keywords) > 0, "Should extract keywords from photo context"
-        
-        # Check for expected Mauritius-related keywords
-        keywords_lower = [k.lower() for k in keywords]
+
+        keyword_terms = {k['term'] for k in keywords}
         expected_keywords = ['morne', 'brabant', 'beach', 'mauritius', 'mountain', 'water']
-        
-        found_keywords = [k for k in expected_keywords if k in keywords_lower]
+        found_keywords = [k for k in expected_keywords if k in keyword_terms]
         assert len(found_keywords) >= 3, f"Should find relevant keywords. Found: {found_keywords}"
-        
+
+        meta_match = next((k for k in keywords if k['term'] == 'li finistreddi'), None)
+        assert meta_match is not None, "Meta tags should include Li Finistreddi"
+        assert meta_match['weight'] >= 5 and meta_match['is_phrase'], "Li Finistreddi should be treated as high-weight phrase"
+
         print(f"PASS: Extracted keywords: {keywords}")
-    
+  
+    def test_extract_photo_keywords_exif_hints(self, extractor):
+        """EXIF hints produce high-weight terms for matching."""
+        photo_context = {
+            'title': 'Evening view over Sardinia',
+            'exif_hints': {
+                'source_urls': ['https://travelmemo.com/italy/sardinia/sardinia-what-to-do-in-north'],
+                'phrases': ['Li Finistreddi Luxury Retreat'],
+                'keywords': ['Gallura', 'Sardinia north']
+            }
+        }
+
+        keywords = extractor._extract_photo_keywords(photo_context)
+        keyword_map = {item['term']: item for item in keywords}
+
+        assert 'https://travelmemo.com/italy/sardinia/sardinia-what-to-do-in-north' in keyword_map
+        assert keyword_map['https://travelmemo.com/italy/sardinia/sardinia-what-to-do-in-north']['weight'] >= 10
+        assert 'li finistreddi luxury retreat' in keyword_map
+        assert keyword_map['li finistreddi luxury retreat']['weight'] >= 6
+        assert 'gallura' in keyword_map
+        assert keyword_map['gallura']['weight'] >= 4
+
     def test_find_relevant_content_mauritius_beach_photo(self, extractor):
         """Test finding relevant blog content for a Mauritius beach photo."""
         # First extract the blog content
@@ -91,39 +122,52 @@ class TestBlogContentExtractor:
             }
         }
         
-        relevant_content = extractor.find_relevant_content(blog_content, photo_context)
-        
-        assert relevant_content is not None, "Should find relevant content for Mauritius beach photo"
-        assert len(relevant_content) > 50, "Should return substantial relevant content"
-        
+        relevant_match = extractor.find_relevant_content(blog_content, photo_context)
+
+        assert relevant_match is not None, "Should find relevant content for Mauritius beach photo"
+        assert len(relevant_match.context) > 50, "Should return substantial relevant content"
+
         # Check that the content contains beach/Le Morne related keywords
-        content_lower = relevant_content.lower()
+        content_lower = relevant_match.context.lower()
         beach_keywords = ['beach', 'le morne', 'water', 'mauritius', 'turquoise', 'crystal']
         found_beach_keywords = [k for k in beach_keywords if k in content_lower]
         
         assert len(found_beach_keywords) >= 2, f"Should contain beach-related content. Found: {found_beach_keywords}"
         
-        print(f"PASS: Found relevant content ({len(relevant_content)} chars)")
-        print(f"Content preview: {relevant_content[:200]}...")
+        print(f"PASS: Found relevant content ({len(relevant_match.context)} chars)")
+        print(f"Content preview: {relevant_match.context[:200]}...")
     
+
+
     def test_score_text_relevance_mauritius_terms(self, extractor):
         """Test text relevance scoring with Mauritius-specific terms."""
-        search_terms = ['mauritius', 'beach', 'morne', 'crystal', 'water']
-        
+        base_terms = ['mauritius', 'beach', 'morne', 'crystal', 'water']
+        search_terms = [
+            {'term': term, 'weight': 1, 'is_phrase': False, 'source': 'test'}
+            for term in base_terms
+        ]
+
         # High relevance text
-        high_relevance = "The beautiful beaches of Mauritius offer crystal clear water, especially at Le Morne beach where you can see the mountain backdrop."
-        high_score = extractor._score_text_relevance(high_relevance, search_terms)
-        
-        # Low relevance text  
-        low_relevance = "This is some random text about something completely different and unrelated to the topic."
-        low_score = extractor._score_text_relevance(low_relevance, search_terms)
-        
+        high_relevance = (
+            "The beautiful beaches of Mauritius offer crystal clear water, "
+            "especially at Le Morne beach where you can see the mountain backdrop."
+        )
+        high_score, high_terms = extractor._score_text_relevance(high_relevance, search_terms)
+
+        # Low relevance text
+        low_relevance = (
+            "This is some random text about something completely different "
+            "and unrelated to the topic."
+        )
+        low_score, low_terms = extractor._score_text_relevance(low_relevance, search_terms)
+
         assert high_score > low_score, f"High relevance text should score higher ({high_score} vs {low_score})"
         assert high_score >= 6, f"Should get good score for relevant text: {high_score}"
         assert low_score == 0, f"Irrelevant text should score 0: {low_score}"
-        
+        assert 'mauritius' in high_terms, "Matched terms should include key keyword"
+
         print(f"PASS: Scoring works: relevant={high_score}, irrelevant={low_score}")
-    
+
     def test_image_context_extraction_mauritius_blog(self, extractor):
         """Test extracting image context from Mauritius blog."""
         blog_content = extractor.extract_blog_content("https://travelmemo.com/mauritius/mauritius-what-to-do")
@@ -156,3 +200,4 @@ class TestBlogContentExtractor:
 if __name__ == "__main__":
     # Allow running tests directly for development
     pytest.main([__file__, "-v"])
+

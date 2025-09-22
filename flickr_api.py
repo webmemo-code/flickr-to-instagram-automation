@@ -4,6 +4,7 @@ Flickr API integration for photo retrieval and metadata extraction.
 import requests
 import json
 import logging
+import re
 from typing import Dict, List, Optional, Tuple
 from config import Config
 from account_config import get_account_config
@@ -131,6 +132,70 @@ class FlickrAPI:
             self.logger.warning(f"Failed to get EXIF data for photo {photo_id}: {e}")
             return None
     
+    def extract_exif_hints(self, exif_data: Optional[Dict]) -> Dict[str, List[str]]:
+        """Extract structured hints from photo EXIF metadata."""
+        hints = {
+            'source_urls': [],
+            'phrases': [],
+            'keywords': []
+        }
+
+        if not exif_data:
+            return hints
+
+        exif_entries = exif_data.get('photo', {}).get('exif', [])
+        if not exif_entries:
+            return hints
+
+        def normalize_value(value: str) -> str:
+            return re.sub(r"\s+", " ", value.strip())
+
+        def add_unique(container: List[str], value: str) -> None:
+            cleaned = normalize_value(value)
+            if cleaned and cleaned not in container:
+                container.append(cleaned)
+
+        for entry in exif_entries:
+            label = entry.get('label') or entry.get('tag') or ''
+            value = entry.get('raw', {}).get('_content', '')
+            if not value:
+                continue
+
+            label_key = re.sub(r"[^a-z0-9]", "", label.lower())
+            normalized_value = normalize_value(value)
+
+            if not normalized_value:
+                continue
+
+            if label_key in {'source', 'sourceurl'}:
+                if normalized_value.startswith(('http://', 'https://')):
+                    add_unique(hints['source_urls'], normalized_value)
+                add_unique(hints['phrases'], normalized_value)
+                continue
+
+            if label_key in {'keywords', 'supplementalcategories', 'category'}:
+                parts = re.split(r"[;,|]", value)
+                for part in parts:
+                    add_unique(hints['keywords'], part)
+                continue
+
+            if label_key in {
+                'organization', 'event', 'objectname', 'headline', 'title',
+                'transmissionreference', 'originaltransmissionreference'
+            }:
+                add_unique(hints['phrases'], normalized_value)
+                continue
+
+            if label_key in {'city', 'sublocation', 'sublocation', 'provinceorstate', 'provincestate', 'state', 'country', 'location'}:
+                add_unique(hints['phrases'], normalized_value)
+                continue
+
+            # Add generic catch-all for notable string fields
+            if len(normalized_value) > 3:
+                add_unique(hints['phrases'], normalized_value)
+
+        return hints
+
     def build_photo_url(self, photo: Dict) -> str:
         """Build the Flickr photo URL."""
         return f"https://live.staticflickr.com/{photo['server']}/{photo['id']}_{photo['secret']}_c.jpg"
@@ -241,6 +306,8 @@ class FlickrAPI:
             # Extract hashtags
             hashtags = self.extract_hashtags(photo_info, location_data)
 
+            exif_hints = self.extract_exif_hints(exif_data)
+
             photo_data = {
                 'id': photo['id'],
                 'title': photo['title'],
@@ -252,6 +319,7 @@ class FlickrAPI:
                 'photo_page_url': photo_page_url,
                 'source_url': source_url,
                 'exif_data': exif_data,
+                'exif_hints': exif_hints,
                 'location_data': location_data,
                 'date_taken': photo.get('datetaken', '')  # Include date taken from Flickr API
             }

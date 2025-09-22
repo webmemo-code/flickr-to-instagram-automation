@@ -127,3 +127,9 @@ test_new_storage.py
 SOLUTION_SUMMARY.md
 state_manager_legacy.py
 CODEX.md
+config.py.bak
+_tmp_test_caption.py
+CODEX_TODO.md
+arch_workflow_log.txt
+*.backup
+.github/workflows/archive/

@@ -4,9 +4,9 @@ OpenAI GPT-4 Vision integration for generating Instagram captions.
 import time
 import logging
 from openai import OpenAI
-from typing import Optional
+from typing import Optional, Dict, List
 from config import Config
-from blog_content_extractor import BlogContentExtractor
+from blog_content_extractor import BlogContentExtractor, BlogContextMatch
 from account_config import is_secondary_account, get_account_config
 
 
@@ -18,7 +18,7 @@ class CaptionGenerator:
         self.client = OpenAI(api_key=config.openai_api_key)
         self.logger = logging.getLogger(__name__)
         self.blog_extractor = BlogContentExtractor(config)
-        self._blog_content_cache = None  # Cache blog content to avoid repeated fetching
+        self._blog_content_cache: Dict[str, Optional[Dict[str, any]]] = {}  # Cache blog content per blog URL
     
     def generate_caption(self, photo_data: dict) -> Optional[str]:
         """Generate an Instagram caption for the given image with enhanced context."""
@@ -57,14 +57,16 @@ class CaptionGenerator:
                     context_parts.append(f"Camera: {' '.join(camera_info)}")
             
             # Add blog post content context (NEW FEATURE)
-            blog_context = self._get_blog_content_context(photo_data)
-            if blog_context:
-                context_parts.append(f"Blog context: {blog_context}")
-                self.logger.info(f"Added blog content context for photo {photo_data.get('id')}")
+            blog_match = self._get_blog_content_context(photo_data)
+            if blog_match:
+                context_parts.append(f"Blog context: {blog_match.context}")
+                self.logger.info(
+                    f"Added blog content context for photo {photo_data.get('id')} from {blog_match.url}"
+                )
             
             # Build the enhanced prompt
             context_text = "\n".join(context_parts) if context_parts else ""
-            
+
             account_config = get_account_config(self.config.account)
             if context_text:
                 # Enhanced prompt with context - use account language configuration
@@ -78,7 +80,7 @@ class CaptionGenerator:
                                   "Nutze Emojis nur sparsam und passend.")
                     
                     # Add special instructions for blog context in German
-                    if blog_context:
+                    if blog_match:
                         prompt_base += (" Achte besonders auf die 'Blog context' Informationen, die redaktionelle Beschreibungen "
                                        "aus dem Reiseblog-Post enthalten, in dem dieses Foto erscheint. Nutze diesen umfangreichen Kontext, "
                                        "um eine informative Caption zu erstellen, die mehr über das Reiseziel erzählt.")
@@ -92,7 +94,7 @@ class CaptionGenerator:
                                   "Use emojis sparingly and appropriately.")
                     
                     # Add special instructions for blog context in English
-                    if blog_context:
+                    if blog_match:
                         prompt_base += (" Pay special attention to the 'Blog context' information, which contains editorial descriptions "
                                        "from the travel blog post where this photo appears. Use this rich context to create a more "
                                        "informative caption that tells more about the destination the photo was taken.")
@@ -168,13 +170,15 @@ class CaptionGenerator:
             caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
 
         # Add blog post URL if available
-        if self.config.blog_post_url:
+        selected_blog = photo_data.get('selected_blog', {})
+        blog_url = selected_blog.get('url') or self.config.get_default_blog_post_url()
+        if blog_url:
             # Add travel tip text before URL based on account language
             if account_config and account_config.language == 'de':
                 caption_parts.append("Lies den Reisetipp unter")
             else:
                 caption_parts.append("Read the travel tip at")
-            caption_parts.append(self.config.blog_post_url)
+            caption_parts.append(blog_url)
         
         # Add hashtags
         if photo_data.get('hashtags'):
@@ -202,29 +206,107 @@ class CaptionGenerator:
         
         return None
     
-    def _get_blog_content_context(self, photo_data: dict) -> Optional[str]:
-        """Get relevant blog content context for the photo."""
-        if not self.config.blog_post_url:
+    def _ensure_longest_source_url(self, photo_data: dict, candidate_url: Optional[str]) -> None:
+        """Update photo_data['source_url'] when a longer canonical URL is found."""
+        if not candidate_url:
+            return
+
+        existing = photo_data.get('source_url')
+        if not existing or len(candidate_url) > len(existing):
+            photo_data['source_url'] = candidate_url
+
+
+
+    def _load_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
+        """Fetch blog content with caching."""
+        if not blog_url:
             return None
-        
-        try:
-            # Get or fetch blog content (with caching)
-            if self._blog_content_cache is None:
-                self.logger.info(f"Fetching blog content from: {self.config.blog_post_url}")
-                self._blog_content_cache = self.blog_extractor.extract_blog_content(self.config.blog_post_url)
-                
-                if not self._blog_content_cache:
-                    self.logger.warning("Failed to extract blog content")
-                    return None
-            
-            # Find content relevant to this photo
-            relevant_content = self.blog_extractor.find_relevant_content(
-                self._blog_content_cache, 
-                photo_data
+
+        if blog_url in self._blog_content_cache:
+            return self._blog_content_cache[blog_url]
+
+        content = self.blog_extractor.get_blog_content(blog_url)
+        self._blog_content_cache[blog_url] = content
+        return content
+
+
+
+    def _get_blog_content_context(self, photo_data: dict) -> Optional[BlogContextMatch]:
+        """Select the most relevant blog context for the given photo."""
+        raw_candidate_urls = getattr(self.config, "blog_post_urls", [])
+        candidate_urls = list(raw_candidate_urls or [])
+        if not candidate_urls:
+            default_url = self.config.get_default_blog_post_url()
+            if default_url:
+                candidate_urls = [default_url]
+
+        exif_hints = photo_data.get('exif_hints') or {}
+        source_urls = exif_hints.get('source_urls', [])
+
+        prioritized_urls: List[str] = []
+
+        def append_url(url: Optional[str]) -> None:
+            if url and url not in prioritized_urls:
+                prioritized_urls.append(url)
+
+        if source_urls:
+            indexed_sources = [
+                (idx, url) for idx, url in enumerate(source_urls) if url
+            ]
+            for _, url in sorted(indexed_sources, key=lambda item: (-len(item[1]), item[0])):
+                if any(existing.startswith(url) and len(existing) > len(url) for existing in prioritized_urls):
+                    continue
+                append_url(url)
+        for url in candidate_urls:
+            append_url(url)
+
+        candidate_urls = prioritized_urls
+
+        if not candidate_urls:
+            return None
+
+        best_match: Optional[BlogContextMatch] = None
+
+        for url in candidate_urls:
+            content = self._load_blog_content(url)
+            if not content:
+                continue
+
+            match = self.blog_extractor.find_relevant_content(content, photo_data)
+            if not match:
+                continue
+
+            normalized = match if match.url else BlogContextMatch(
+                url=url,
+                context=match.context,
+                score=match.score,
+                matched_terms=match.matched_terms
             )
-            
-            return relevant_content
-            
-        except Exception as e:
-            self.logger.error(f"Error getting blog content context: {e}")
-            return None
+
+            if not best_match or normalized.score > best_match.score:
+                best_match = normalized
+
+        if best_match:
+            photo_data['selected_blog'] = {
+                'url': best_match.url,
+                'context_snippet': best_match.context,
+                'matched_terms': list(best_match.matched_terms),
+                'derived_from_exif': best_match.url in source_urls
+            }
+            self._ensure_longest_source_url(photo_data, best_match.url)
+            return best_match
+
+        fallback_url = candidate_urls[0]
+        photo_data['selected_blog'] = {
+            'url': fallback_url,
+            'context_snippet': None,
+            'matched_terms': [],
+            'derived_from_exif': fallback_url in source_urls
+        }
+        self._ensure_longest_source_url(photo_data, fallback_url)
+        self.logger.debug("No relevant blog context match found; using fallback URL %s", fallback_url)
+        return None
+
+
+
+
