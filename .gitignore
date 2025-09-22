@@ -134,3 +134,4 @@ arch_workflow_log.txt
 *.backup
 .github/workflows/archive/
 COMMIT_TODO.md
+resolve_conflicts_script.sh
