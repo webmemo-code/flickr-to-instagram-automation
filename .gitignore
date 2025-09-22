@@ -133,3 +133,4 @@ CODEX_TODO.md
 arch_workflow_log.txt
 *.backup
 .github/workflows/archive/
+COMMIT_TODO.md
