@@ -180,6 +180,7 @@ class TestCaptionGenerator:
         photo_data = {
             'id': 'with-exif',
             'url': 'https://example.com/with-exif.jpg',
+            'source_url': short_exif_url,
             'exif_hints': {'source_urls': [short_exif_url, long_exif_url]},
         }
 
@@ -201,9 +202,11 @@ class TestCaptionGenerator:
             match = generator._get_blog_content_context(photo_data)
 
         assert processed_urls[0] == long_exif_url
+        assert short_exif_url not in processed_urls
         assert isinstance(match, BlogContextMatch)
         assert match.url == long_exif_url
         assert photo_data['selected_blog']['url'] == long_exif_url
+        assert photo_data['source_url'] == long_exif_url
         assert photo_data['selected_blog']['derived_from_exif'] is True
 
     def test_build_full_caption_structure(self, generator, sample_mauritius_photo_data):

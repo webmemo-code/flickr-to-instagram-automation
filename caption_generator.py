@@ -203,6 +203,17 @@ class CaptionGenerator:
         
         return None
     
+    def _ensure_longest_source_url(self, photo_data: dict, candidate_url: Optional[str]) -> None:
+        """Update photo_data['source_url'] when a longer canonical URL is found."""
+        if not candidate_url:
+            return
+
+        existing = photo_data.get('source_url')
+        if not existing or len(candidate_url) > len(existing):
+            photo_data['source_url'] = candidate_url
+
+
+
     def _load_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """Fetch blog content with caching."""
         if not blog_url:
@@ -240,6 +251,8 @@ class CaptionGenerator:
                 (idx, url) for idx, url in enumerate(source_urls) if url
             ]
             for _, url in sorted(indexed_sources, key=lambda item: (-len(item[1]), item[0])):
+                if any(existing.startswith(url) and len(existing) > len(url) for existing in prioritized_urls):
+                    continue
                 append_url(url)
         for url in candidate_urls:
             append_url(url)
@@ -277,6 +290,7 @@ class CaptionGenerator:
                 'matched_terms': list(best_match.matched_terms),
                 'derived_from_exif': best_match.url in source_urls
             }
+            self._ensure_longest_source_url(photo_data, best_match.url)
             return best_match
 
         fallback_url = candidate_urls[0]
@@ -286,6 +300,7 @@ class CaptionGenerator:
             'matched_terms': [],
             'derived_from_exif': fallback_url in source_urls
         }
+        self._ensure_longest_source_url(photo_data, fallback_url)
         self.logger.debug("No relevant blog context match found; using fallback URL %s", fallback_url)
         return None
 
