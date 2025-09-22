@@ -26,6 +26,18 @@ class BlogContextMatch:
     matched_terms: Tuple[str, ...]
 
 
+
+
+@dataclass(frozen=True)
+class BlogContextMatch:
+    """Container for the best matching blog context snippet."""
+
+    url: str
+    context: str
+    score: int
+    matched_terms: Tuple[str, ...]
+
+
 class BlogContentExtractor:
     """Extracts and processes blog post content for caption enhancement."""
     
