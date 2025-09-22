@@ -170,7 +170,8 @@ class TestCaptionGenerator:
 
     def test_get_blog_content_context_prioritizes_exif_urls(self, generator, config):
         """EXIF-sourced URLs should be evaluated before configured fallbacks."""
-        exif_url = 'https://travelmemo.com/exif-match'
+        long_exif_url = 'https://travelmemo.com/italien/sardinien/sardinien-norden-reisetipps'
+        short_exif_url = 'https://travelmemo.com/italien/sar'
         fallback_url = 'https://travelmemo.com/fallback-post'
         config.blog_post_url = fallback_url
         config.blog_post_urls = [fallback_url]
@@ -179,15 +180,18 @@ class TestCaptionGenerator:
         photo_data = {
             'id': 'with-exif',
             'url': 'https://example.com/with-exif.jpg',
-            'exif_hints': {'source_urls': [exif_url]},
+            'exif_hints': {'source_urls': [short_exif_url, long_exif_url]},
         }
 
+        processed_urls = []
+
         def load_side_effect(url):
+            processed_urls.append(url)
             return {'url': url}
 
         def find_side_effect(content, _photo):
             url = content['url']
-            if url == exif_url:
+            if url == long_exif_url:
                 return BlogContextMatch(url=url, context='Context from EXIF URL', score=10, matched_terms=('exif',))
             if url == fallback_url:
                 return BlogContextMatch(url=url, context='Fallback context', score=5, matched_terms=('fallback',))
@@ -196,9 +200,10 @@ class TestCaptionGenerator:
         with patch.object(generator, '_load_blog_content', side_effect=load_side_effect),              patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
             match = generator._get_blog_content_context(photo_data)
 
+        assert processed_urls[0] == long_exif_url
         assert isinstance(match, BlogContextMatch)
-        assert match.url == exif_url
-        assert photo_data['selected_blog']['url'] == exif_url
+        assert match.url == long_exif_url
+        assert photo_data['selected_blog']['url'] == long_exif_url
         assert photo_data['selected_blog']['derived_from_exif'] is True
 
     def test_build_full_caption_structure(self, generator, sample_mauritius_photo_data):

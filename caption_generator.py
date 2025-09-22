@@ -235,8 +235,12 @@ class CaptionGenerator:
             if url and url not in prioritized_urls:
                 prioritized_urls.append(url)
 
-        for url in source_urls:
-            append_url(url)
+        if source_urls:
+            indexed_sources = [
+                (idx, url) for idx, url in enumerate(source_urls) if url
+            ]
+            for _, url in sorted(indexed_sources, key=lambda item: (-len(item[1]), item[0])):
+                append_url(url)
         for url in candidate_urls:
             append_url(url)
 
