@@ -135,3 +135,5 @@ arch_workflow_log.txt
 .github/workflows/archive/
 COMMIT_TODO.md
 resolve_conflicts_script.sh
+fix_all_commits.sh
+reword_only_script.sh
