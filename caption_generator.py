@@ -173,6 +173,16 @@ class CaptionGenerator:
         # Add blog post URL if available
         selected_blog = photo_data.get('selected_blog', {})
         blog_url = selected_blog.get('url') or self.config.get_default_blog_post_url()
+
+        # If no URL is found through blog context or config, try to use a fallback from account config
+        if not blog_url:
+            if account_config and account_config.blog_domains:
+                # Use the first preferred domain as a fallback
+                primary_domain = account_config.blog_domains[0]
+                if primary_domain:
+                    blog_url = f"https://{primary_domain}"
+                    self.logger.debug(f"Using fallback URL from account domain preference: {blog_url}")
+
         if blog_url:
             # Add travel tip text before URL based on account language
             if account_config and account_config.language == 'de':

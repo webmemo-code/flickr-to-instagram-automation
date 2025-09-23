@@ -409,6 +409,50 @@ class TestCaptionGenerator:
         assert photo_data['selected_blog']['url'] == complete_english_url
         assert photo_data['source_url'] == complete_english_url  # Updated by _ensure_longest_source_url
 
+    def test_caption_url_fallback_when_no_blog_context_found(self, generator, config):
+        """Ensure caption always includes a URL even when no blog context is found."""
+        # Simulate scenario where no blog URLs are accessible and no default is configured
+        config.account = 'primary'
+        config.get_default_blog_post_url.return_value = None  # No default URL configured
+
+        photo_data = {
+            'id': 'no-blog-context',
+            'title': 'Photo without blog context',
+            'description': 'A photo that has no associated blog context',
+            'hashtags': '#test #photo #reisememo'
+            # Note: no 'selected_blog' key - simulates when _get_blog_content_context returns None
+        }
+
+        generated_caption = "This is a test caption."
+
+        # Mock account config to provide domain fallback
+        with patch('account_config.get_account_config') as mock_get_config:
+            mock_get_config.return_value = AccountConfig(
+                account_id='primary',
+                display_name='Primary',
+                environment_name='primary-account',
+                language='en',
+                blog_domains=['travelmemo.com', 'backup.com']
+            )
+
+            caption = generator.build_full_caption(photo_data, generated_caption)
+
+        # Caption should include the fallback URL from account domain preferences
+        assert 'https://travelmemo.com' in caption, f"Expected fallback URL in caption, but got: {caption}"
+        assert 'Read the travel tip at' in caption, "Expected travel tip text in caption"
+        assert photo_data['hashtags'] in caption, "Expected hashtags in caption"
+
+        # Verify the URL appears in the correct location (after the travel tip text)
+        lines = caption.split('\n\n')
+        url_section_found = False
+        for i, line in enumerate(lines):
+            if 'Read the travel tip at' in line:
+                # Next line should contain the URL
+                if i + 1 < len(lines) and 'https://travelmemo.com' in lines[i + 1]:
+                    url_section_found = True
+                    break
+        assert url_section_found, f"URL should appear after 'Read the travel tip at' text. Caption: {caption}"
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
