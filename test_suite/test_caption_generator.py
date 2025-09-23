@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from caption_generator import CaptionGenerator
+from account_config import AccountConfig
 from config import Config
 from blog_content_extractor import BlogContextMatch
 
@@ -124,7 +125,9 @@ class TestCaptionGenerator:
             matched_terms=('mauritius', 'beach')
         )
 
-        with patch.object(generator, '_load_blog_content', return_value={'paragraphs': ['stub']}),              patch.object(generator.blog_extractor, 'find_relevant_content', return_value=blog_match):
+        with patch.object(generator, '_load_blog_content', return_value={'paragraphs': ['stub']}), \
+             patch.object(generator.blog_extractor, 'find_relevant_content', return_value=blog_match), \
+             patch.object(generator, '_validate_url_accessibility', return_value=True):
             match = generator._get_blog_content_context(sample_mauritius_photo_data)
 
         assert isinstance(match, BlogContextMatch)
@@ -198,7 +201,9 @@ class TestCaptionGenerator:
                 return BlogContextMatch(url=url, context='Fallback context', score=5, matched_terms=('fallback',))
             return None
 
-        with patch.object(generator, '_load_blog_content', side_effect=load_side_effect),              patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
+        with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
+             patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
+             patch.object(generator, '_validate_url_accessibility', return_value=True):
             match = generator._get_blog_content_context(photo_data)
 
         assert processed_urls[0] == long_exif_url
@@ -236,6 +241,173 @@ class TestCaptionGenerator:
         assert caption is not None
         assert isinstance(caption, str)
         assert len(caption) > 20
+
+    def test_domain_preference_in_exif_url_selection(self, generator, config):
+        """Domain preferences should be applied to EXIF URLs to fix issue #162."""
+        # Set up account with specific domain preferences (German account prefers reisememo.ch)
+
+        # URLs where German URL is longer but English URL should be preferred for English account
+        german_url = 'https://reisememo.ch/italien/sardinien/sardinien-reisetipps-norden'  # Longer German URL
+        english_url = 'https://travelmemo.com/italy/sardinia'  # Shorter English URL
+
+        photo_data = {
+            'id': 'domain-preference-test',
+            'url': 'https://example.com/test.jpg',
+            'exif_hints': {'source_urls': [german_url, english_url]},  # German URL appears first and is longer
+        }
+
+        processed_urls = []
+
+        def load_side_effect(url):
+            processed_urls.append(url)
+            return {'url': url}
+
+        def find_side_effect(content, _photo):
+            # Both URLs should work, but preference should determine which is chosen first
+            return BlogContextMatch(url=content['url'], context=f'Context from {content["url"]}', score=10, matched_terms=('test',))
+
+        # Mock URL accessibility (both URLs are accessible)
+        def mock_validate_url(url):
+            return True
+
+        # Test with English account (should prefer travelmemo.com)
+        config.account = 'primary'  # English account
+
+        with patch('account_config.get_account_config') as mock_get_config:
+            mock_get_config.return_value = AccountConfig(
+                account_id='primary',
+                display_name='Primary',
+                environment_name='primary-account',
+                language='en',
+                blog_domains=['travelmemo.com', 'reisememo.ch']  # Prefers travelmemo.com first
+            )
+
+            with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
+                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+
+                match = generator._get_blog_content_context(photo_data)
+
+        # The English URL should be processed first due to domain preference
+        assert processed_urls[0] == english_url, f"Expected {english_url} to be processed first, but got {processed_urls[0]}"
+        assert match.url == english_url
+        assert photo_data['selected_blog']['url'] == english_url
+
+        # Reset for German account test
+        photo_data = {
+            'id': 'domain-preference-test-de',
+            'url': 'https://example.com/test.jpg',
+            'exif_hints': {'source_urls': [german_url, english_url]},  # Same URLs
+        }
+        processed_urls.clear()
+
+        # Test with German account (should prefer reisememo.ch)
+        config.account = 'reisememo'  # German account
+
+        with patch('account_config.get_account_config') as mock_get_config:
+            mock_get_config.return_value = AccountConfig(
+                account_id='reisememo',
+                display_name='Reisememo',
+                environment_name='secondary-account',
+                language='de',
+                blog_domains=['reisememo.ch', 'travelmemo.com']  # Prefers reisememo.ch first
+            )
+
+            with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
+                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+
+                match = generator._get_blog_content_context(photo_data)
+
+        # The German URL should be processed first due to domain preference
+        assert processed_urls[0] == german_url, f"Expected {german_url} to be processed first, but got {processed_urls[0]}"
+        assert match.url == german_url
+        assert photo_data['selected_blog']['url'] == german_url
+
+    def test_issue_162_german_url_interference_fix(self, generator, config):
+        """Integration test for issue #162: German URLs interfering with English account URL selection."""
+        # Simulate the exact scenario from issue #162:
+        # - All photos in an album refer to the same destination
+        # - German URLs are longer due to language, not completeness
+        # - English account should prefer shorter but complete English URLs
+
+        # URLs from the issue description - German URL is longer but should not be preferred for English account
+        complete_english_url = 'https://travelmemo.com/italy/sardinia'  # Complete but shorter
+        longer_german_url = 'https://reisememo.ch/italien/sardinien/sardinien-sehenswuerdigkeiten-reisetipps'  # Longer German
+        truncated_english_url = 'https://travelmemo.com/italy/sar'  # Truncated English URL
+
+        # Photo data with EXIF containing multiple URLs (simulating Flickr EXIF data)
+        photo_data = {
+            'id': 'issue-162-test',
+            'url': 'https://example.com/sardinia-photo.jpg',
+            'title': 'Beautiful Sardinia coastline',
+            'exif_hints': {
+                'source_urls': [
+                    truncated_english_url,    # Appears first, truncated
+                    longer_german_url,        # Appears second, longer (would be selected by old logic)
+                    complete_english_url      # Appears third, complete English URL
+                ]
+            }
+        }
+
+        processed_urls = []
+
+        def load_side_effect(url):
+            processed_urls.append(url)
+            return {'url': url, 'title': f'Blog post for {url}'}
+
+        def find_side_effect(content, _photo):
+            url = content['url']
+            if 'travelmemo.com' in url:
+                return BlogContextMatch(url=url, context='Sardinia travel tips from English blog', score=8, matched_terms=('sardinia', 'travel'))
+            elif 'reisememo.ch' in url:
+                return BlogContextMatch(url=url, context='Sardinien Reisetipps vom deutschen Blog', score=7, matched_terms=('sardinien', 'reise'))
+            return None
+
+        # Mock URL accessibility - all URLs are accessible
+        def mock_validate_url(url):
+            return True
+
+        # Test with English primary account configuration
+        config.account = 'primary'
+
+        with patch('account_config.get_account_config') as mock_get_config:
+            # English account prefers travelmemo.com domains
+            mock_get_config.return_value = AccountConfig(
+                account_id='primary',
+                display_name='Primary',
+                environment_name='primary-account',
+                language='en',
+                blog_domains=['travelmemo.com', 'reisememo.ch']  # English domain preferred first
+            )
+
+            with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
+                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+
+                match = generator._get_blog_content_context(photo_data)
+
+        # ASSERTION: The fix should ensure that English URLs are prioritized over German URLs
+        # even when German URLs are longer, fixing the interference described in issue #162
+
+        # The complete English URL should be selected, not the longer German URL
+        assert match is not None, "Should find a blog context match"
+        assert 'travelmemo.com' in match.url, f"Expected English travelmemo.com URL, but got {match.url}"
+        assert match.url == complete_english_url, f"Expected complete English URL {complete_english_url}, but got {match.url}"
+
+        # Verify that English URLs were processed before German URLs
+        english_urls_processed = [url for url in processed_urls if 'travelmemo.com' in url]
+        german_urls_processed = [url for url in processed_urls if 'reisememo.ch' in url]
+
+        if english_urls_processed and german_urls_processed:
+            first_english_index = processed_urls.index(english_urls_processed[0])
+            first_german_index = processed_urls.index(german_urls_processed[0])
+            assert first_english_index < first_german_index, \
+                f"English URLs should be processed before German URLs. Processing order: {processed_urls}"
+
+        # Verify photo data is updated correctly
+        assert photo_data['selected_blog']['url'] == complete_english_url
+        assert photo_data['source_url'] == complete_english_url  # Updated by _ensure_longest_source_url
 
 
 if __name__ == '__main__':

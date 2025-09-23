@@ -3,6 +3,7 @@ OpenAI GPT-4 Vision integration for generating Instagram captions.
 """
 import time
 import logging
+import requests
 from openai import OpenAI
 from typing import Optional, Dict, List
 from config import Config
@@ -230,6 +231,18 @@ class CaptionGenerator:
 
         return sorted(urls, key=priority)
 
+    def _validate_url_accessibility(self, url: str) -> bool:
+        """Check if a URL is accessible by making a HEAD request."""
+        try:
+            response = requests.head(url, timeout=5, allow_redirects=True)
+            # Consider 2xx and 3xx status codes as accessible
+            is_accessible = 200 <= response.status_code < 400
+            self.logger.debug(f"URL accessibility check for {url}: {response.status_code} ({'accessible' if is_accessible else 'not accessible'})")
+            return is_accessible
+        except requests.exceptions.RequestException as e:
+            self.logger.debug(f"URL accessibility check failed for {url}: {e}")
+            return False
+
 
 
     def _load_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
@@ -265,10 +278,19 @@ class CaptionGenerator:
                 prioritized_urls.append(url)
 
         if source_urls:
-            indexed_sources = [
-                (idx, url) for idx, url in enumerate(source_urls) if url
-            ]
-            for _, url in sorted(indexed_sources, key=lambda item: (-len(item[1]), item[0])):
+            # Apply domain preferences to EXIF URLs first, then sort by length within same domain preference
+            account_config = get_account_config(self.config.account)
+            preferred_domains = account_config.blog_domains if account_config else []
+
+            # Sort EXIF URLs by domain preference first, then by length
+            sorted_source_urls = self._sort_urls_by_domain_preference(source_urls, preferred_domains)
+
+            # Log the URL selection decision for debugging
+            self.logger.debug(f"EXIF URLs before domain sorting: {source_urls}")
+            self.logger.debug(f"EXIF URLs after domain sorting: {sorted_source_urls}")
+            self.logger.debug(f"Account '{self.config.account}' preferred domains: {preferred_domains}")
+
+            for url in sorted_source_urls:
                 if any(existing.startswith(url) and len(existing) > len(url) for existing in prioritized_urls):
                     continue
                 append_url(url)
@@ -276,9 +298,8 @@ class CaptionGenerator:
             append_url(url)
 
         candidate_urls = prioritized_urls
-        account_config = get_account_config(self.config.account)
-        preferred_domains = account_config.blog_domains if account_config else []
-        candidate_urls = self._sort_urls_by_domain_preference(candidate_urls, preferred_domains)
+        # Note: Domain preferences for EXIF URLs are already applied above
+        # Only apply domain preferences to the entire list if we have mixed sources
 
         if not candidate_urls:
             return None
@@ -286,6 +307,11 @@ class CaptionGenerator:
         best_match: Optional[BlogContextMatch] = None
 
         for url in candidate_urls:
+            # Validate URL accessibility first
+            if not self._validate_url_accessibility(url):
+                self.logger.debug(f"Skipping inaccessible URL: {url}")
+                continue
+
             content = self._load_blog_content(url)
             if not content:
                 continue
@@ -314,15 +340,25 @@ class CaptionGenerator:
             self._ensure_longest_source_url(photo_data, best_match.url)
             return best_match
 
-        fallback_url = candidate_urls[0]
-        photo_data['selected_blog'] = {
-            'url': fallback_url,
-            'context_snippet': None,
-            'matched_terms': [],
-            'derived_from_exif': fallback_url in source_urls
-        }
-        self._ensure_longest_source_url(photo_data, fallback_url)
-        self.logger.debug("No relevant blog context match found; using fallback URL %s", fallback_url)
+        # Find the first accessible URL as fallback
+        fallback_url = None
+        for url in candidate_urls:
+            if self._validate_url_accessibility(url):
+                fallback_url = url
+                break
+
+        if fallback_url:
+            photo_data['selected_blog'] = {
+                'url': fallback_url,
+                'context_snippet': None,
+                'matched_terms': [],
+                'derived_from_exif': fallback_url in source_urls
+            }
+            self._ensure_longest_source_url(photo_data, fallback_url)
+            self.logger.debug("No relevant blog context match found; using accessible fallback URL %s", fallback_url)
+        else:
+            self.logger.warning("No accessible URLs found in candidate list: %s", candidate_urls)
+
         return None
 
 

@@ -17,6 +17,7 @@ class TestBlogContentExtractor:
         """Create test config with live blog URL."""
         config = MagicMock(spec=Config)
         config.blog_post_url = "https://travelmemo.com/mauritius/mauritius-what-to-do"
+        config.account = "primary"  # Add account attribute for account_config access
         return config
     
     @pytest.fixture
