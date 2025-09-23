@@ -11,6 +11,31 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import base64
 from custom_endpoint_extractor import CustomEndpointExtractor
+from account_config import get_account_config
+
+
+
+
+@dataclass(frozen=True)
+class BlogContextMatch:
+    """Container for the best matching blog context snippet."""
+
+    url: str
+    context: str
+    score: int
+    matched_terms: Tuple[str, ...]
+
+
+
+
+@dataclass(frozen=True)
+class BlogContextMatch:
+    """Container for the best matching blog context snippet."""
+
+    url: str
+    context: str
+    score: int
+    matched_terms: Tuple[str, ...]
 
 
 
@@ -538,8 +563,12 @@ class BlogContentExtractor:
         last_error = None
         last_http_status = None
 
+        # Get configured blog domains for this account
+        account_config = get_account_config(self.config.account)
+        configured_domains = account_config.blog_domains if account_config else ['travelmemo.com']
+
         # Try WordPress REST API if this looks like a WordPress site
-        if 'travelmemo.com' in blog_url or 'reisememo.ch' in blog_url:
+        if any(domain in blog_url for domain in configured_domains):
             # First try custom endpoint (most reliable)
             self.logger.info(f"Attempting custom endpoint extraction for: {blog_url}")
             attempted_methods.append("Custom WordPress API Endpoint")
@@ -609,11 +638,11 @@ class BlogContentExtractor:
             self.logger.debug("Email notifier not available - skipping API failure notification")
             return
 
-        # Determine account name from URL
-        account_name = "Primary"
-        if 'reisememo.ch' in blog_url:
-            account_name = "Secondary (Reisememo)"
-        elif 'travelmemo.com' in blog_url:
+        # Determine account name from configuration
+        account_config = get_account_config(self.config.account)
+        if account_config:
+            account_name = f"{account_config.display_name} ({self.config.account})"
+        else:
             account_name = "Primary (TravelMemo)"
 
         # Prepare error details

@@ -5,7 +5,7 @@ This module defines the data structures used by the new Git-based storage system
 providing rich metadata and better tracking capabilities.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from enum import Enum
@@ -115,33 +115,23 @@ class InstagramPost:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'InstagramPost':
         """Create from dictionary (JSON deserialization)."""
+        payload = data.copy()
+
+        # Normalize legacy keys
+        if 'photo_id' not in payload and 'flickr_photo_id' in payload:
+            payload['photo_id'] = payload.pop('flickr_photo_id')
+
         # Convert status string to enum
-        if 'status' in data:
-            data['status'] = PostStatus(data['status'])
+        if 'status' in payload:
+            payload['status'] = PostStatus(payload['status'])
 
         # Convert retry history
-        if 'retry_history' in data and data['retry_history']:
-            data['retry_history'] = [
-                RetryAttempt.from_dict(attempt) for attempt in data['retry_history']
+        if 'retry_history' in payload and payload['retry_history']:
+            payload['retry_history'] = [
+                RetryAttempt.from_dict(attempt) for attempt in payload['retry_history']
             ]
 
-        return cls(**data)
-
-    @classmethod
-    def from_legacy_dict(cls, data: Dict[str, Any]) -> 'InstagramPost':
-        """Create from legacy repository variable format."""
-        return cls(
-            position=data.get('position', 0),
-            photo_id=data.get('photo_id', ''),
-            instagram_post_id=data.get('instagram_post_id'),
-            posted_at=data.get('posted_at'),
-            title=data.get('title'),
-            status=PostStatus.POSTED if data.get('instagram_post_id') else PostStatus.PENDING,
-            account=data.get('account'),
-            created_at=data.get('posted_at'),  # Use posted_at as created_at for legacy data
-            last_update=data.get('posted_at')
-        )
-
+        return cls(**payload)
 
 @dataclass
 class AlbumMetadata:
@@ -166,8 +156,6 @@ class AlbumMetadata:
     error_count: int = 0
     last_error_message: Optional[str] = None
     last_error_at: Optional[str] = None
-    migrated_from: Optional[str] = None
-    migration_date: Optional[str] = None
 
     def update_counts(self, posts: List[InstagramPost]):
         """Update statistics based on current post data."""
@@ -228,11 +216,19 @@ class AlbumMetadata:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'AlbumMetadata':
         """Create from dictionary (JSON deserialization)."""
-        # Convert status string to enum
-        if 'completion_status' in data:
-            data['completion_status'] = AlbumStatus(data['completion_status'])
+        payload = data.copy()
 
-        return cls(**data)
+        # Normalize completion status
+        if 'completion_status' in payload:
+            payload['completion_status'] = AlbumStatus(payload['completion_status'])
+
+        # Drop unknown legacy fields
+        allowed = {field.name for field in fields(cls)}
+        for key in list(payload.keys()):
+            if key not in allowed:
+                payload.pop(key)
+
+        return cls(**payload)
 
     @classmethod
     def create_new(cls, album_id: str, account: str, total_photos: int = 0) -> 'AlbumMetadata':
@@ -276,7 +272,10 @@ class FailedPosition:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'FailedPosition':
         """Create from dictionary (JSON deserialization)."""
-        return cls(**data)
+        payload = data.copy()
+        if 'photo_id' not in payload and 'flickr_photo_id' in payload:
+            payload['photo_id'] = payload.pop('flickr_photo_id')
+        return cls(**payload)
 
     @classmethod
     def from_position(cls, position: int, photo_id: Optional[str] = None,
@@ -291,37 +290,3 @@ class FailedPosition:
         )
 
 
-def migrate_legacy_data(legacy_posts: List[Dict], legacy_failed: List[int],
-                       account: str, album_id: str) -> tuple[List[InstagramPost], List[FailedPosition], AlbumMetadata]:
-    """
-    Migrate legacy repository variable data to new enhanced models.
-
-    Args:
-        legacy_posts: List of post dictionaries from repository variables
-        legacy_failed: List of failed position integers
-        account: Account name
-        album_id: Album ID
-
-    Returns:
-        Tuple of (enhanced posts, enhanced failed positions, album metadata)
-    """
-    # Convert legacy posts
-    enhanced_posts = []
-    for post_data in legacy_posts:
-        enhanced_post = InstagramPost.from_legacy_dict(post_data)
-        enhanced_post.account = account
-        enhanced_posts.append(enhanced_post)
-
-    # Convert legacy failed positions
-    enhanced_failed = []
-    for position in legacy_failed:
-        failed_pos = FailedPosition.from_position(position)
-        enhanced_failed.append(failed_pos)
-
-    # Create album metadata
-    metadata = AlbumMetadata.create_new(album_id, account)
-    metadata.update_counts(enhanced_posts)
-    metadata.migrated_from = "repository_variables"
-    metadata.migration_date = datetime.now().isoformat()
-
-    return enhanced_posts, enhanced_failed, metadata

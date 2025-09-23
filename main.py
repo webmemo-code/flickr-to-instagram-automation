@@ -15,6 +15,7 @@ from caption_generator import CaptionGenerator
 from instagram_api import InstagramAPI
 from state_manager import StateManager
 from email_notifier import EmailNotifier
+from account_config import account_manager
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -62,7 +63,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
 
-        state_manager = StateManager(config, repo_name)
+        environment_name = account_manager.get_environment_name(account)
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
 
         # Initialize orchestration modules
         from orchestration import (
@@ -205,7 +207,8 @@ def reset_dry_runs(account: str = 'primary') -> None:
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
-        state_manager = StateManager(config, repo_name)
+        environment_name = account_manager.get_environment_name(account)
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
         cleared_count = state_manager.clear_dry_run_records()
         
         print(f"✅ Cleared {cleared_count} dry run records")
@@ -226,7 +229,8 @@ def show_stats(account: str = 'primary') -> None:
         if not repo_name:
             raise ValueError("GITHUB_REPOSITORY environment variable not set")
         
-        state_manager = StateManager(config, repo_name)
+        environment_name = account_manager.get_environment_name(account)
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
         flickr_api = FlickrAPI(config)
         
         # Get total photos in album
@@ -315,11 +319,13 @@ def main():
         action='store_true',
         help='Test email notification configuration'
     )
+    # Get available account choices dynamically from account configuration
+    available_accounts = account_manager.get_all_account_ids()
     parser.add_argument(
         '--account',
-        choices=['primary', 'reisememo'],
+        choices=available_accounts,
         default='primary',
-        help='Account to use (primary or reisememo)'
+        help=f'Account to use (available: {", ".join(available_accounts)})'
     )
     
     args = parser.parse_args()

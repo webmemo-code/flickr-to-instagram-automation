@@ -7,6 +7,7 @@ from openai import OpenAI
 from typing import Optional, Dict, List
 from config import Config
 from blog_content_extractor import BlogContentExtractor, BlogContextMatch
+from account_config import is_secondary_account, get_account_config
 
 
 class CaptionGenerator:
@@ -65,12 +66,12 @@ class CaptionGenerator:
             
             # Build the enhanced prompt
             context_text = "\n".join(context_parts) if context_parts else ""
-            account_code = getattr(self.config, 'account', 'primary')
 
+            account_config = get_account_config(self.config.account)
             if context_text:
-                # Enhanced prompt with context - language-aware
-                if account_code == 'reisememo':
-                    # German prompts for Reisememo account
+                # Enhanced prompt with context - use account language configuration
+                if account_config and account_config.language == 'de':
+                    # German prompts for German-language accounts
                     prompt_base = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
                                   "Schreibe sachlich, authentisch, persönlich und duze deine Follower. Nutze den gegebenen Blog-Kontext, "
@@ -84,7 +85,7 @@ class CaptionGenerator:
                                        "aus dem Reiseblog-Post enthalten, in dem dieses Foto erscheint. Nutze diesen umfangreichen Kontext, "
                                        "um eine informative Caption zu erstellen, die mehr über das Reiseziel erzählt.")
                 else:
-                    # English prompts for primary account
+                    # English prompts for English-language accounts
                     prompt_base = ("You are an Instagram influencer who publishes travel photos. Create an Instagram caption "
                                   "in five short sentences. Add a new paragraph for each sentence. "
                                   "Make it factual, authentic and personal. Use the provided blog post context "
@@ -99,23 +100,23 @@ class CaptionGenerator:
                                        "informative caption that tells more about the destination the photo was taken.")
                 
                 prompt = prompt_base + f"\n\nContext about this photo:\n{context_text}"
-                self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')} (account: {account_code})")
+                self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')} (account: {self.config.account})")
             else:
-                # Fallback to original prompt style when no context available - language-aware
-                if account_code == 'reisememo':
-                    # German fallback prompt for Reisememo account
+                # Fallback to original prompt style when no context available - use account language configuration
+                if account_config and account_config.language == 'de':
+                    # German fallback prompt for German-language accounts
                     prompt = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
                              "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
                              "Verwende keine Anführungszeichen. Halte es persönlich und authentisch. "
                              "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
                              "Nutze Emojis nur sparsam und passend.")
                 else:
-                    # English fallback prompt for primary account
+                    # English fallback prompt for English-language accounts
                     prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                              "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
                              "Do not use quotation marks. Keep it personal and authentic. "
                              "Use emojis sparingly and appropriately.")
-                self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {account_code})")
+                self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
             response = self.client.chat.completions.create(
                 model=self.config.openai_model,
@@ -147,8 +148,7 @@ class CaptionGenerator:
     def build_full_caption(self, photo_data: dict, generated_caption: str) -> str:
         """Build the complete Instagram caption with title, generated content, and hashtags."""
         caption_parts = []
-        account_code = getattr(self.config, 'account', 'primary')
-        
+
         # Add title and description
         if photo_data.get('title'):
             title_desc = f"{photo_data['title']}"
@@ -161,17 +161,20 @@ class CaptionGenerator:
             caption_parts.append(generated_caption)
         
         # Add account-specific footer branding
-        if account_code == 'reisememo':
-            caption_parts.append("Reisememo des Schweizer Reiseblogs über Erlebnisreisen.")
+        account_config = get_account_config(self.config.account)
+        if account_config and account_config.brand_signature:
+            caption_parts.append(account_config.brand_signature)
+        elif account_config and account_config.language == 'de':
+            caption_parts.append(f"{account_config.display_name} des Schweizer Reiseblogs über Erlebnisreisen.")
         else:
             caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
-        
+
         # Add blog post URL if available
         selected_blog = photo_data.get('selected_blog', {})
         blog_url = selected_blog.get('url') or self.config.get_default_blog_post_url()
         if blog_url:
-            # Add travel tip text before URL based on account
-            if account_code == 'reisememo':
+            # Add travel tip text before URL based on account language
+            if account_config and account_config.language == 'de':
                 caption_parts.append("Lies den Reisetipp unter")
             else:
                 caption_parts.append("Read the travel tip at")
@@ -211,6 +214,21 @@ class CaptionGenerator:
         existing = photo_data.get('source_url')
         if not existing or len(candidate_url) > len(existing):
             photo_data['source_url'] = candidate_url
+
+
+    def _sort_urls_by_domain_preference(self, urls: List[str], preferred_domains: List[str]) -> List[str]:
+        """Sort URLs so account-preferred domains are evaluated first."""
+        if not urls or not preferred_domains:
+            return urls
+
+        def priority(url: str):
+            lower_url = url.lower()
+            for idx, domain in enumerate(preferred_domains):
+                if domain and domain.lower() in lower_url:
+                    return (0, idx, -len(url))
+            return (1, len(preferred_domains), -len(url))
+
+        return sorted(urls, key=priority)
 
 
 
@@ -258,6 +276,9 @@ class CaptionGenerator:
             append_url(url)
 
         candidate_urls = prioritized_urls
+        account_config = get_account_config(self.config.account)
+        preferred_domains = account_config.blog_domains if account_config else []
+        candidate_urls = self._sort_urls_by_domain_preference(candidate_urls, preferred_domains)
 
         if not candidate_urls:
             return None

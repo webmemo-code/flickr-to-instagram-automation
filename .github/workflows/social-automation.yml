@@ -1,28 +1,32 @@
-name: Social Media Automation (Reusable)
+name: Shared Workflow Items (do not run)
+
+# Centralized reusable workflow for Flickr to Instagram automation
+# Eliminates code duplication between primary and secondary account workflows
+# Uses Git-based state management with fine-grained PAT permissions
 
 on:
   workflow_call:
     inputs:
       account_id:
-        description: 'Account identifier for logging and identification'
+        description: 'Account identifier for logging and identification (e.g., "primary", "secondary")'
         required: true
         type: string
       environment_name:
-        description: 'GitHub environment name for secrets scope'
+        description: 'GitHub environment name for environment-specific secrets and variables'
         required: true
         type: string
       account_flag:
-        description: 'CLI account flag (empty for primary, "reisememo" for secondary)'
+        description: 'CLI account flag passed to main.py (empty for primary, secondary account ID for secondary accounts)'
         required: false
         type: string
         default: ''
       dry_run:
-        description: 'Run in dry-run mode (no actual posting)'
+        description: 'Run in dry-run mode without posting to Instagram (for testing)'
         required: false
         type: boolean
         default: false
       show_stats:
-        description: 'Show statistics only (no automation run)'
+        description: 'Display posting statistics only without running automation'
         required: false
         type: boolean
         default: false
@@ -36,21 +40,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # Use fine-grained PAT with contents:write permission for Git-based state management
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
-      - name: Set up Python
+      - name: Set up Python environment
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: requirements.txt
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Validate environment variables
+      - name: Validate configuration and environment
         run: |
           echo "Checking required environment variables for ${{ inputs.account_id }} account..."
           python -c "

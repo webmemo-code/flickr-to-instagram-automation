@@ -106,12 +106,17 @@ processed_images/
 generated_captions/
 api_responses/
 temp/
+TASKS_REISEMEMO.md
+
 # Diagnostic and internal files
 read_write_github_variables.py
 PLANNING.md
 TASKS.md
 TODO.md
 CLAUDE.md
+CODEX.md
+test_account_config.py
+migrate_state_storage.py
 
 # WordPress plugin files (deployment templates)
 *.php
@@ -119,9 +124,16 @@ CLAUDE.md
 TRAVELMEMO_CONTENT_API.md
 STORAGE_MIGRATION.md
 test_new_storage.py
+SOLUTION_SUMMARY.md
+state_manager_legacy.py
+CODEX.md
 config.py.bak
 _tmp_test_caption.py
 CODEX_TODO.md
 arch_workflow_log.txt
 *.backup
 .github/workflows/archive/
+COMMIT_TODO.md
+resolve_conflicts_script.sh
+fix_all_commits.sh
+reword_only_script.sh

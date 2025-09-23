@@ -135,7 +135,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
         """Write JSON data to repository file."""
         try:
             content = json.dumps(data, indent=2, default=str)
-            content_encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+            # GitHub Contents API automatically handles base64 encoding - don't encode manually
 
             # Check if file exists to determine if we're creating or updating
             try:
@@ -144,7 +144,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
                 self.repo.update_file(
                     path=file_path,
                     message=commit_message,
-                    content=content_encoded,
+                    content=content,
                     sha=existing_file.sha,
                     branch=self.branch
                 )
@@ -155,7 +155,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
                     self.repo.create_file(
                         path=file_path,
                         message=commit_message,
-                        content=content_encoded,
+                        content=content,
                         branch=self.branch
                     )
                     self.logger.debug(f"Created file {file_path}")
@@ -250,163 +250,3 @@ class GitFileStorageAdapter(StateStorageAdapter):
         except Exception as e:
             self.logger.debug(f"Git storage not available: {e}")
             return False
-
-    def migrate_from_repository_variables(self, old_state_manager) -> Dict[str, Any]:
-        """
-        Migrate existing data from repository variables to Git storage.
-
-        Args:
-            old_state_manager: StateManager instance with repository variable access
-
-        Returns:
-            Dict containing migration results and statistics
-        """
-        migration_results = {
-            "success": False,
-            "accounts_migrated": [],
-            "albums_migrated": [],
-            "posts_migrated": 0,
-            "failed_positions_migrated": 0,
-            "errors": []
-        }
-
-        try:
-            # Get all repository variables that match our patterns
-            repo_vars = self.repo.get_variables()
-
-            for var in repo_vars:
-                var_name = var.name
-
-                # Parse variable names to extract account and album info
-                if "_INSTA_POSTS_" in var_name:
-                    # Format: {ENVIRONMENT}_INSTA_POSTS_{ALBUM_ID}
-                    parts = var_name.split("_INSTA_POSTS_")
-                    if len(parts) == 2:
-                        environment = parts[0]
-                        album_id = parts[1]
-
-                        # Convert environment to account name
-                        account = "primary" if environment == "PRIMARY_ACCOUNT" else "secondary"
-
-                        try:
-                            # Parse existing JSON data
-                            posts_data = json.loads(var.value) if var.value else []
-
-                            # Migrate posts data
-                            if self.write_posts(account, album_id, posts_data):
-                                migration_results["posts_migrated"] += len(posts_data)
-                                if account not in migration_results["accounts_migrated"]:
-                                    migration_results["accounts_migrated"].append(account)
-                                if album_id not in migration_results["albums_migrated"]:
-                                    migration_results["albums_migrated"].append(album_id)
-                            else:
-                                migration_results["errors"].append(f"Failed to migrate posts for {account}/{album_id}")
-
-                        except json.JSONDecodeError as e:
-                            migration_results["errors"].append(f"Invalid JSON in {var_name}: {e}")
-
-                elif "_FAILED_POSITIONS_" in var_name:
-                    # Format: {ENVIRONMENT}_FAILED_POSITIONS_{ALBUM_ID}
-                    parts = var_name.split("_FAILED_POSITIONS_")
-                    if len(parts) == 2:
-                        environment = parts[0]
-                        album_id = parts[1]
-
-                        # Convert environment to account name
-                        account = "primary" if environment == "PRIMARY_ACCOUNT" else "secondary"
-
-                        try:
-                            # Parse existing JSON data
-                            failed_data = json.loads(var.value) if var.value else []
-
-                            # Migrate failed positions data
-                            if self.write_failed_positions(account, album_id, failed_data):
-                                migration_results["failed_positions_migrated"] += len(failed_data)
-                                if account not in migration_results["accounts_migrated"]:
-                                    migration_results["accounts_migrated"].append(account)
-                                if album_id not in migration_results["albums_migrated"]:
-                                    migration_results["albums_migrated"].append(album_id)
-                            else:
-                                migration_results["errors"].append(f"Failed to migrate failed positions for {account}/{album_id}")
-
-                        except json.JSONDecodeError as e:
-                            migration_results["errors"].append(f"Invalid JSON in {var_name}: {e}")
-
-            # Create initial metadata for migrated albums
-            for account in migration_results["accounts_migrated"]:
-                for album_id in migration_results["albums_migrated"]:
-                    posts = self.read_posts(account, album_id)
-                    failed = self.read_failed_positions(account, album_id)
-
-                    metadata = {
-                        "album_id": album_id,
-                        "account": account,
-                        "created_at": datetime.now().isoformat(),
-                        "last_update": datetime.now().isoformat(),
-                        "total_photos": 0,  # Will be updated by StateManager
-                        "posted_count": len(posts),
-                        "failed_count": len(failed),
-                        "completion_status": "active",
-                        "migrated_from": "repository_variables",
-                        "migration_date": datetime.now().isoformat()
-                    }
-
-                    self.write_metadata(account, album_id, metadata)
-
-            migration_results["success"] = len(migration_results["errors"]) == 0
-
-        except Exception as e:
-            migration_results["errors"].append(f"Migration failed: {e}")
-            self.logger.error(f"Migration failed: {e}")
-
-        return migration_results
-
-
-class RepositoryVariableStorageAdapter(StateStorageAdapter):
-    """
-    Legacy repository variable storage adapter.
-
-    This maintains the existing repository variable storage system for
-    backward compatibility during migration.
-    """
-
-    def __init__(self, state_manager):
-        """Initialize with existing StateManager instance."""
-        self.state_manager = state_manager
-        self.logger = logging.getLogger(__name__)
-
-    def read_posts(self, account: str, album_id: str) -> List[Dict]:
-        """Read posts using legacy repository variable method."""
-        # Use the state manager's existing method
-        return self.state_manager.get_instagram_posts()
-
-    def write_posts(self, account: str, album_id: str, posts: List[Dict]) -> bool:
-        """Write posts using legacy repository variable method."""
-        # The legacy system doesn't support bulk writes, only individual appends
-        # This is a limitation we're migrating away from
-        return True
-
-    def read_failed_positions(self, account: str, album_id: str) -> List[int]:
-        """Read failed positions using legacy repository variable method."""
-        return self.state_manager.get_failed_positions()
-
-    def write_failed_positions(self, account: str, album_id: str, positions: List[int]) -> bool:
-        """Write failed positions using legacy repository variable method."""
-        # The legacy system manages this internally
-        return True
-
-    def read_metadata(self, account: str, album_id: str) -> Dict:
-        """Read metadata (limited in legacy system)."""
-        return {
-            "album_id": album_id,
-            "account": account,
-            "legacy_system": True
-        }
-
-    def write_metadata(self, account: str, album_id: str, metadata: Dict) -> bool:
-        """Write metadata (not supported in legacy system)."""
-        return True
-
-    def is_available(self) -> bool:
-        """Check if legacy storage is available."""
-        return hasattr(self.state_manager, 'repo') and self.state_manager.repo is not None

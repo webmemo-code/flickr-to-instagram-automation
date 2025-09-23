@@ -1,41 +1,46 @@
-name: Secondary Flickr to Instagram Automation
+name: Secondary Flickr to Insta Automation
 run-name: "Secondary Account - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
 
-on:
-  # Daily posting at 05:11 UTC (07:11 CEST)
-  # schedule:
-  #   - cron: '11 5 * * *'
-  #   - cron: '15 11 * * *'  # Test run
+# Secondary Instagram account automation workflow
+# Uses the centralized reusable workflow with secondary-account environment
+# Posts photos from Flickr album with account-specific language and branding
 
-  # Manual trigger with options
+on:
+  # Scheduled automation - Currently disabled, enable by uncommenting
+  # schedule:
+  #   - cron: '11 5 * * *'    # Daily posting at 05:11 UTC (07:11 CEST)
+
+  # Manual execution with configuration options
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Run without posting (dry run)'
+        description: 'Test mode - validate photos and generate captions without posting to Instagram'
         type: boolean
         default: false
       show_stats:
-        description: 'Show statistics only'
+        description: 'Display album statistics and posting progress without running automation'
         type: boolean
         default: false
 
-# Ensure only one Reisememo automation runs at a time
+# Prevent concurrent secondary account automation runs
 concurrency:
-  group: social-media-automation-reisememo
+  group: social-media-automation-secondary
   cancel-in-progress: false
 
+# Permissions for Git-based state management and legacy compatibility
 permissions:
-  contents: read
-  issues: write        # For legacy GitHub Issues (compatibility)
-  actions: write       # For repository variables state management
+  contents: read       # Read repository code and configuration
+  issues: write       # For legacy GitHub Issues audit trail (if enabled)
+  actions: write      # For workflow execution and artifact handling
 
 jobs:
   automation:
+    name: Execute Secondary Account Automation
     uses: ./.github/workflows/social-automation.yml
     with:
       account_id: reisememo
-      environment_name: secondary-account
-      account_flag: reisememo  # Pass account flag for secondary account
+      environment_name: secondary-account     # Uses secondary-account GitHub environment
+      account_flag: reisememo                 # Triggers secondary account configuration (language, branding, etc.)
       dry_run: ${{ inputs.dry_run || false }}
       show_stats: ${{ inputs.show_stats || false }}
-    secrets: inherit
+    secrets: inherit                         # Pass all repository and environment secrets
