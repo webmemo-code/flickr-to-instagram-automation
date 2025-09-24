@@ -160,5 +160,23 @@
     "instagram_url": null,
     "caption_length": null,
     "hashtags_count": null
+  },
+  {
+    "position": 10,
+    "photo_id": "53440591540",
+    "instagram_post_id": "18079605094960064",
+    "posted_at": "2025-09-24T18:21:40.458233",
+    "title": "Li Finistreddi Country Resort Hotel",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": null,
+    "account": "primary",
+    "created_at": "2025-09-24T18:21:40.458208",
+    "last_update": "2025-09-24T18:21:40.458234",
+    "flickr_url": "https://live.staticflickr.com/65535/53440591540_0d0c1f5dc1_c.jpg",
+    "instagram_url": null,
+    "caption_length": null,
+    "hashtags_count": null
   }
 ]
