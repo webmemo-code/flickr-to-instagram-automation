@@ -178,5 +178,23 @@
     "instagram_url": null,
     "caption_length": null,
     "hashtags_count": null
+  },
+  {
+    "position": 11,
+    "photo_id": "53440177606",
+    "instagram_post_id": "18060941927378848",
+    "posted_at": "2025-09-25T18:22:21.914668",
+    "title": "Li Finistreddi Boutique-Hotel",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": null,
+    "account": "primary",
+    "created_at": "2025-09-25T18:22:21.914658",
+    "last_update": "2025-09-25T18:22:21.914669",
+    "flickr_url": "https://live.staticflickr.com/65535/53440177606_38909ac190_c.jpg",
+    "instagram_url": null,
+    "caption_length": null,
+    "hashtags_count": null
   }
 ]
