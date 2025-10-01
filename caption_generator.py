@@ -287,16 +287,28 @@ class CaptionGenerator:
         return sorted(urls, key=priority)
 
     def _validate_url_accessibility(self, url: str) -> bool:
-        """Check if a URL is accessible by making a HEAD request."""
+        """Check if a URL is accessible by making a HEAD request, falling back to GET if needed."""
         try:
+            # Try HEAD request first (faster)
             response = requests.head(url, timeout=5, allow_redirects=True)
             # Consider 2xx and 3xx status codes as accessible
             is_accessible = 200 <= response.status_code < 400
+
+            # If HEAD fails with 405 (Method Not Allowed) or 403, try GET
+            if response.status_code in [403, 405]:
+                self.logger.debug(f"HEAD request returned {response.status_code} for {url}, trying GET")
+                response = requests.get(url, timeout=5, allow_redirects=True, stream=True)
+                # Only read headers, don't download body
+                response.close()
+                is_accessible = 200 <= response.status_code < 400
+
             self.logger.debug(f"URL accessibility check for {url}: {response.status_code} ({'accessible' if is_accessible else 'not accessible'})")
             return is_accessible
         except requests.exceptions.RequestException as e:
             self.logger.debug(f"URL accessibility check failed for {url}: {e}")
-            return False
+            # If validation fails, assume URL is accessible and let _load_blog_content handle errors
+            # This prevents false negatives from overly restrictive servers
+            return True
 
 
 
