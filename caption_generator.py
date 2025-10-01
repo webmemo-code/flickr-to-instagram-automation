@@ -5,7 +5,7 @@ import time
 import logging
 import requests
 from openai import OpenAI
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from config import Config
 from blog_content_extractor import BlogContentExtractor, BlogContextMatch
 from account_config import is_secondary_account, get_account_config
@@ -26,17 +26,17 @@ class CaptionGenerator:
         try:
             # Build enhanced context from available data
             context_parts = []
-            
+
             # Add title and description
             if photo_data.get('title'):
                 context_parts.append(f"Photo title: {photo_data['title']}")
             if photo_data.get('description'):
                 context_parts.append(f"Photo description: {photo_data['description']}")
-            
+
             # Add source/blog URL context
             if photo_data.get('source_url'):
                 context_parts.append(f"This photo appears in a blog post at: {photo_data['source_url']}")
-            
+
             # Add location context
             if photo_data.get('location_data'):
                 location = photo_data['location_data'].get('photo', {}).get('location', {})
@@ -46,7 +46,7 @@ class CaptionGenerator:
                         location_parts.append(location[field]['_content'])
                 if location_parts:
                     context_parts.append(f"Location: {', '.join(location_parts)}")
-            
+
             # Add EXIF context (camera info)
             if photo_data.get('exif_data'):
                 exif = photo_data['exif_data'].get('photo', {}).get('exif', [])
@@ -56,14 +56,59 @@ class CaptionGenerator:
                         camera_info.append(tag.get('raw', {}).get('_content', ''))
                 if camera_info:
                     context_parts.append(f"Camera: {' '.join(camera_info)}")
-            
-            # Add blog post content context (NEW FEATURE)
+
+            # Add EXIF hints (phrases, keywords, source URLs)
+            exif_hints = photo_data.get('exif_hints', {})
+            if exif_hints:
+                if exif_hints.get('phrases'):
+                    context_parts.append(f"EXIF phrases: {', '.join(exif_hints['phrases'][:10])}")
+                if exif_hints.get('keywords'):
+                    context_parts.append(f"EXIF keywords: {', '.join(exif_hints['keywords'][:10])}")
+
+            # Add blog post content context (ENHANCED FEATURE)
             blog_match = self._get_blog_content_context(photo_data)
+            blog_content = None
+            if blog_match and blog_match.url:
+                # Try to load full blog content
+                blog_content = self._load_blog_content(blog_match.url)
+
             if blog_match:
-                context_parts.append(f"Blog context: {blog_match.context}")
-                self.logger.info(
-                    f"Added blog content context for photo {photo_data.get('id')} from {blog_match.url}"
-                )
+                # Build structured blog context with headings and paragraphs
+                blog_context_parts = []
+
+                # Start with match context for backward compatibility
+                blog_context_parts.append(f"Blog context: {blog_match.context}")
+
+                # Add full blog content if available
+                if blog_content:
+                    blog_context_parts.append(f"\n=== Full Blog Post: {blog_content.get('title', 'Untitled')} ===")
+                    blog_context_parts.append(f"URL: {blog_content.get('url', '')}")
+
+                    # Add headings for structure
+                    if blog_content.get('headings'):
+                        heading_texts = [h['text'] for h in blog_content['headings'][:5]]
+                        blog_context_parts.append(f"Sections: {' | '.join(heading_texts)}")
+
+                    # Add paragraphs (limited to fit in context window)
+                    if blog_content.get('paragraphs'):
+                        # Limit total blog content to ~4000 chars to leave room for other context
+                        paragraphs = blog_content['paragraphs'][:15]  # First 15 paragraphs
+                        blog_text = '\n\n'.join(paragraphs)
+                        if len(blog_text) > 4000:
+                            blog_text = blog_text[:4000] + "..."
+                        blog_context_parts.append(f"Content:\n{blog_text}")
+
+                    self.logger.info(
+                        f"Added full blog content context for photo {photo_data.get('id')} from {blog_content.get('url')} "
+                        f"({len(blog_content.get('paragraphs', []))} paragraphs, {len(blog_content.get('headings', []))} headings)"
+                    )
+                else:
+                    self.logger.info(
+                        f"Added blog context snippet for photo {photo_data.get('id')} from {blog_match.url}"
+                    )
+
+                blog_context_full = '\n'.join(blog_context_parts)
+                context_parts.append(blog_context_full)
             
             # Build the enhanced prompt
             context_text = "\n".join(context_parts) if context_parts else ""
@@ -75,31 +120,31 @@ class CaptionGenerator:
                     # German prompts for German-language accounts
                     prompt_base = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
-                                  "Schreibe sachlich, authentisch, persönlich und duze deine Follower. Nutze den gegebenen Blog-Kontext, "
-                                  "um eine spezifische Caption zu erstellen, die den Ort, die Geschichte oder den Kontext erwähnt." 
+                                  "Schreibe sachlich, authentisch, persönlich und duze deine Follower. "
                                   "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
-                                  "Nutze Emojis nur sparsam und passend.")
-                    
-                    # Add special instructions for blog context in German
-                    if blog_match:
-                        prompt_base += (" Achte besonders auf die 'Blog context' Informationen, die redaktionelle Beschreibungen "
-                                       "aus dem Reiseblog-Post enthalten, in dem dieses Foto erscheint. Nutze diesen umfangreichen Kontext, "
-                                       "um eine informative Caption zu erstellen, die mehr über das Reiseziel erzählt.")
+                                  "Nutze Emojis nur sparsam und passend.\n\n"
+                                  "WICHTIG: Nutze die bereitgestellten Blog-Inhalte, um KONKRETE Details zu erwähnen:\n"
+                                  "- Zitiere spezifische Orte, Namen, Ereignisse oder Fakten aus dem Blog-Post\n"
+                                  "- Erzähle eine kurze Geschichte oder Anekdote, die im Blog beschrieben wird\n"
+                                  "- Vermeide generische Reisebeschreibungen - sei spezifisch!\n"
+                                  "- Wenn das Foto eine bestimmte Sehenswürdigkeit, Restaurant, oder Aktivität zeigt, verwende den exakten Namen aus dem Blog\n"
+                                  "- Beziehe dich auf konkrete Erlebnisse oder Eindrücke, die im Blog-Post erwähnt werden")
+
                 else:
                     # English prompts for English-language accounts
                     prompt_base = ("You are an Instagram influencer who publishes travel photos. Create an Instagram caption "
                                   "in five short sentences. Add a new paragraph for each sentence. "
-                                  "Make it factual, authentic and personal. Use the provided blog post context "
-                                  "to create a specific caption that references the location, story, or context. "
-                                  "Do not use the terms 'I can\'t wait to share more...' or 'Stay tuned for more...'."
-                                  "Use emojis sparingly and appropriately.")
-                    
-                    # Add special instructions for blog context in English
-                    if blog_match:
-                        prompt_base += (" Pay special attention to the 'Blog context' information, which contains editorial descriptions "
-                                       "from the travel blog post where this photo appears. Use this rich context to create a more "
-                                       "informative caption that tells more about the destination the photo was taken.")
-                
+                                  "Make it factual, authentic and personal. "
+                                  "Do not use the terms 'I can\'t wait to share more...' or 'Stay tuned for more...'. "
+                                  "Use emojis sparingly and appropriately.\n\n"
+                                  "CRITICAL: Use the provided blog post context to include SPECIFIC details:\n"
+                                  "- Reference specific places, names, events, or facts from the blog post\n"
+                                  "- Tell a brief story or anecdote that's described in the blog content\n"
+                                  "- Avoid generic travel descriptions—be specific and concrete!\n"
+                                  "- If the photo shows a particular landmark, restaurant, or activity, use the exact name from the blog\n"
+                                  "- Reference concrete experiences or impressions mentioned in the blog post\n"
+                                  "- Mine the blog content for unique details that make this photo's story stand out")
+
                 prompt = prompt_base + f"\n\nContext about this photo:\n{context_text}"
                 self.logger.debug(f"Using enhanced prompt with context for photo {photo_data.get('id')} (account: {self.config.account})")
             else:
@@ -133,8 +178,8 @@ class CaptionGenerator:
                         ]
                     }
                 ],
-                max_tokens=400,
-                temperature=0.1
+                max_tokens=600,  # Increased from 400 to allow more detailed captions
+                temperature=0.4  # Increased from 0.1 to allow more creative, less generic output
             )
             
             generated_text = response.choices[0].message.content
@@ -327,18 +372,10 @@ class CaptionGenerator:
                 continue
 
             match = self.blog_extractor.find_relevant_content(content, photo_data)
-            if not match:
-                continue
 
-            normalized = match if match.url else BlogContextMatch(
-                url=url,
-                context=match.context,
-                score=match.score,
-                matched_terms=match.matched_terms
-            )
-
-            if not best_match or normalized.score > best_match.score:
-                best_match = normalized
+            # Keep track of best match
+            if match and (not best_match or match.score > best_match.score):
+                best_match = match
 
         if best_match:
             photo_data['selected_blog'] = {
@@ -366,6 +403,13 @@ class CaptionGenerator:
             }
             self._ensure_longest_source_url(photo_data, fallback_url)
             self.logger.debug("No relevant blog context match found; using accessible fallback URL %s", fallback_url)
+            # Return a minimal match object for the fallback
+            return BlogContextMatch(
+                url=fallback_url,
+                context="",
+                score=0,
+                matched_terms=tuple()
+            )
         else:
             self.logger.warning("No accessible URLs found in candidate list: %s", candidate_urls)
 
