@@ -340,5 +340,23 @@
     "instagram_url": null,
     "caption_length": null,
     "hashtags_count": null
+  },
+  {
+    "position": 20,
+    "photo_id": "53440493789",
+    "instagram_post_id": "",
+    "posted_at": "2025-10-04T18:21:24.898948",
+    "title": "Villa Escargot B&B",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": null,
+    "account": "primary",
+    "created_at": "2025-10-04T18:21:24.898937",
+    "last_update": "2025-10-04T18:21:24.898950",
+    "flickr_url": "https://live.staticflickr.com/65535/53440493789_5fe9971f18_c.jpg",
+    "instagram_url": null,
+    "caption_length": null,
+    "hashtags_count": null
   }
 ]
