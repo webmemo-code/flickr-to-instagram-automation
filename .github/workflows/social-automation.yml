@@ -315,7 +315,7 @@ jobs:
           fi
 
       - name: Auto-disable workflow on album completion
-        if: ${{ inputs.show_stats != true && (steps.check_complete.outputs.album_complete == 'true' || steps.post_run_check.outputs.album_just_completed == 'true') }}
+        if: ${{ inputs.show_stats != true && steps.post_run_check.outputs.album_just_completed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
