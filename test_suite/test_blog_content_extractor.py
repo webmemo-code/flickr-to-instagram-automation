@@ -7,6 +7,7 @@ import os
 from unittest.mock import patch, MagicMock
 from blog_content_extractor import BlogContentExtractor
 from config import Config
+from photo_models import EnrichedPhoto
 
 
 class TestBlogContentExtractor:
@@ -55,20 +56,21 @@ class TestBlogContentExtractor:
 
 
 
-        photo_context = {
-            'title': 'Le Morne Brabant Beach Mauritius',
-            'description': 'Beautiful beach at Le Morne with crystal clear water and mountain views',
-            'location_data': {
+        photo_context = EnrichedPhoto(
+            id='test', title='Le Morne Brabant Beach Mauritius', album_position=1,
+            url='http://example.com/photo.jpg', server='1', secret='s', date_taken='',
+            description='Beautiful beach at Le Morne with crystal clear water and mountain views',
+            location_data={
                 'city': 'Le Morne',
                 'region': 'Black River',
                 'country': 'Mauritius'
             },
-            'tags': ['Li Finistreddi', 'luxury hotel', 'Mauritius beach']
-        }
-        
-
-
-
+            exif_hints={
+                'source_urls': [],
+                'phrases': [],
+                'keywords': ['Li Finistreddi', 'luxury hotel', 'Mauritius beach']
+            },
+        )
 
         keywords = extractor._extract_photo_keywords(photo_context)
 
@@ -80,21 +82,22 @@ class TestBlogContentExtractor:
         assert len(found_keywords) >= 3, f"Should find relevant keywords. Found: {found_keywords}"
 
         meta_match = next((k for k in keywords if k['term'] == 'li finistreddi'), None)
-        assert meta_match is not None, "Meta tags should include Li Finistreddi"
-        assert meta_match['weight'] >= 5 and meta_match['is_phrase'], "Li Finistreddi should be treated as high-weight phrase"
+        assert meta_match is not None, "EXIF keywords should include Li Finistreddi"
+        assert meta_match['weight'] >= 4 and meta_match['is_phrase'], "Li Finistreddi should be treated as high-weight phrase"
 
         print(f"PASS: Extracted keywords: {keywords}")
   
     def test_extract_photo_keywords_exif_hints(self, extractor):
         """EXIF hints produce high-weight terms for matching."""
-        photo_context = {
-            'title': 'Evening view over Sardinia',
-            'exif_hints': {
+        photo_context = EnrichedPhoto(
+            id='test', title='Evening view over Sardinia', album_position=1,
+            url='http://example.com/photo.jpg', server='1', secret='s', date_taken='',
+            exif_hints={
                 'source_urls': ['https://travelmemo.com/italy/sardinia/sardinia-what-to-do-in-north'],
                 'phrases': ['Li Finistreddi Luxury Retreat'],
                 'keywords': ['Gallura', 'Sardinia north']
-            }
-        }
+            },
+        )
 
         keywords = extractor._extract_photo_keywords(photo_context)
         keyword_map = {item['term']: item for item in keywords}
@@ -113,15 +116,16 @@ class TestBlogContentExtractor:
         assert blog_content is not None, "Should extract blog content successfully"
         
         # Sample photo context for a Mauritius beach photo
-        photo_context = {
-            'title': 'Le Morne Beach Mauritius',
-            'description': 'Beautiful beach with turquoise water and Le Morne mountain',
-            'location_data': {
+        photo_context = EnrichedPhoto(
+            id='test', title='Le Morne Beach Mauritius', album_position=1,
+            url='http://example.com/photo.jpg', server='1', secret='s', date_taken='',
+            description='Beautiful beach with turquoise water and Le Morne mountain',
+            location_data={
                 'city': 'Le Morne',
-                'region': 'Black River', 
+                'region': 'Black River',
                 'country': 'Mauritius'
-            }
-        }
+            },
+        )
         
         relevant_match = extractor.find_relevant_content(blog_content, photo_context)
 

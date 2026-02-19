@@ -643,7 +643,7 @@ class BlogContentExtractor:
         self._content_cache[blog_url] = content
         return content
 
-    def find_relevant_content(self, blog_content: Dict[str, any], photo_context: Dict[str, any]) -> Optional[BlogContextMatch]:
+    def find_relevant_content(self, blog_content: Dict[str, any], photo_context) -> Optional[BlogContextMatch]:
         """Find the best matching blog content snippet for a given photo."""
         if not blog_content or not photo_context:
             return None
@@ -704,7 +704,7 @@ class BlogContentExtractor:
 
 
 
-    def _extract_photo_keywords(self, photo_context: Dict[str, any]) -> List[Dict[str, any]]:
+    def _extract_photo_keywords(self, photo_context) -> List[Dict[str, any]]:
         """Extract searchable keywords and phrases from photo metadata."""
         keywords: List[Dict[str, any]] = []
         seen = set()
@@ -728,7 +728,7 @@ class BlogContentExtractor:
 
         stop_words = {'photo', 'image', 'picture', 'with', 'from', 'this', 'that', 'have', 'been', 'were', 'they'}
 
-        title = photo_context.get('title') or ''
+        title = getattr(photo_context, 'title', '') or ''
         if title:
             add_term(title, weight=2, is_phrase=True, source='title')
             title_words = re.findall(r"[A-Za-z'-]+", title)
@@ -744,7 +744,7 @@ class BlogContentExtractor:
                         continue
                     add_term(phrase, weight=3, is_phrase=True, source='title_phrase')
 
-        description = photo_context.get('description') or ''
+        description = getattr(photo_context, 'description', '') or ''
         if description:
             desc_words = re.findall(r"[A-Za-z'-]+", description)
             for word in desc_words:
@@ -753,7 +753,7 @@ class BlogContentExtractor:
                     continue
                 add_term(word_lower, weight=1, source='description')
 
-        location_data = photo_context.get('location_data', {}) or {}
+        location_data = getattr(photo_context, 'location_data', {}) or {}
         possible_locations = []
         if isinstance(location_data, dict):
             for key in ['city', 'region', 'country', 'locality']:
@@ -777,8 +777,9 @@ class BlogContentExtractor:
 
         tag_sources = []
         for key in ['tags', 'meta_keywords', 'keywords']:
-            if key in photo_context and photo_context[key]:
-                tag_sources.append(photo_context[key])
+            val = getattr(photo_context, key, None)
+            if val:
+                tag_sources.append(val)
         for source_entries in tag_sources:
             if isinstance(source_entries, str):
                 entries = re.split(r'[;,]', source_entries)
@@ -799,7 +800,7 @@ class BlogContentExtractor:
                         continue
                     add_term(word_lower, weight=3, source='meta_word')
 
-        exif_hints = photo_context.get('exif_hints') or {}
+        exif_hints = getattr(photo_context, 'exif_hints', {}) or {}
         for url in exif_hints.get('source_urls', []):
             add_term(url, weight=10, is_phrase=True, source='exif_source')
         for phrase in exif_hints.get('phrases', []):
