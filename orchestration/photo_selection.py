@@ -44,8 +44,8 @@ class PhotoSelector:
             PhotoSelectionResult with photo data and selection status
         """
         try:
-            # Get photos from Flickr
-            photos = self.flickr_api.get_unposted_photos()
+            # Get lightweight photo list (single API call)
+            photos = self.flickr_api.get_photo_list()
             if not photos:
                 return PhotoSelectionResult(
                     success=False,
@@ -53,10 +53,6 @@ class PhotoSelector:
                 )
 
             self.logger.info(f"Retrieved {len(photos)} photos from album")
-
-            # Debug: Log all photos and their positions
-            for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
-                self.logger.debug(f"Album photo #{photo.get('album_position', '?')}: {photo['id']} - {photo['title']}")
 
             # Check if album is complete (only count actual posts, not dry runs)
             if self.state_manager.is_album_complete(len(photos)):
@@ -68,7 +64,7 @@ class PhotoSelector:
                 result.is_album_complete = True
                 return result
 
-            # Get next photo to post
+            # Get next photo to post (uses only id and album_position)
             next_photo = self.state_manager.get_next_photo_to_post(
                 photos,
                 include_dry_runs=include_dry_runs and dry_run_mode
@@ -87,6 +83,9 @@ class PhotoSelector:
                 )
                 result.is_album_complete = True
                 return result
+
+            # Fetch full metadata only for the selected photo (3 API calls instead of 3×N)
+            self.flickr_api.enrich_photo(next_photo)
 
             position = next_photo.get('album_position', 'unknown')
             self.logger.info(f"📸 Selected photo #{position}: {next_photo['title']} (ID: {next_photo['id']})")

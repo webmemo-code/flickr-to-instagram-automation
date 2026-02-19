@@ -291,66 +291,57 @@ class FlickrAPI:
             return count
         return 0
 
-    def get_unposted_photos(self) -> List[Dict]:
-        """Get list of photos that haven't been posted yet."""
+    def get_photo_list(self) -> List[Dict]:
+        """Get lightweight photo list from album (single API call, no per-photo metadata)."""
         photoset_id = self.config.flickr_album_id
-        
+
         photos_data = self.get_photos_from_photoset(photoset_id)
         if not photos_data:
             return []
-        
+
         photos = []
         for photo in photos_data['photoset']['photo']:
-            # Get additional photo information
-            photo_info, description = self.get_photo_info(photo['id'])
-            location_data = self.get_photo_location(photo['id'])
-            exif_data = self.get_photo_exif(photo['id'])
-
-            # Build photo URL
-            photo_url = self.build_photo_url(photo)
-
-            # Extract additional URLs and context
-            photo_page_url = self.get_photo_page_url(photo_info)
-            source_url = self.extract_source_url(description, photo_info)
-
-            # Extract hashtags
-            hashtags = self.extract_hashtags(photo_info, location_data)
-
-            exif_hints = self.extract_exif_hints(exif_data)
-
-            photo_data = {
+            photos.append({
                 'id': photo['id'],
                 'title': photo['title'],
-                'description': description,
-                'url': photo_url,
-                'hashtags': hashtags,
+                'url': self.build_photo_url(photo),
                 'server': photo['server'],
                 'secret': photo['secret'],
-                'photo_page_url': photo_page_url,
-                'source_url': source_url,
-                'exif_data': exif_data,
-                'exif_hints': exif_hints,
-                'location_data': location_data,
-                'date_taken': photo.get('datetaken', '')  # Include date taken from Flickr API
-            }
-            photos.append(photo_data)
+                'date_taken': photo.get('datetaken', ''),
+            })
 
-        # Sort photos by date taken (oldest first) - this ensures chronological publication order
-        # Photos without date_taken will be sorted to the end
+        # Sort by date taken (oldest first) for chronological publication order
         photos.sort(key=lambda x: x['date_taken'] or '9999-12-31 23:59:59')
 
-        # Assign album positions based on chronological order (oldest = position 1)
+        # Assign album positions based on chronological order
         for index, photo in enumerate(photos):
             photo['album_position'] = index + 1
 
-        # Log the chronological order for verification
-        if photos:
-            self.logger.info(f"Photo ordering (oldest to newest):")
-            for i, photo in enumerate(photos[:5]):  # Show first 5 for brevity
-                date_display = photo['date_taken'] if photo['date_taken'] else 'No date'
-                self.logger.info(f"  #{photo['album_position']}: {photo['title']} - {date_display}")
-            if len(photos) > 5:
-                self.logger.info(f"  ... and {len(photos) - 5} more photos")
+        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} (lightweight listing)")
+        return photos
 
-        self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} sorted chronologically (oldest first)")
+    def enrich_photo(self, photo: Dict) -> Dict:
+        """Fetch detailed metadata (info, location, EXIF) for a single photo."""
+        photo_id = photo['id']
+
+        photo_info, description = self.get_photo_info(photo_id)
+        location_data = self.get_photo_location(photo_id)
+        exif_data = self.get_photo_exif(photo_id)
+
+        photo['description'] = description
+        photo['photo_page_url'] = self.get_photo_page_url(photo_info)
+        photo['source_url'] = self.extract_source_url(description, photo_info)
+        photo['hashtags'] = self.extract_hashtags(photo_info, location_data)
+        photo['exif_data'] = exif_data
+        photo['exif_hints'] = self.extract_exif_hints(exif_data)
+        photo['location_data'] = location_data
+
+        self.logger.info(f"Enriched photo #{photo.get('album_position', '?')}: {photo['title']}")
+        return photo
+
+    def get_unposted_photos(self) -> List[Dict]:
+        """Get all photos with full metadata. Use get_photo_list() + enrich_photo() instead for efficiency."""
+        photos = self.get_photo_list()
+        for photo in photos:
+            self.enrich_photo(photo)
         return photos
