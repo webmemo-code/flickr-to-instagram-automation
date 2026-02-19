@@ -9,6 +9,8 @@ on:
   # Scheduled automation - Daily posting at 18:13 UTC (20:13 CEST)
   schedule:
     - cron: '13 18 * * *'
+    - cron: '17 21 * * *'   
+    - cron: '21 09 * * *'
 
   # Manual execution with configuration options
   workflow_dispatch:
@@ -41,6 +43,7 @@ jobs:
       account_id: primary
       environment_name: primary-account        # Uses primary-account GitHub environment
       account_flag: ''                        # Primary account uses default CLI behavior
+      caller_workflow: 'primary-flickr-to-insta.yml'
       dry_run: ${{ inputs.dry_run || false }}
       show_stats: ${{ inputs.show_stats || false }}
     secrets: inherit                          # Pass all repository and environment secrets
