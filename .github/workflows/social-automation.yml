@@ -162,9 +162,8 @@ jobs:
               state_manager = StateManager(config, repo_name, environment_name='${{ inputs.environment_name }}')
               flickr_api = FlickrAPI(config)
 
-              print('Getting photos from Flickr...')
-              photos = flickr_api.get_unposted_photos()
-              total_photos = len(photos) if photos else 0
+              print('Getting album photo count from Flickr...')
+              total_photos = flickr_api.get_album_photo_count()
               print(f'Found {total_photos} photos in ${{ inputs.account_id }} album')
 
               print('Checking album completion status...')

@@ -281,6 +281,16 @@ class FlickrAPI:
             self.logger.error(f"Failed to get photoset info for {photoset_id}: {e}")
             return None
 
+    def get_album_photo_count(self, photoset_id: Optional[str] = None) -> int:
+        """Get the total number of photos in an album with a single API call."""
+        photoset_id = photoset_id or self.config.flickr_album_id
+        info = self.get_photoset_info(photoset_id)
+        if info and 'photoset' in info:
+            count = int(info['photoset'].get('count_photos', 0))
+            self.logger.info(f"Album {photoset_id} has {count} photos")
+            return count
+        return 0
+
     def get_unposted_photos(self) -> List[Dict]:
         """Get list of photos that haven't been posted yet."""
         photoset_id = self.config.flickr_album_id
