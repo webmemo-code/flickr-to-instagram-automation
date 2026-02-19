@@ -30,6 +30,10 @@ on:
         required: false
         type: boolean
         default: false
+      caller_workflow:
+        description: 'Filename of the calling workflow (for auto-disable on album completion)'
+        required: true
+        type: string
 
 jobs:
   social-automation:
@@ -295,6 +299,31 @@ jobs:
           echo "🎉 ${{ inputs.account_id }} album is complete! All photos have been posted to Instagram."
           echo "The automation will not run until you configure a new album."
 
+      - name: Check if album completed during this run
+        id: post_run_check
+        if: ${{ steps.check_complete.outputs.album_complete != 'true' }}
+        run: |
+          if [ -f "album_complete.marker" ]; then
+            echo "album_just_completed=true" >> "$GITHUB_OUTPUT"
+            echo "Album completed during this automation run"
+          else
+            echo "album_just_completed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auto-disable workflow on album completion
+        if: ${{ inputs.show_stats != true && (steps.check_complete.outputs.album_complete == 'true' || steps.post_run_check.outputs.album_just_completed == 'true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "📴 Album complete - disabling scheduled workflow to save resources"
+          gh workflow disable "${{ inputs.caller_workflow }}" --repo "${{ github.repository }}"
+          echo "✅ Workflow '${{ inputs.caller_workflow }}' has been disabled"
+          echo ""
+          echo "To re-enable after configuring a new album:"
+          echo "  1. Update FLICKR_ALBUM_ID in the GitHub environment"
+          echo "  2. Go to Actions > select the workflow > click '...' > Enable workflow"
+          echo "  3. Or run: gh workflow enable ${{ inputs.caller_workflow }}"
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -318,9 +347,10 @@ jobs:
           echo "**Show Stats Only:** ${{ inputs.show_stats }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ steps.check_complete.outputs.album_complete }}" = "true" ]; then
+          if [ "${{ steps.check_complete.outputs.album_complete }}" = "true" ] || [ "${{ steps.post_run_check.outputs.album_just_completed }}" = "true" ]; then
             echo "### ✅ Album Status: Complete" >> $GITHUB_STEP_SUMMARY
-            echo "All photos have been posted. No automation run needed." >> $GITHUB_STEP_SUMMARY
+            echo "All photos have been posted. Workflow has been auto-disabled." >> $GITHUB_STEP_SUMMARY
+            echo "Re-enable the workflow after configuring a new album." >> $GITHUB_STEP_SUMMARY
           else
             echo "### 📸 Album Status: Active" >> $GITHUB_STEP_SUMMARY
             echo "Photos remaining to post. Automation executed." >> $GITHUB_STEP_SUMMARY

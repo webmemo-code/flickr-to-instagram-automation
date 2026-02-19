@@ -153,7 +153,7 @@ class Config:
         """Return the primary blog post URL if available."""
         if self.blog_post_urls:
             return self.blog_post_urls[0]
-        return None
+        return self.blog_post_url
 
     @property
     def graph_endpoint_base(self) -> str:

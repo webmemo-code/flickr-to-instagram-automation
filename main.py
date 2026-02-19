@@ -106,6 +106,11 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         if selection_result.is_album_complete:
             logger.info(f"🎉 {selection_result.message}")
 
+            # Signal completion to workflow for auto-disable
+            if not dry_run:
+                with open('album_complete.marker', 'w') as f:
+                    f.write('true')
+
             # Handle album completion
             state_orchestrator.handle_album_completion(selection_result.photos_total, config.album_name)
 
@@ -189,6 +194,10 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         progress_info = posting_workflow_result['progress_info']
         if progress_info.get('is_complete', False):
             state_orchestrator.handle_album_completion(selection_result.photos_total, config.album_name)
+            # Signal completion to workflow for auto-disable
+            if not dry_run:
+                with open('album_complete.marker', 'w') as f:
+                    f.write('true')
 
         return True
 

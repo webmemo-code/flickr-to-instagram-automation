@@ -41,6 +41,7 @@ jobs:
       account_id: reisememo
       environment_name: secondary-account     # Uses secondary-account GitHub environment
       account_flag: reisememo                 # Triggers secondary account configuration (language, branding, etc.)
+      caller_workflow: 'secondary-flickr-to-insta.yml'
       dry_run: ${{ inputs.dry_run || false }}
       show_stats: ${{ inputs.show_stats || false }}
     secrets: inherit                         # Pass all repository and environment secrets
