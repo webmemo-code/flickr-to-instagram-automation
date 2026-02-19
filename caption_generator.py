@@ -122,6 +122,7 @@ class CaptionGenerator:
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
                                   "Schreibe sachlich, authentisch, persönlich und duze deine Follower. "
                                   "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
+                                  "Verwende KEINE Markdown-Formatierung wie **fett** oder *kursiv* - Instagram unterstützt kein Markdown.\n"
                                   "Nutze Emojis nur sparsam und passend.\n\n"
                                   "WICHTIG: Nutze die bereitgestellten Blog-Inhalte, um KONKRETE Details zu erwähnen:\n"
                                   "- Zitiere spezifische Orte, Namen, Ereignisse oder Fakten aus dem Blog-Post\n"
@@ -136,6 +137,7 @@ class CaptionGenerator:
                                   "in five short sentences. Add a new paragraph for each sentence. "
                                   "Make it factual, authentic and personal. "
                                   "Do not use the terms 'I can\'t wait to share more...' or 'Stay tuned for more...'. "
+                                  "Do NOT use markdown formatting like **bold** or *italic*—Instagram does not support markdown. Use plain text only.\n"
                                   "Use emojis sparingly and appropriately.\n\n"
                                   "CRITICAL: Use the provided blog post context to include SPECIFIC details:\n"
                                   "- Reference specific places, names, events, or facts from the blog post\n"
@@ -155,12 +157,14 @@ class CaptionGenerator:
                              "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
                              "Verwende keine Anführungszeichen. Halte es persönlich und authentisch. "
                              "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
+                             "Verwende KEINE Markdown-Formatierung wie **fett** oder *kursiv* - Instagram unterstützt kein Markdown. "
                              "Nutze Emojis nur sparsam und passend.")
                 else:
                     # English fallback prompt for English-language accounts
                     prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                              "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
                              "Do not use quotation marks. Keep it personal and authentic. "
+                             "Do NOT use markdown formatting like **bold** or *italic*—Instagram does not support markdown. Use plain text only. "
                              "Use emojis sparingly and appropriately.")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
@@ -186,8 +190,10 @@ class CaptionGenerator:
             )
 
             generated_text = response.content[0].text
+            # Strip markdown bold/italic — Instagram renders these as literal asterisks
+            generated_text = generated_text.replace('**', '').replace('__', '')
             self.logger.info(f"Generated enhanced caption for photo {photo_data['id']}")
-            
+
             return generated_text
             
         except Exception as e:
@@ -219,17 +225,19 @@ class CaptionGenerator:
             caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
 
         # Add blog post URL if available
+        # Priority: explicitly configured BLOG_POST_URL(S) > auto-discovered selected_blog URL
         selected_blog = photo_data.get('selected_blog', {})
-        blog_url = selected_blog.get('url') or self.config.get_default_blog_post_url()
+        blog_url = self.config.get_default_blog_post_url()
 
-        # If no URL is found through blog context or config, try to use a fallback from account config
         if not blog_url:
-            if account_config and account_config.blog_domains:
-                # Use the first preferred domain as a fallback
+            # Fall back to auto-discovered URL, but only if it matches the account's primary domain
+            candidate = selected_blog.get('url')
+            if candidate and account_config and account_config.blog_domains:
                 primary_domain = account_config.blog_domains[0]
-                if primary_domain:
-                    blog_url = f"https://{primary_domain}"
-                    self.logger.debug(f"Using fallback URL from account domain preference: {blog_url}")
+                if primary_domain and primary_domain.lower() in candidate.lower():
+                    blog_url = candidate
+                else:
+                    self.logger.debug(f"Skipping auto-discovered URL '{candidate}' — doesn't match primary domain '{primary_domain}'")
 
         if blog_url:
             # Add travel tip text before URL based on account language
@@ -380,9 +388,8 @@ class CaptionGenerator:
                           else None)
         if primary_domain:
             domain_filtered = [u for u in candidate_urls if primary_domain.lower() in u.lower()]
-            if domain_filtered:
-                self.logger.debug(f"Strict domain filter: kept {len(domain_filtered)}/{len(candidate_urls)} URLs matching '{primary_domain}'")
-                candidate_urls = domain_filtered
+            self.logger.debug(f"Strict domain filter: kept {len(domain_filtered)}/{len(candidate_urls)} URLs matching '{primary_domain}'")
+            candidate_urls = domain_filtered  # May be empty — that's correct; don't use wrong-domain URLs
 
         best_match: Optional[BlogContextMatch] = None
 

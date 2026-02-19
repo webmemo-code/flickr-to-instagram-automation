@@ -410,8 +410,7 @@ class TestCaptionGenerator:
         assert photo_data['source_url'] == complete_english_url  # Updated by _ensure_longest_source_url
 
     def test_caption_url_fallback_when_no_blog_context_found(self, generator, config):
-        """Ensure caption always includes a URL even when no blog context is found."""
-        # Simulate scenario where no blog URLs are accessible and no default is configured
+        """When no BLOG_POST_URL is configured and no selected_blog, no URL appears in caption."""
         config.account = 'primary'
         config.get_default_blog_post_url.return_value = None  # No default URL configured
 
@@ -425,7 +424,6 @@ class TestCaptionGenerator:
 
         generated_caption = "This is a test caption."
 
-        # Mock account config to provide domain fallback
         with patch('account_config.get_account_config') as mock_get_config:
             mock_get_config.return_value = AccountConfig(
                 account_id='primary',
@@ -437,21 +435,38 @@ class TestCaptionGenerator:
 
             caption = generator.build_full_caption(photo_data, generated_caption)
 
-        # Caption should include the fallback URL from account domain preferences
-        assert 'https://travelmemo.com' in caption, f"Expected fallback URL in caption, but got: {caption}"
-        assert 'Read the travel tip at' in caption, "Expected travel tip text in caption"
+        # No bare-domain fallback — better to omit URL than show a generic domain
+        assert 'https://travelmemo.com' not in caption, f"Should not contain bare domain URL: {caption}"
+        assert 'Read the travel tip at' not in caption, "Should not contain travel tip text without a URL"
         assert photo_data['hashtags'] in caption, "Expected hashtags in caption"
 
-        # Verify the URL appears in the correct location (after the travel tip text)
-        lines = caption.split('\n\n')
-        url_section_found = False
-        for i, line in enumerate(lines):
-            if 'Read the travel tip at' in line:
-                # Next line should contain the URL
-                if i + 1 < len(lines) and 'https://travelmemo.com' in lines[i + 1]:
-                    url_section_found = True
-                    break
-        assert url_section_found, f"URL should appear after 'Read the travel tip at' text. Caption: {caption}"
+    def test_caption_uses_configured_url_over_selected_blog(self, generator, config):
+        """BLOG_POST_URL(S) takes priority over auto-discovered selected_blog URL."""
+        config.account = 'primary'
+        config.get_default_blog_post_url.return_value = 'https://travelmemo.com/mauritius-guide/'
+
+        photo_data = {
+            'id': 'url-priority',
+            'title': 'Priority test',
+            'selected_blog': {'url': 'https://reisememo.ch/some-post/'},
+            'hashtags': '#test'
+        }
+
+        generated_caption = "Test caption."
+
+        with patch('account_config.get_account_config') as mock_get_config:
+            mock_get_config.return_value = AccountConfig(
+                account_id='primary',
+                display_name='Primary',
+                environment_name='primary-account',
+                language='en',
+                blog_domains=['travelmemo.com']
+            )
+
+            caption = generator.build_full_caption(photo_data, generated_caption)
+
+        assert 'https://travelmemo.com/mauritius-guide/' in caption, f"Should use configured URL: {caption}"
+        assert 'reisememo.ch' not in caption, f"Should not contain secondary domain URL: {caption}"
 
 
 if __name__ == '__main__':
