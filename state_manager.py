@@ -148,87 +148,6 @@ class StateManager:
                 self.get_account_normalized()
             )
 
-    def record_post(self, position: int, photo_data: dict, instagram_post_id: str,
-                   title: str = "", create_audit_issue: bool = False) -> bool:
-        """
-        Record a successful Instagram post.
-
-        Args:
-            position: Photo position in album
-            photo_data: Photo data from Flickr
-            instagram_post_id: Instagram post ID
-            title: Post title
-            create_audit_issue: Whether to create audit issue for additional auditing
-
-        Returns:
-            True if post was successfully recorded, False otherwise
-        """
-        try:
-            # Get current posts
-            posts = self.get_instagram_posts()
-
-            # Check if post already exists (update) or create new
-            existing_post = None
-            for post in posts:
-                if post.position == position:
-                    existing_post = post
-                    break
-
-            if existing_post:
-                # Update existing post
-                existing_post.mark_as_posted(instagram_post_id)
-                existing_post.title = title
-                existing_post.account = self.get_account_normalized()
-            else:
-                # Create new post
-                new_post = InstagramPost(
-                    position=position,
-                    photo_id=photo_data.get('id', ''),
-                    title=title,
-                    account=self.get_account_normalized(),
-                    flickr_url=photo_data.get('url_o') or photo_data.get('url')
-                )
-                new_post.mark_as_posted(instagram_post_id)
-                posts.append(new_post)
-
-            # Write updated posts
-            posts_data = [post.to_dict() for post in posts]
-            success = self.storage_adapter.write_posts(
-                self.get_account_normalized(),
-                self.current_album_id,
-                posts_data
-            )
-
-            if success:
-                # Update metadata
-                metadata = self.get_album_metadata()
-                metadata.update_counts(posts)
-
-                # Add workflow run info if available
-                workflow_run_id = os.getenv('GITHUB_RUN_ID')
-                if workflow_run_id:
-                    metadata.add_workflow_run(workflow_run_id)
-
-                self.storage_adapter.write_metadata(
-                    self.get_account_normalized(),
-                    self.current_album_id,
-                    metadata.to_dict()
-                )
-
-                # Remove from failed positions if it was there
-                self.remove_failed_position(position)
-
-
-                self.logger.info(f"Recorded post for position {position} (Instagram ID: {instagram_post_id})")
-                return True  # Post successfully recorded
-            else:
-                self.logger.error(f"Failed to write post record for position {position}")
-                return False
-
-        except Exception as e:
-            self.logger.error(f"Failed to record post for position {position}: {e}")
-            return False
-
     def clear_dry_run_records(self) -> int:
         """Clear dry-run post records from Git-based storage."""
         try:
@@ -501,98 +420,86 @@ class StateManager:
 
     def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None,
                           is_dry_run: bool = False, create_audit_issue: bool = False) -> Optional[str]:
-        """
-        Record a successful post using enhanced state management.
+        """Record a post (successful, failed, or dry run).
 
         Args:
             photo_data: Photo data dictionary from Flickr
             instagram_post_id: Instagram post ID if successful, None if failed
             is_dry_run: Whether this was a dry run
-            create_audit_issue: Whether to create audit issues (compatibility parameter)
+            create_audit_issue: Whether to create audit issues (unused, kept for API compat)
 
         Returns:
             Post record ID or None if failed
         """
         try:
-            # Extract photo information
-            flickr_photo_id = photo_data.get('id', '')
             album_position = photo_data.get('album_position', 0)
+            flickr_photo_id = photo_data.get('id', '')
             title = photo_data.get('title', 'Unknown')
             flickr_url = photo_data.get('url', '')
 
             if is_dry_run:
-                # Persist dry run record so the next dry run picks a different photo
                 self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")
-                posts = self.get_instagram_posts()
-                dry_post = InstagramPost(
-                    position=album_position,
-                    photo_id=flickr_photo_id,
-                    title=title,
-                    status=PostStatus.POSTED,
-                    account=self.get_account_normalized(),
-                    flickr_url=flickr_url,
-                    is_dry_run=True,
-                    workflow_run_id=os.getenv('GITHUB_RUN_ID'),
-                )
-                posts.append(dry_post)
-                self.storage_adapter.write_posts(
-                    self.get_account_normalized(),
-                    self.current_album_id,
-                    [p.to_dict() for p in posts]
-                )
-                return "dry_run"
 
-            # Determine post status
+            # Build the post record
             if instagram_post_id:
                 status = PostStatus.POSTED
-                posted_at = datetime.now().isoformat()
-                self.logger.info(f"✅ Recording successful post for photo #{album_position}")
+                self.logger.info(f"Recording successful post for photo #{album_position}")
+            elif is_dry_run:
+                status = PostStatus.POSTED
             else:
                 status = PostStatus.FAILED
-                posted_at = None
-                self.logger.warning(f"⚠️ Recording failed post for photo #{album_position}")
+                self.logger.warning(f"Recording failed post for photo #{album_position}")
 
-            # Create Instagram post record
             post = InstagramPost(
                 position=album_position,
                 photo_id=flickr_photo_id,
-                instagram_post_id=instagram_post_id or "",
-                posted_at=posted_at or datetime.now().isoformat(),
-                title=photo_data.get('title', 'Unknown'),
+                title=title,
                 status=status,
-                retry_count=0,
-                workflow_run_id=os.getenv('GITHUB_RUN_ID'),
-                account=self.config.account,
+                account=self.get_account_normalized(),
                 flickr_url=flickr_url,
+                is_dry_run=is_dry_run,
+                workflow_run_id=os.getenv('GITHUB_RUN_ID'),
                 instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
-                caption_length=len(photo_data.get('title', '')[:100])
             )
+            if instagram_post_id:
+                post.mark_as_posted(instagram_post_id)
 
-            # Save the post record using existing method
-            success = self.record_post(
-                position=album_position,
-                photo_data=photo_data,
-                instagram_post_id=instagram_post_id or "",
-                title=title
+            # Upsert into posts list
+            posts = self.get_instagram_posts()
+            existing_idx = next(
+                (i for i, p in enumerate(posts) if p.position == album_position), None
             )
-
-            if success:
-                # Update album metadata
-                metadata = self.get_album_metadata()
-                metadata.last_update = datetime.now().isoformat()
-                if instagram_post_id:
-                    metadata.last_posted_at = posted_at
-                # Save album metadata
-                self.storage_adapter.write_metadata(
-                    self.get_account_normalized(),
-                    self.current_album_id,
-                    metadata.to_dict()
-                )
-
-                return flickr_photo_id
+            if existing_idx is not None:
+                posts[existing_idx] = post
             else:
-                self.logger.error(f"Failed to save post record for photo #{album_position}")
+                posts.append(post)
+
+            # Persist
+            if not self.storage_adapter.write_posts(
+                self.get_account_normalized(), self.current_album_id,
+                [p.to_dict() for p in posts]
+            ):
+                self.logger.error(f"Failed to write post record for photo #{album_position}")
                 return None
+
+            # Update metadata
+            metadata = self.get_album_metadata()
+            metadata.update_counts(posts)
+            metadata.last_update = datetime.now().isoformat()
+            if instagram_post_id:
+                metadata.last_posted_at = datetime.now().isoformat()
+            workflow_run_id = os.getenv('GITHUB_RUN_ID')
+            if workflow_run_id:
+                metadata.add_workflow_run(workflow_run_id)
+            self.storage_adapter.write_metadata(
+                self.get_account_normalized(), self.current_album_id, metadata.to_dict()
+            )
+
+            # Clear from failed positions on success
+            if instagram_post_id:
+                self.remove_failed_position(album_position)
+
+            return "dry_run" if is_dry_run else flickr_photo_id
 
         except Exception as e:
             self.logger.error(f"Failed to create post record: {e}")

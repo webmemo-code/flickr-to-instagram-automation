@@ -14,13 +14,13 @@ import json
 
 # Email imports with fallback
 try:
-    from email.mime.text import MimeText
-    from email.mime.multipart import MimeMultipart
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
     EMAIL_AVAILABLE = True
 except ImportError:
     EMAIL_AVAILABLE = False
-    MimeText = None
-    MimeMultipart = None
+    MIMEText = None
+    MIMEMultipart = None
 
 
 class CriticalFailureNotifier:
@@ -135,11 +135,11 @@ This is an automated safety alert. The automation has been halted to prevent pos
                 return False
 
             # Create email message
-            msg = MimeMultipart()
+            msg = MIMEMultipart()
             msg['From'] = self.email_user
             msg['To'] = self.notification_recipient
             msg['Subject'] = subject
-            msg.attach(MimeText(body, 'plain'))
+            msg.attach(MIMEText(body, 'plain'))
 
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:

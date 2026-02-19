@@ -56,7 +56,7 @@ class TestCaptionGenerationIntegration:
         gallery_id = config.flickr_album_id
         
         # Get photos from the gallery
-        photos = flickr_api.get_unposted_photos()
+        photos = flickr_api.get_photo_list()
         
         assert photos is not None, f"Should retrieve photos from gallery {gallery_id}"
         assert len(photos) > 0, f"Gallery {gallery_id} should contain photos"
@@ -73,34 +73,32 @@ class TestCaptionGenerationIntegration:
     def test_enhanced_photo_metadata_collection(self, flickr_api, config):
         """Test collecting enhanced metadata for photos from the gallery."""
         # Get a photo from the gallery
-        photos = flickr_api.get_unposted_photos()
+        photos = flickr_api.get_photo_list()
         assert len(photos) > 0
-        
+
         first_photo = photos[0]
         photo_id = first_photo['id']
-        
-        # Get enhanced metadata
-        enhanced_photo = flickr_api.get_photo_with_metadata(photo_id)
-        
-        assert enhanced_photo is not None, "Should get enhanced photo metadata"
-        
+
+        # Get enhanced metadata via enrich_photo
+        flickr_api.enrich_photo(first_photo)
+
         # Check for enhanced fields
         expected_fields = ['id', 'url', 'title', 'description']
         for field in expected_fields:
-            assert field in enhanced_photo, f"Enhanced photo should have {field}"
-        
+            assert field in first_photo, f"Enhanced photo should have {field}"
+
         # Check for additional metadata
         metadata_fields = ['location_data', 'exif_data']
-        metadata_found = [field for field in metadata_fields if enhanced_photo.get(field)]
-        
+        metadata_found = [field for field in metadata_fields if first_photo.get(field)]
+
         print(f"PASS: Enhanced metadata collected for photo {photo_id}")
-        print(f"Available metadata: {list(enhanced_photo.keys())}")
+        print(f"Available metadata: {list(first_photo.keys())}")
         print(f"Additional metadata found: {metadata_found}")
     
     def test_blog_context_matching_with_flickr_photo(self, flickr_api, caption_generator, config):
         """Test matching blog content with actual Flickr photo from the gallery."""
         # Get a photo from the gallery
-        photos = flickr_api.get_unposted_photos()
+        photos = flickr_api.get_photo_list()
         assert len(photos) > 0
         
         # Get enhanced metadata for the first photo
@@ -146,7 +144,7 @@ class TestCaptionGenerationIntegration:
     def test_end_to_end_caption_generation(self, flickr_api, caption_generator, config):
         """Test complete end-to-end caption generation with live data."""
         # Get photo from gallery
-        photos = flickr_api.get_unposted_photos()
+        photos = flickr_api.get_photo_list()
         assert len(photos) > 0
         
         # Get enhanced photo metadata
@@ -194,8 +192,9 @@ class TestCaptionGenerationIntegration:
             pytest.skip("Requires Anthropic API key")
 
         # Get photo from gallery
-        photos = flickr_api.get_unposted_photos()
-        enhanced_photo = flickr_api.get_photo_with_metadata(photos[0]['id'])
+        photos = flickr_api.get_photo_list()
+        enhanced_photo = photos[0]
+        flickr_api.enrich_photo(enhanced_photo)
 
         # Test with blog context
         config_with_blog = MagicMock(spec=Config)

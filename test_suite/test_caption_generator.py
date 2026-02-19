@@ -84,16 +84,16 @@ class TestCaptionGenerator:
             matched_terms=('mauritius', 'beach')
         )
 
-        with patch.object(generator, '_get_blog_content_context', return_value=blog_match),              patch.object(generator.client.chat.completions, 'create') as mock_create:
+        with patch.object(generator, '_get_blog_content_context', return_value=blog_match),              patch.object(generator.client.messages, 'create') as mock_create:
             mock_response = MagicMock()
-            mock_response.choices = [MagicMock(message=MagicMock(content='Test caption'))]
+            mock_response.content = [MagicMock(text='Test caption')]
             mock_create.return_value = mock_response
 
             generator.generate_caption(photo_data)
 
             _, kwargs = mock_create.call_args
             messages = kwargs['messages']
-            prompt_content = messages[0]['content'][0]['text']
+            prompt_content = messages[0]['content'][1]['text']
 
             assert 'Le Morne Beach Mauritius' in prompt_content
             assert 'Crystal clear turquoise water' in prompt_content
@@ -155,16 +155,16 @@ class TestCaptionGenerator:
             matched_terms=('exif',)
         )
 
-        with patch.object(generator, '_get_blog_content_context', side_effect=[blog_match, None]),              patch.object(generator.client.chat.completions, 'create') as mock_create:
+        with patch.object(generator, '_get_blog_content_context', side_effect=[blog_match, None]),              patch.object(generator.client.messages, 'create') as mock_create:
             mock_response = MagicMock()
-            mock_response.choices = [MagicMock(message=MagicMock(content='Test caption'))]
+            mock_response.content = [MagicMock(text='Test caption')]
             mock_create.return_value = mock_response
 
             generator.generate_caption(rich_photo)
-            rich_prompt = mock_create.call_args[1]['messages'][0]['content'][0]['text']
+            rich_prompt = mock_create.call_args[1]['messages'][0]['content'][1]['text']
 
             generator.generate_caption(minimal_photo)
-            minimal_prompt = mock_create.call_args[1]['messages'][0]['content'][0]['text']
+            minimal_prompt = mock_create.call_args[1]['messages'][0]['content'][1]['text']
 
         assert 'Use the provided blog post context' in rich_prompt
         assert 'Blog context:' in rich_prompt

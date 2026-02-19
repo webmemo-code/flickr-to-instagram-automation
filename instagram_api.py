@@ -112,24 +112,35 @@ class InstagramAPI:
         
         return post_id
     
-    def post_with_retry(self, image_url: str, caption: str, max_retries: int = 3) -> Optional[str]:
-        """Post to Instagram with retry logic."""
+    def post_with_retry(self, image_url: str, caption: str,
+                        max_retries: int = 3, initial_wait: int = 30) -> Optional[str]:
+        """Post to Instagram with retry logic.
+
+        Creates the media container once, then retries only the publish step
+        with exponential backoff if publishing fails (e.g., error 9007 - media not ready).
+        """
+        # Phase 1: Create container (if this fails, the image URL is likely bad)
+        container_id = self.create_media_container(image_url, caption)
+        if not container_id:
+            self.logger.error("Failed to create media container - aborting")
+            return None
+
+        # Phase 2: Publish with retry (container may need time to process)
         for attempt in range(max_retries):
+            if attempt > 0:
+                wait_time = initial_wait * (2 ** (attempt - 1))  # 30s, 60s
+                self.logger.info(f"Waiting {wait_time}s before publish attempt {attempt + 1}/{max_retries}")
+                time.sleep(wait_time)
+
             try:
-                post_id = self.post_photo(image_url, caption)
+                post_id = self.publish_media_container(container_id)
                 if post_id:
                     return post_id
-                    
+                self.logger.warning(f"Publish attempt {attempt + 1}/{max_retries} failed")
             except Exception as e:
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff
-                    self.logger.warning(f"Posting failed, waiting {wait_time} seconds before retry {attempt + 1}")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    self.logger.error(f"Failed to post after {attempt + 1} attempts: {e}")
-                    break
-        
+                self.logger.warning(f"Publish attempt {attempt + 1}/{max_retries} raised exception: {e}")
+
+        self.logger.error(f"Failed to publish container {container_id} after {max_retries} attempts")
         return None
     
     def check_api_limits(self) -> Dict:

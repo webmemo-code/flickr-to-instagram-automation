@@ -209,27 +209,28 @@ class FlickrAPI:
         return None
     
     def extract_source_url(self, description: str, photo_info: Dict) -> Optional[str]:
-        """Extract blog post URL from description or photo metadata."""
+        """Extract blog post URL from description, strictly matching the account's primary domain."""
         import re
-        
-        # Look for URLs in description
-        if description:
-            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\],.]'
-            urls = re.findall(url_pattern, description)
-            
-            # Filter for blog URLs using account configuration
-            account_config = get_account_config(self.config.account)
-            configured_domains = account_config.blog_domains if account_config else ['travelmemo.com']
-            all_domains = configured_domains + ['blog']  # Include 'blog' as fallback
 
+        if not description:
+            return None
+
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\],.]'
+        urls = re.findall(url_pattern, description)
+        if not urls:
+            return None
+
+        # Strict: only accept URLs from the account's primary (first) domain
+        account_config = get_account_config(self.config.account)
+        primary_domain = (account_config.blog_domains[0]
+                          if account_config and account_config.blog_domains
+                          else None)
+
+        if primary_domain:
             for url in urls:
-                if any(domain in url.lower() for domain in all_domains):
+                if primary_domain.lower() in url.lower():
                     return url
-            
-            # Return first URL if no blog-specific URL found
-            if urls:
-                return urls[0]
-        
+
         return None
     
     def extract_hashtags(self, photo_info: Dict, location_data: Optional[Dict] = None) -> str:

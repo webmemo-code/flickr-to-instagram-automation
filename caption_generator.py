@@ -369,11 +369,20 @@ class CaptionGenerator:
             append_url(url)
 
         candidate_urls = prioritized_urls
-        # Note: Domain preferences for EXIF URLs are already applied above
-        # Only apply domain preferences to the entire list if we have mixed sources
 
         if not candidate_urls:
             return None
+
+        # Strict domain filter: only evaluate URLs matching the account's primary domain
+        account_config = get_account_config(self.config.account)
+        primary_domain = (account_config.blog_domains[0]
+                          if account_config and account_config.blog_domains
+                          else None)
+        if primary_domain:
+            domain_filtered = [u for u in candidate_urls if primary_domain.lower() in u.lower()]
+            if domain_filtered:
+                self.logger.debug(f"Strict domain filter: kept {len(domain_filtered)}/{len(candidate_urls)} URLs matching '{primary_domain}'")
+                candidate_urls = domain_filtered
 
         best_match: Optional[BlogContextMatch] = None
 
