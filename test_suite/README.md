@@ -28,7 +28,7 @@ This test suite verifies that the automation system:
 - **English Blog URL**: `https://your-english-blog.com/your-blog-post`
 - **German Blog URL**: `https://your-german-blog.de/your-blog-post`
 - **Flickr Gallery**: `72157674455663497` (66 photos)
-- **OpenAI API**: Live GPT-4o-mini calls for multi-language caption generation
+- **Anthropic API**: Live Claude Sonnet calls for multi-language caption generation
 - **WordPress Authentication**: Live tests with application password authentication
 
 ## Quick Start
@@ -85,7 +85,7 @@ The following environment variables must be set in the parent directory's `.env`
 **Required for Live Tests:**
 - `FLICKR_API_KEY` - Your Flickr API key
 - `FLICKR_USER_ID` - Your Flickr user ID
-- `OPENAI_API_KEY` - OpenAI API key for multi-language caption generation
+- `ANTHROPIC_API_KEY` - Anthropic API key for multi-language caption generation
 - `WORDPRESS_USERNAME` - WordPress username for authentication testing
 - `WORDPRESS_APP_PASSWORD` - WordPress application password for content access
 
@@ -112,7 +112,7 @@ The enhanced implementation is **working correctly** and ready for multi-account
 
 - **Account Configuration Tests**: ~2 seconds
 - **Enhanced Blog Extraction Tests**: ~8 seconds (includes WordPress auth)
-- **Multi-Language Caption Generation Tests**: ~20 seconds (includes OpenAI API calls)
+- **Multi-Language Caption Generation Tests**: ~20 seconds (includes Anthropic API calls)
 - **EXIF URL Prioritization Tests**: ~5 seconds
 - **Multi-Account Integration Tests**: ~90 seconds (includes all APIs)
 - **Full Test Suite**: ~3 minutes

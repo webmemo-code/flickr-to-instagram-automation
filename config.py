@@ -29,7 +29,7 @@ class Config:
         self.flickr_api_key = os.getenv('FLICKR_API_KEY')
         self.flickr_user_id = os.getenv('FLICKR_USER_ID')
         self.flickr_username = os.getenv('FLICKR_USERNAME')  # Flickr username for URLs
-        self.openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
         self.github_token = os.getenv('GITHUB_TOKEN')
 
         # WordPress credentials for authenticated content access
@@ -53,7 +53,7 @@ class Config:
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = 'https://graph.facebook.com/'
         self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
-        self.openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')  # Default to gpt-4o-mini
+        self.anthropic_model = os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
         
         # State management options
         self.create_audit_issues = os.getenv('CREATE_AUDIT_ISSUES', 'false').lower() == 'true'  # Default: disabled for scale
@@ -95,7 +95,7 @@ class Config:
             'FLICKR_API_KEY': self.flickr_api_key,
             'FLICKR_USER_ID': self.flickr_user_id,
             'FLICKR_USERNAME': self.flickr_username,
-            'OPENAI_API_KEY': self.openai_api_key,
+            'ANTHROPIC_API_KEY': self.anthropic_api_key,
             'GITHUB_TOKEN': self.github_token,
         }
 

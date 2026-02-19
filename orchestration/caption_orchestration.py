@@ -40,8 +40,8 @@ class CaptionOrchestrator:
             CaptionResult with the generated caption and metadata
         """
         try:
-            # Generate caption with GPT-4 Vision
-            self.logger.info("🤖 Generating enhanced caption with GPT-4 Vision...")
+            # Generate caption with Claude Vision
+            self.logger.info("🤖 Generating enhanced caption with Claude Vision...")
             generated_caption = self.caption_generator.generate_with_retry(photo_data)
 
             used_fallback = False

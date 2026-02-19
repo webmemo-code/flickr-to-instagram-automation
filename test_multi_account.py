@@ -37,7 +37,7 @@ def test_config():
     print("\n--- Required Environment Variables Check ---")
     
     # Common variables
-    common_vars = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'OPENAI_API_KEY', 'GITHUB_TOKEN']
+    common_vars = ['FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN']
     
     # Primary account variables
     primary_vars = ['FLICKR_ALBUM_ID', 'INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID']

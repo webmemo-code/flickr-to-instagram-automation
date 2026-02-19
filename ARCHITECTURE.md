@@ -22,7 +22,7 @@ graph TB
     subgraph "External Dependencies"
         FA[📷 Flickr API]
         IA[📱 Instagram Graph API]
-        OA[🤖 OpenAI GPT-4 Vision]
+        OA[🤖 Anthropic Claude Vision]
         WP[📝 WordPress API]
         BE[🌐 Blog Content Extractor]
     end
@@ -230,7 +230,7 @@ context_parts = [
 
 **Workflow**:
 1. Preprocess photo data for enhanced context
-2. Generate caption using GPT-4 Vision
+2. Generate caption using Claude Vision
 3. Apply fallback logic if generation fails
 4. Build complete Instagram caption with hashtags
 5. Validate caption length and content

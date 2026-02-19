@@ -1,5 +1,5 @@
 """
-Tests for CaptionGenerator using live Flickr gallery and OpenAI API.
+Tests for CaptionGenerator using live Flickr gallery and Anthropic API.
 Tests the enhanced caption generation with blog context integration.
 """
 import os
@@ -29,8 +29,8 @@ class TestCaptionGenerator:
     def config(self):
         """Create a config mock with sensible defaults for testing."""
         config = MagicMock(spec=Config)
-        config.openai_api_key = os.getenv('OPENAI_API_KEY') or 'test-key'
-        config.openai_model = 'gpt-4o-mini'
+        config.anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or 'test-key'
+        config.anthropic_model = 'claude-sonnet-4-6'
         config.blog_post_url = "https://travelmemo.com/mauritius/mauritius-what-to-do"
         config.blog_post_urls = [config.blog_post_url]
         config.account = 'primary'
@@ -102,7 +102,7 @@ class TestCaptionGenerator:
             assert 'travelmemo.com' in prompt_content
             assert 'Blog context:' in prompt_content
 
-    @pytest.mark.skipif(not os.getenv('OPENAI_API_KEY'), reason='Requires OpenAI API key')
+    @pytest.mark.skipif(not os.getenv('ANTHROPIC_API_KEY'), reason='Requires Anthropic API key')
     def test_generate_caption_with_blog_context_live(self, generator, sample_mauritius_photo_data):
         """Integration smoke test that exercises the live dependencies."""
         caption = generator.generate_caption(sample_mauritius_photo_data)
@@ -233,7 +233,7 @@ class TestCaptionGenerator:
         assert 'Travelmemo from a one-of-a-kind travel experience.' in full_caption
         assert sample_mauritius_photo_data['hashtags'] in full_caption
 
-    @pytest.mark.skipif(not os.getenv('OPENAI_API_KEY'), reason='Requires OpenAI API key')
+    @pytest.mark.skipif(not os.getenv('ANTHROPIC_API_KEY'), reason='Requires Anthropic API key')
     def test_retry_mechanism_success(self, generator, sample_mauritius_photo_data):
         """Smoke test for retry wrapper when APIs are reachable."""
         caption = generator.generate_with_retry(sample_mauritius_photo_data, max_retries=3)

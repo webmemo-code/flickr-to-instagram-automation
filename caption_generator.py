@@ -1,10 +1,10 @@
 """
-OpenAI GPT-4 Vision integration for generating Instagram captions.
+Anthropic Claude Vision integration for generating Instagram captions.
 """
 import time
 import logging
 import requests
-from openai import OpenAI
+import anthropic
 from typing import Optional, Dict, List, Tuple
 from config import Config
 from blog_content_extractor import BlogContentExtractor, BlogContextMatch
@@ -12,11 +12,11 @@ from account_config import is_secondary_account, get_account_config
 
 
 class CaptionGenerator:
-    """Generate Instagram captions using OpenAI GPT-4 Vision."""
-    
+    """Generate Instagram captions using Anthropic Claude Vision."""
+
     def __init__(self, config: Config):
         self.config = config
-        self.client = OpenAI(api_key=config.openai_api_key)
+        self.client = anthropic.Anthropic(api_key=config.anthropic_api_key)
         self.logger = logging.getLogger(__name__)
         self.blog_extractor = BlogContentExtractor(config)
         self._blog_content_cache: Dict[str, Optional[Dict[str, any]]] = {}  # Cache blog content per blog URL
@@ -164,25 +164,28 @@ class CaptionGenerator:
                              "Use emojis sparingly and appropriately.")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.get('id')} (account: {self.config.account})")
             
-            response = self.client.chat.completions.create(
-                model=self.config.openai_model,
+            response = self.client.messages.create(
+                model=self.config.anthropic_model,
+                max_tokens=600,
+                temperature=0.4,
                 messages=[
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": prompt},
                             {
-                                "type": "image_url",
-                                "image_url": {"url": photo_data['url']}
-                            }
+                                "type": "image",
+                                "source": {
+                                    "type": "url",
+                                    "url": photo_data['url']
+                                }
+                            },
+                            {"type": "text", "text": prompt}
                         ]
                     }
-                ],
-                max_tokens=600,  # Increased from 400 to allow more detailed captions
-                temperature=0.4  # Increased from 0.1 to allow more creative, less generic output
+                ]
             )
-            
-            generated_text = response.choices[0].message.content
+
+            generated_text = response.content[0].text
             self.logger.info(f"Generated enhanced caption for photo {photo_data['id']}")
             
             return generated_text

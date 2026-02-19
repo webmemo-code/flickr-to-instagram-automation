@@ -47,8 +47,8 @@ class TestCaptionGenerationIntegration:
     @pytest.fixture 
     def caption_generator(self, config):
         """Create CaptionGenerator instance."""
-        if not config.openai_api_key:
-            pytest.skip("Requires OPENAI_API_KEY environment variable")
+        if not config.anthropic_api_key:
+            pytest.skip("Requires ANTHROPIC_API_KEY environment variable")
         return CaptionGenerator(config)
     
     def test_flickr_gallery_photo_retrieval(self, flickr_api, config):
@@ -142,7 +142,7 @@ class TestCaptionGenerationIntegration:
         else:
             print("WARN: No blog context extracted - this may indicate an issue with blog content extraction")
     
-    @pytest.mark.skipif(not os.getenv('OPENAI_API_KEY'), reason="Requires OpenAI API key") 
+    @pytest.mark.skipif(not os.getenv('ANTHROPIC_API_KEY'), reason="Requires Anthropic API key") 
     def test_end_to_end_caption_generation(self, flickr_api, caption_generator, config):
         """Test complete end-to-end caption generation with live data."""
         # Get photo from gallery
@@ -190,27 +190,27 @@ class TestCaptionGenerationIntegration:
         
     def test_caption_quality_with_vs_without_blog_context(self, flickr_api, config):
         """Compare caption quality with and without blog context."""
-        if not os.getenv('OPENAI_API_KEY'):
-            pytest.skip("Requires OpenAI API key")
-            
+        if not os.getenv('ANTHROPIC_API_KEY'):
+            pytest.skip("Requires Anthropic API key")
+
         # Get photo from gallery
         photos = flickr_api.get_unposted_photos()
         enhanced_photo = flickr_api.get_photo_with_metadata(photos[0]['id'])
-        
+
         # Test with blog context
         config_with_blog = MagicMock(spec=Config)
-        config_with_blog.openai_api_key = config.openai_api_key
-        config_with_blog.openai_model = config.openai_model
+        config_with_blog.anthropic_api_key = config.anthropic_api_key
+        config_with_blog.anthropic_model = config.anthropic_model
         config_with_blog.blog_post_url = config.blog_post_url
-        
+
         generator_with_blog = CaptionGenerator(config_with_blog)
         enhanced_photo['source_url'] = config.blog_post_url
         caption_with_blog = generator_with_blog.generate_caption(enhanced_photo)
-        
+
         # Test without blog context
         config_without_blog = MagicMock(spec=Config)
-        config_without_blog.openai_api_key = config.openai_api_key
-        config_without_blog.openai_model = config.openai_model
+        config_without_blog.anthropic_api_key = config.anthropic_api_key
+        config_without_blog.anthropic_model = config.anthropic_model
         config_without_blog.blog_post_url = None
         
         generator_without_blog = CaptionGenerator(config_without_blog)
