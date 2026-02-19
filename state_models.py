@@ -64,6 +64,7 @@ class InstagramPost:
     instagram_url: Optional[str] = None
     caption_length: Optional[int] = None
     hashtags_count: Optional[int] = None
+    is_dry_run: bool = False
 
     def __post_init__(self):
         """Initialize default values after creation."""

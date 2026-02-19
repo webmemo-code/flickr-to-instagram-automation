@@ -439,7 +439,7 @@ class StateManager:
             # Get posted photos
             posted_photos = self.get_instagram_posts()
             posted_ids = {post.photo_id for post in posted_photos if post.photo_id
-                         if not include_dry_runs or not getattr(post, 'is_dry_run', False)}
+                         if include_dry_runs or not getattr(post, 'is_dry_run', False)}
 
             # Get failed positions that should be retried
             failed_positions = self.get_enhanced_failed_positions()
@@ -521,8 +521,25 @@ class StateManager:
             flickr_url = photo_data.get('url', '')
 
             if is_dry_run:
-                # For dry runs, just log - don't create actual records
+                # Persist dry run record so the next dry run picks a different photo
                 self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")
+                posts = self.get_instagram_posts()
+                dry_post = InstagramPost(
+                    position=album_position,
+                    photo_id=flickr_photo_id,
+                    title=title,
+                    status=PostStatus.POSTED,
+                    account=self.get_account_normalized(),
+                    flickr_url=flickr_url,
+                    is_dry_run=True,
+                    workflow_run_id=os.getenv('GITHUB_RUN_ID'),
+                )
+                posts.append(dry_post)
+                self.storage_adapter.write_posts(
+                    self.get_account_normalized(),
+                    self.current_album_id,
+                    [p.to_dict() for p in posts]
+                )
                 return "dry_run"
 
             # Determine post status
