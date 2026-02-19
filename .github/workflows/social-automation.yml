@@ -74,7 +74,7 @@ jobs:
 
           # Show API versions being used
           graph_version = os.getenv('GRAPH_API_VERSION', 'v18.0')
-          anthropic_model = os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
+          anthropic_model = os.getenv('ANTHROPIC_MODEL') or 'claude-sonnet-4-6'
           print(f'Using Graph API version: {graph_version}')
           print(f'Using Anthropic model: {anthropic_model}')
           print(f'Account: ${{ inputs.account_id }}')

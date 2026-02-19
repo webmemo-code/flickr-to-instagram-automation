@@ -53,7 +53,7 @@ class Config:
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = 'https://graph.facebook.com/'
         self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
-        self.anthropic_model = os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
+        self.anthropic_model = os.getenv('ANTHROPIC_MODEL') or 'claude-sonnet-4-6'
         
         # State management options
         self.create_audit_issues = os.getenv('CREATE_AUDIT_ISSUES', 'false').lower() == 'true'  # Default: disabled for scale

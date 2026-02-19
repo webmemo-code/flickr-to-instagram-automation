@@ -291,16 +291,17 @@ class CaptionGenerator:
 
     def _validate_url_accessibility(self, url: str) -> bool:
         """Check if a URL is accessible by making a HEAD request, falling back to GET if needed."""
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; TravelmemoBot/1.0)'}
         try:
             # Try HEAD request first (faster)
-            response = requests.head(url, timeout=5, allow_redirects=True)
+            response = requests.head(url, timeout=5, allow_redirects=True, headers=headers)
             # Consider 2xx and 3xx status codes as accessible
             is_accessible = 200 <= response.status_code < 400
 
             # If HEAD fails with 405 (Method Not Allowed) or 403, try GET
             if response.status_code in [403, 405]:
                 self.logger.debug(f"HEAD request returned {response.status_code} for {url}, trying GET")
-                response = requests.get(url, timeout=5, allow_redirects=True, stream=True)
+                response = requests.get(url, timeout=5, allow_redirects=True, stream=True, headers=headers)
                 # Only read headers, don't download body
                 response.close()
                 is_accessible = 200 <= response.status_code < 400
