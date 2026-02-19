@@ -8,6 +8,7 @@ import re
 from typing import Dict, List, Optional, Tuple
 from config import Config
 from account_config import get_account_config
+from photo_models import PhotoListItem, EnrichedPhoto
 
 
 class FlickrAPI:
@@ -292,7 +293,7 @@ class FlickrAPI:
             return count
         return 0
 
-    def get_photo_list(self) -> List[Dict]:
+    def get_photo_list(self) -> List[PhotoListItem]:
         """Get lightweight photo list from album (single API call, no per-photo metadata)."""
         photoset_id = self.config.flickr_album_id
 
@@ -300,9 +301,10 @@ class FlickrAPI:
         if not photos_data:
             return []
 
-        photos = []
+        # Build temporary list for sorting before assigning positions
+        raw_photos = []
         for photo in photos_data['photoset']['photo']:
-            photos.append({
+            raw_photos.append({
                 'id': photo['id'],
                 'title': photo['title'],
                 'url': self.build_photo_url(photo),
@@ -312,37 +314,52 @@ class FlickrAPI:
             })
 
         # Sort by date taken (oldest first) for chronological publication order
-        photos.sort(key=lambda x: x['date_taken'] or '9999-12-31 23:59:59')
+        raw_photos.sort(key=lambda x: x['date_taken'] or '9999-12-31 23:59:59')
 
-        # Assign album positions based on chronological order
-        for index, photo in enumerate(photos):
-            photo['album_position'] = index + 1
+        # Create typed objects with final album positions
+        photos = [
+            PhotoListItem(
+                id=raw['id'],
+                title=raw['title'],
+                url=raw['url'],
+                server=raw['server'],
+                secret=raw['secret'],
+                date_taken=raw['date_taken'],
+                album_position=index + 1,
+            )
+            for index, raw in enumerate(raw_photos)
+        ]
 
         self.logger.info(f"Retrieved {len(photos)} photos from album {photoset_id} (lightweight listing)")
         return photos
 
-    def enrich_photo(self, photo: Dict) -> Dict:
+    def enrich_photo(self, photo: PhotoListItem) -> EnrichedPhoto:
         """Fetch detailed metadata (info, location, EXIF) for a single photo."""
-        photo_id = photo['id']
+        photo_info, description = self.get_photo_info(photo.id)
+        location_data = self.get_photo_location(photo.id)
+        exif_data = self.get_photo_exif(photo.id)
 
-        photo_info, description = self.get_photo_info(photo_id)
-        location_data = self.get_photo_location(photo_id)
-        exif_data = self.get_photo_exif(photo_id)
+        enriched = EnrichedPhoto(
+            id=photo.id,
+            title=photo.title,
+            url=photo.url,
+            server=photo.server,
+            secret=photo.secret,
+            date_taken=photo.date_taken,
+            album_position=photo.album_position,
+            description=description,
+            photo_page_url=self.get_photo_page_url(photo_info) or "",
+            source_url=self.extract_source_url(description, photo_info),
+            hashtags=self.extract_hashtags(photo_info, location_data),
+            exif_data=exif_data,
+            exif_hints=self.extract_exif_hints(exif_data),
+            location_data=location_data,
+        )
 
-        photo['description'] = description
-        photo['photo_page_url'] = self.get_photo_page_url(photo_info)
-        photo['source_url'] = self.extract_source_url(description, photo_info)
-        photo['hashtags'] = self.extract_hashtags(photo_info, location_data)
-        photo['exif_data'] = exif_data
-        photo['exif_hints'] = self.extract_exif_hints(exif_data)
-        photo['location_data'] = location_data
+        self.logger.info(f"Enriched photo #{enriched.album_position}: {enriched.title}")
+        return enriched
 
-        self.logger.info(f"Enriched photo #{photo.get('album_position', '?')}: {photo['title']}")
-        return photo
-
-    def get_unposted_photos(self) -> List[Dict]:
+    def get_unposted_photos(self) -> List[EnrichedPhoto]:
         """Get all photos with full metadata. Use get_photo_list() + enrich_photo() instead for efficiency."""
         photos = self.get_photo_list()
-        for photo in photos:
-            self.enrich_photo(photo)
-        return photos
+        return [self.enrich_photo(photo) for photo in photos]

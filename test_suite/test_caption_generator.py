@@ -11,6 +11,7 @@ from caption_generator import CaptionGenerator
 from account_config import AccountConfig
 from config import Config
 from blog_content_extractor import BlogContextMatch
+from photo_models import EnrichedPhoto
 
 
 def safe_print(text):
@@ -45,12 +46,14 @@ class TestCaptionGenerator:
     @pytest.fixture
     def sample_mauritius_photo_data(self):
         """Sample photo data representative of Flickr API output."""
-        return {
-            'id': '31352051237',
-            'url': 'https://live.staticflickr.com/4885/31352051237_b494dd1d65_c.jpg',
-            'title': 'Le Morne Beach Mauritius',
-            'description': 'Crystal clear turquoise water at Le Morne beach with the iconic Le Morne Brabant mountain in the background. One of the most beautiful beaches in Mauritius.',
-            'location_data': {
+        return EnrichedPhoto(
+            id='31352051237',
+            url='https://live.staticflickr.com/4885/31352051237_b494dd1d65_c.jpg',
+            title='Le Morne Beach Mauritius',
+            server='4885', secret='b494dd1d65', date_taken='2024-01-01 12:00:00',
+            album_position=1,
+            description='Crystal clear turquoise water at Le Morne beach with the iconic Le Morne Brabant mountain in the background. One of the most beautiful beaches in Mauritius.',
+            location_data={
                 'photo': {
                     'location': {
                         'locality': {'_content': 'Le Morne'},
@@ -59,7 +62,7 @@ class TestCaptionGenerator:
                     }
                 }
             },
-            'exif_data': {
+            exif_data={
                 'photo': {
                     'exif': [
                         {'tag': 'Make', 'raw': {'_content': 'Canon'}},
@@ -67,18 +70,18 @@ class TestCaptionGenerator:
                     ]
                 }
             },
-            'exif_hints': {
+            exif_hints={
                 'source_urls': ['https://travelmemo.com/mauritius/mauritius-what-to-do']
             },
-            'source_url': 'https://travelmemo.com/mauritius/mauritius-what-to-do',
-            'hashtags': '#Mauritius #Beach #Travel #Paradise #LeMorne'
-        }
+            source_url='https://travelmemo.com/mauritius/mauritius-what-to-do',
+            hashtags='#Mauritius #Beach #Travel #Paradise #LeMorne',
+        )
 
     def test_build_context_from_photo_data(self, generator, sample_mauritius_photo_data):
         """Ensure the enhanced prompt includes all relevant context pieces."""
         photo_data = sample_mauritius_photo_data
         blog_match = BlogContextMatch(
-            url=photo_data['source_url'],
+            url=photo_data.source_url,
             context='Mauritius travel guide excerpt highlighting Le Morne beach.',
             score=42,
             matched_terms=('mauritius', 'beach')
@@ -126,27 +129,28 @@ class TestCaptionGenerator:
         )
 
         with patch.object(generator, '_load_blog_content', return_value={'paragraphs': ['stub']}), \
-             patch.object(generator.blog_extractor, 'find_relevant_content', return_value=blog_match), \
-             patch.object(generator, '_validate_url_accessibility', return_value=True):
+             patch.object(generator.blog_extractor, 'find_relevant_content', return_value=blog_match):
             match = generator._get_blog_content_context(sample_mauritius_photo_data)
 
         assert isinstance(match, BlogContextMatch)
         assert match.context.startswith('Detailed travel memo')
-        selected = sample_mauritius_photo_data['selected_blog']
+        selected = sample_mauritius_photo_data.selected_blog
         assert selected['url'] == config.blog_post_url
         assert selected['derived_from_exif']
 
     def test_enhanced_vs_basic_prompt_selection(self, generator):
         """Ensure contextual prompts differ from the basic fallback prompt."""
-        rich_photo = {
-            'id': 'test1',
-            'url': 'https://example.com/photo.jpg',
-            'title': 'Test Beach',
-            'description': 'Beautiful beach scene',
-            'location_data': {'photo': {'location': {'country': {'_content': 'Mauritius'}}}},
-            'exif_hints': {'source_urls': ['https://example.com/exif-post']}
-        }
-        minimal_photo = {'id': 'test2', 'url': 'https://example.com/photo2.jpg'}
+        rich_photo = EnrichedPhoto(
+            id='test1', url='https://example.com/photo.jpg', title='Test Beach',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            description='Beautiful beach scene',
+            location_data={'photo': {'location': {'country': {'_content': 'Mauritius'}}}},
+            exif_hints={'source_urls': ['https://example.com/exif-post']},
+        )
+        minimal_photo = EnrichedPhoto(
+            id='test2', url='https://example.com/photo2.jpg', title='',
+            server='1', secret='b', date_taken='2024-01-01', album_position=2,
+        )
 
         blog_match = BlogContextMatch(
             url='https://example.com/exif-post',
@@ -180,12 +184,12 @@ class TestCaptionGenerator:
         config.blog_post_urls = [fallback_url]
         config.get_default_blog_post_url.return_value = fallback_url
 
-        photo_data = {
-            'id': 'with-exif',
-            'url': 'https://example.com/with-exif.jpg',
-            'source_url': short_exif_url,
-            'exif_hints': {'source_urls': [short_exif_url, long_exif_url]},
-        }
+        photo_data = EnrichedPhoto(
+            id='with-exif', url='https://example.com/with-exif.jpg', title='Test',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            source_url=short_exif_url,
+            exif_hints={'source_urls': [short_exif_url, long_exif_url]},
+        )
 
         processed_urls = []
 
@@ -202,17 +206,16 @@ class TestCaptionGenerator:
             return None
 
         with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
-             patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
-             patch.object(generator, '_validate_url_accessibility', return_value=True):
+             patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
             match = generator._get_blog_content_context(photo_data)
 
         assert processed_urls[0] == long_exif_url
         assert short_exif_url not in processed_urls
         assert isinstance(match, BlogContextMatch)
         assert match.url == long_exif_url
-        assert photo_data['selected_blog']['url'] == long_exif_url
-        assert photo_data['source_url'] == long_exif_url
-        assert photo_data['selected_blog']['derived_from_exif'] is True
+        assert photo_data.selected_blog['url'] == long_exif_url
+        assert photo_data.source_url == long_exif_url
+        assert photo_data.selected_blog['derived_from_exif'] is True
 
     def test_build_full_caption_structure(self, generator, sample_mauritius_photo_data):
         """Validate the final caption assembly adds branding and hashtags."""
@@ -228,10 +231,10 @@ class TestCaptionGenerator:
 
         assert full_caption is not None
         assert generated_caption in full_caption
-        assert sample_mauritius_photo_data['title'] in full_caption
-        assert sample_mauritius_photo_data['description'] in full_caption
+        assert sample_mauritius_photo_data.title in full_caption
+        assert sample_mauritius_photo_data.description in full_caption
         assert 'Travelmemo from a one-of-a-kind travel experience.' in full_caption
-        assert sample_mauritius_photo_data['hashtags'] in full_caption
+        assert sample_mauritius_photo_data.hashtags in full_caption
 
     @pytest.mark.skipif(not os.getenv('ANTHROPIC_API_KEY'), reason='Requires Anthropic API key')
     def test_retry_mechanism_success(self, generator, sample_mauritius_photo_data):
@@ -250,11 +253,11 @@ class TestCaptionGenerator:
         german_url = 'https://reisememo.ch/italien/sardinien/sardinien-reisetipps-norden'  # Longer German URL
         english_url = 'https://travelmemo.com/italy/sardinia'  # Shorter English URL
 
-        photo_data = {
-            'id': 'domain-preference-test',
-            'url': 'https://example.com/test.jpg',
-            'exif_hints': {'source_urls': [german_url, english_url]},  # German URL appears first and is longer
-        }
+        photo_data = EnrichedPhoto(
+            id='domain-preference-test', url='https://example.com/test.jpg', title='Test',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            exif_hints={'source_urls': [german_url, english_url]},
+        )
 
         processed_urls = []
 
@@ -265,10 +268,6 @@ class TestCaptionGenerator:
         def find_side_effect(content, _photo):
             # Both URLs should work, but preference should determine which is chosen first
             return BlogContextMatch(url=content['url'], context=f'Context from {content["url"]}', score=10, matched_terms=('test',))
-
-        # Mock URL accessibility (both URLs are accessible)
-        def mock_validate_url(url):
-            return True
 
         # Test with English account (should prefer travelmemo.com)
         config.account = 'primary'  # English account
@@ -283,22 +282,21 @@ class TestCaptionGenerator:
             )
 
             with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
-                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
-                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
 
                 match = generator._get_blog_content_context(photo_data)
 
         # The English URL should be processed first due to domain preference
         assert processed_urls[0] == english_url, f"Expected {english_url} to be processed first, but got {processed_urls[0]}"
         assert match.url == english_url
-        assert photo_data['selected_blog']['url'] == english_url
+        assert photo_data.selected_blog['url'] == english_url
 
         # Reset for German account test
-        photo_data = {
-            'id': 'domain-preference-test-de',
-            'url': 'https://example.com/test.jpg',
-            'exif_hints': {'source_urls': [german_url, english_url]},  # Same URLs
-        }
+        photo_data = EnrichedPhoto(
+            id='domain-preference-test-de', url='https://example.com/test.jpg', title='Test',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            exif_hints={'source_urls': [german_url, english_url]},
+        )
         processed_urls.clear()
 
         # Test with German account (should prefer reisememo.ch)
@@ -314,15 +312,14 @@ class TestCaptionGenerator:
             )
 
             with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
-                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
-                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
 
                 match = generator._get_blog_content_context(photo_data)
 
         # The German URL should be processed first due to domain preference
         assert processed_urls[0] == german_url, f"Expected {german_url} to be processed first, but got {processed_urls[0]}"
         assert match.url == german_url
-        assert photo_data['selected_blog']['url'] == german_url
+        assert photo_data.selected_blog['url'] == german_url
 
     def test_issue_162_german_url_interference_fix(self, generator, config):
         """Integration test for issue #162: German URLs interfering with English account URL selection."""
@@ -337,18 +334,18 @@ class TestCaptionGenerator:
         truncated_english_url = 'https://travelmemo.com/italy/sar'  # Truncated English URL
 
         # Photo data with EXIF containing multiple URLs (simulating Flickr EXIF data)
-        photo_data = {
-            'id': 'issue-162-test',
-            'url': 'https://example.com/sardinia-photo.jpg',
-            'title': 'Beautiful Sardinia coastline',
-            'exif_hints': {
+        photo_data = EnrichedPhoto(
+            id='issue-162-test', url='https://example.com/sardinia-photo.jpg',
+            title='Beautiful Sardinia coastline',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            exif_hints={
                 'source_urls': [
                     truncated_english_url,    # Appears first, truncated
                     longer_german_url,        # Appears second, longer (would be selected by old logic)
                     complete_english_url      # Appears third, complete English URL
                 ]
-            }
-        }
+            },
+        )
 
         processed_urls = []
 
@@ -364,10 +361,6 @@ class TestCaptionGenerator:
                 return BlogContextMatch(url=url, context='Sardinien Reisetipps vom deutschen Blog', score=7, matched_terms=('sardinien', 'reise'))
             return None
 
-        # Mock URL accessibility - all URLs are accessible
-        def mock_validate_url(url):
-            return True
-
         # Test with English primary account configuration
         config.account = 'primary'
 
@@ -382,8 +375,7 @@ class TestCaptionGenerator:
             )
 
             with patch.object(generator, '_load_blog_content', side_effect=load_side_effect), \
-                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect), \
-                 patch.object(generator, '_validate_url_accessibility', side_effect=mock_validate_url):
+                 patch.object(generator.blog_extractor, 'find_relevant_content', side_effect=find_side_effect):
 
                 match = generator._get_blog_content_context(photo_data)
 
@@ -406,21 +398,24 @@ class TestCaptionGenerator:
                 f"English URLs should be processed before German URLs. Processing order: {processed_urls}"
 
         # Verify photo data is updated correctly
-        assert photo_data['selected_blog']['url'] == complete_english_url
-        assert photo_data['source_url'] == complete_english_url  # Updated by _ensure_longest_source_url
+        assert photo_data.selected_blog['url'] == complete_english_url
+        assert photo_data.source_url == complete_english_url  # Updated by _ensure_longest_source_url
 
     def test_caption_url_fallback_when_no_blog_context_found(self, generator, config):
         """When no BLOG_POST_URL is configured and no selected_blog, no URL appears in caption."""
         config.account = 'primary'
+        config.blog_post_url = None
+        config.blog_post_urls = []
         config.get_default_blog_post_url.return_value = None  # No default URL configured
 
-        photo_data = {
-            'id': 'no-blog-context',
-            'title': 'Photo without blog context',
-            'description': 'A photo that has no associated blog context',
-            'hashtags': '#test #photo #reisememo'
-            # Note: no 'selected_blog' key - simulates when _get_blog_content_context returns None
-        }
+        photo_data = EnrichedPhoto(
+            id='no-blog-context', url='https://example.com/photo.jpg',
+            title='Photo without blog context',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            description='A photo that has no associated blog context',
+            hashtags='#test #photo #reisememo',
+            # Note: no selected_blog - simulates when _get_blog_content_context returns None
+        )
 
         generated_caption = "This is a test caption."
 
@@ -438,19 +433,20 @@ class TestCaptionGenerator:
         # No bare-domain fallback — better to omit URL than show a generic domain
         assert 'https://travelmemo.com' not in caption, f"Should not contain bare domain URL: {caption}"
         assert 'Read the travel tip at' not in caption, "Should not contain travel tip text without a URL"
-        assert photo_data['hashtags'] in caption, "Expected hashtags in caption"
+        assert photo_data.hashtags in caption, "Expected hashtags in caption"
 
     def test_caption_uses_configured_url_over_selected_blog(self, generator, config):
         """BLOG_POST_URL(S) takes priority over auto-discovered selected_blog URL."""
         config.account = 'primary'
+        config.blog_post_urls = ['https://travelmemo.com/mauritius-guide/']
         config.get_default_blog_post_url.return_value = 'https://travelmemo.com/mauritius-guide/'
 
-        photo_data = {
-            'id': 'url-priority',
-            'title': 'Priority test',
-            'selected_blog': {'url': 'https://reisememo.ch/some-post/'},
-            'hashtags': '#test'
-        }
+        photo_data = EnrichedPhoto(
+            id='url-priority', url='https://example.com/photo.jpg', title='Priority test',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+            selected_blog={'url': 'https://reisememo.ch/some-post/'},
+            hashtags='#test',
+        )
 
         generated_caption = "Test caption."
 

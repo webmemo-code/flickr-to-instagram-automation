@@ -75,6 +75,16 @@ class InstagramPost:
         if self.last_update is None:
             self.last_update = datetime.now().isoformat()
 
+    @staticmethod
+    def get_real_posted(posts: List['InstagramPost']) -> List['InstagramPost']:
+        """Get posts that were actually posted (excludes dry runs)."""
+        return [p for p in posts if p.status == PostStatus.POSTED and not p.is_dry_run]
+
+    @staticmethod
+    def count_real_posted(posts: List['InstagramPost']) -> int:
+        """Count posts that were actually posted (excludes dry runs)."""
+        return len(InstagramPost.get_real_posted(posts))
+
     def add_retry_attempt(self, error_message: str, workflow_run_id: Optional[str] = None):
         """Add a retry attempt to the history."""
         self.retry_count += 1
@@ -159,8 +169,8 @@ class AlbumMetadata:
     last_error_at: Optional[str] = None
 
     def update_counts(self, posts: List[InstagramPost]):
-        """Update statistics based on current post data."""
-        self.posted_count = len([p for p in posts if p.status == PostStatus.POSTED])
+        """Update statistics based on current post data (excludes dry runs from posted count)."""
+        self.posted_count = InstagramPost.count_real_posted(posts)
         self.failed_count = len([p for p in posts if p.status == PostStatus.FAILED])
         self.pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
         self.retrying_count = len([p for p in posts if p.status == PostStatus.RETRYING])

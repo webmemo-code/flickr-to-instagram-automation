@@ -125,14 +125,14 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
                                    total_photos, config, account_display, dry_run)
             return True
 
-        flickr_api.enrich_photo(selected_photo)
-        position = selected_photo.get('album_position', 'unknown')
-        logger.info(f"Selected photo #{position}: {selected_photo['title']} (ID: {selected_photo['id']})")
+        selected_photo = flickr_api.enrich_photo(selected_photo)
+        position = selected_photo.album_position
+        logger.info(f"Selected photo #{position}: {selected_photo.title} (ID: {selected_photo.id})")
 
         # --- Photo Validation ---
         logger.info("Validating image URL (includes retry if needed)...")
-        if not instagram_api.validate_image_url(selected_photo['url']):
-            error_msg = f"Invalid or inaccessible image URL after retries: {selected_photo['url']}"
+        if not instagram_api.validate_image_url(selected_photo.url):
+            error_msg = f"Invalid or inaccessible image URL after retries: {selected_photo.url}"
             logger.error(f"Photo validation failed: {error_msg}")
             state_manager.create_post_record(selected_photo, None, is_dry_run=dry_run)
             _log_run(state_manager, True,
@@ -155,12 +155,12 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         instagram_post_id = None
         if dry_run:
             logger.info(f"DRY RUN: Would post to Instagram")
-            logger.info(f"Image URL: {selected_photo['url']}")
+            logger.info(f"Image URL: {selected_photo.url}")
             logger.info(f"Caption: {full_caption}")
             logger.info(f"Dry run completed for photo #{position}")
         else:
             logger.info("Posting to Instagram...")
-            instagram_post_id = instagram_api.post_with_retry(selected_photo['url'], full_caption)
+            instagram_post_id = instagram_api.post_with_retry(selected_photo.url, full_caption)
             if not instagram_post_id:
                 logger.error(f"Failed to post photo #{position} to Instagram")
                 state_manager.create_post_record(selected_photo, None, is_dry_run=False)

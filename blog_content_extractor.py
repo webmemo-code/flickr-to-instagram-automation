@@ -26,30 +26,6 @@ class BlogContextMatch:
     matched_terms: Tuple[str, ...]
 
 
-
-
-@dataclass(frozen=True)
-class BlogContextMatch:
-    """Container for the best matching blog context snippet."""
-
-    url: str
-    context: str
-    score: int
-    matched_terms: Tuple[str, ...]
-
-
-
-
-@dataclass(frozen=True)
-class BlogContextMatch:
-    """Container for the best matching blog context snippet."""
-
-    url: str
-    context: str
-    score: int
-    matched_terms: Tuple[str, ...]
-
-
 class BlogContentExtractor:
     """Extracts and processes blog post content for caption enhancement."""
     
@@ -365,88 +341,6 @@ class BlogContentExtractor:
 
         return None
 
-    def _try_direct_page_scraping(self, blog_url: str) -> Optional[str]:
-        """
-        Try to scrape content directly from the blog page as fallback for Elementor read-more limitation.
-
-        Args:
-            blog_url: URL of the blog post
-
-        Returns:
-            Extracted text content or None if scraping fails
-        """
-        try:
-            self.logger.debug(f"Attempting direct page scraping for: {blog_url}")
-
-            # Use consistent user-agent with cookie consent
-            scraping_headers = {
-                'User-Agent': 'TravelMemo-ContentFetcher/1.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-                # Add cookies to bypass consent banners
-                'Cookie': 'cmplz_marketing=allow; cmplz_statistics=allow; cmplz_functional=allow; wp_has_consent=1'
-            }
-
-            response = self.session.get(blog_url, headers=scraping_headers, timeout=30)
-
-            if response.status_code != 200:
-                self.logger.debug(f"Direct page scraping failed with status {response.status_code}")
-                return None
-
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            # Try to find main content area with Elementor-specific selectors
-            content_selectors = [
-                '.elementor-widget-text-editor .elementor-widget-container',
-                '.elementor-text-editor',
-                '.entry-content',
-                '.post-content',
-                '.content',
-                'article',
-                'main'
-            ]
-
-            extracted_text = []
-
-            for selector in content_selectors:
-                elements = soup.select(selector)
-                for element in elements:
-                    # Skip read-more widgets and other navigation elements
-                    if any(cls in element.get('class', []) for cls in ['read-more', 'navigation', 'menu']):
-                        continue
-
-                    text = element.get_text().strip()
-                    if len(text) > 50:  # Only substantial content
-                        # Clean up text
-                        text = re.sub(r'\s+', ' ', text)
-                        extracted_text.append(text)
-
-                # If we found content with this selector, no need to try others
-                if extracted_text:
-                    break
-
-            if extracted_text:
-                combined_text = ' '.join(extracted_text)
-                # Remove duplicates and clean up
-                combined_text = re.sub(r'\s+', ' ', combined_text).strip()
-
-                if len(combined_text) > 200:  # Minimum useful content length
-                    self.logger.debug(f"Direct scraping extracted {len(combined_text)} characters")
-                    return combined_text
-
-        except Exception as e:
-            self.logger.debug(f"Direct page scraping failed for {blog_url}: {e}")
-
-        return None
-
     def _try_direct_page_scraping_structured(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
         Try to scrape and structure content directly from the blog page.
@@ -662,57 +556,6 @@ class BlogContentExtractor:
         except Exception as e:
             self.logger.error(f"Failed to send API failure notification: {e}")
 
-    def _extract_title(self, soup: BeautifulSoup) -> str:
-        """Extract the blog post title."""
-        # Try multiple selectors for title
-        selectors = ['h1', 'title', '.entry-title', '.post-title', 'h1.title']
-        
-        for selector in selectors:
-            element = soup.select_one(selector)
-            if element:
-                return element.get_text().strip()
-        
-        return "Unknown Title"
-    
-    def _extract_paragraphs(self, soup: BeautifulSoup) -> List[str]:
-        """Extract text paragraphs from the blog post."""
-        paragraphs = []
-        
-        # Look for main content areas first
-        content_areas = soup.select('.entry-content, .post-content, .content, article, main')
-        
-        if content_areas:
-            # Use the first found content area
-            content_soup = content_areas[0]
-        else:
-            # Fallback to entire document
-            content_soup = soup
-        
-        # Extract paragraphs from content area
-        for p in content_soup.find_all('p'):
-            text = p.get_text().strip()
-            if len(text) > 50:  # Only include substantial paragraphs
-                # Clean up text
-                text = re.sub(r'\s+', ' ', text)
-                paragraphs.append(text)
-        
-        return paragraphs
-    
-    def _extract_headings(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
-        """Extract headings from the blog post."""
-        headings = []
-        
-        for level in range(1, 7):  # h1 to h6
-            for heading in soup.find_all(f'h{level}'):
-                text = heading.get_text().strip()
-                if text:
-                    headings.append({
-                        'level': level,
-                        'text': text
-                    })
-        
-        return headings
-    
     def _extract_image_references(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, str]]:
         """Extract image references and their context."""
         images = []
@@ -788,19 +631,6 @@ class BlogContentExtractor:
         except Exception:
             return None
     
-    def _extract_meta_description(self, soup: BeautifulSoup) -> Optional[str]:
-        """Extract meta description from the page."""
-        meta_desc = soup.find('meta', attrs={'name': 'description'})
-        if meta_desc:
-            return meta_desc.get('content', '').strip()
-        
-        # Try Open Graph description
-        og_desc = soup.find('meta', attrs={'property': 'og:description'})
-        if og_desc:
-            return og_desc.get('content', '').strip()
-        
-        return None
-    
     def get_blog_content(self, blog_url: str) -> Optional[Dict[str, any]]:
         """Retrieve blog content with caching to avoid duplicate fetches."""
         if not blog_url:
@@ -871,9 +701,6 @@ class BlogContentExtractor:
         except Exception as e:
             self.logger.error(f"Error finding relevant content: {e}")
             return None
-
-
-
 
 
 

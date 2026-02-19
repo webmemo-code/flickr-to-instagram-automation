@@ -13,6 +13,7 @@ from github import Github
 from config import Config
 from storage_adapter import GitFileStorageAdapter
 from state_models import InstagramPost, AlbumMetadata, FailedPosition, PostStatus, AlbumStatus
+from photo_models import PhotoListItem, EnrichedPhoto
 from notification_system import notifier, CriticalStateFailure
 from account_config import account_manager
 
@@ -157,8 +158,7 @@ class StateManager:
                 return 0
 
             remaining_posts = [
-                post for post in posts
-                if not bool(getattr(post, "is_dry_run", False))
+                post for post in posts if not post.is_dry_run
             ]
             cleared_count = len(posts) - len(remaining_posts)
 
@@ -281,7 +281,7 @@ class StateManager:
         """Check if the album is complete."""
         try:
             posts = self.get_instagram_posts()
-            posted_count = len([p for p in posts if p.status == PostStatus.POSTED])
+            posted_count = InstagramPost.count_real_posted(posts)
 
             # Update metadata with current photo count
             metadata = self.get_album_metadata()
@@ -310,7 +310,7 @@ class StateManager:
 
             # Calculate statistics
             total_posts = len(posts)
-            posted_count = len([p for p in posts if p.status == PostStatus.POSTED])
+            posted_count = InstagramPost.count_real_posted(posts)
             failed_count = len([f for f in failed_positions if not f.resolved])
             pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
 
@@ -339,12 +339,12 @@ class StateManager:
             }
 
 
-    def get_next_photo_to_post(self, photos: List[Dict], include_dry_runs: bool = False) -> Optional[Dict]:
+    def get_next_photo_to_post(self, photos: List[PhotoListItem], include_dry_runs: bool = False) -> Optional[PhotoListItem]:
         """
         Get the next photo to post from the provided photos list.
 
         Args:
-            photos: List of photo dictionaries from Flickr
+            photos: List of PhotoListItem objects from Flickr
             include_dry_runs: Whether to consider dry run photos as posted
 
         Returns:
@@ -357,17 +357,19 @@ class StateManager:
 
             # Get posted photos
             posted_photos = self.get_instagram_posts()
-            posted_ids = {post.photo_id for post in posted_photos if post.photo_id
-                         if include_dry_runs or not getattr(post, 'is_dry_run', False)}
+            if include_dry_runs:
+                real_posted = [p for p in posted_photos if p.status == PostStatus.POSTED]
+            else:
+                real_posted = InstagramPost.get_real_posted(posted_photos)
+            posted_ids = {p.photo_id for p in real_posted if p.photo_id}
 
             # Get failed positions that should be retried
             failed_positions = self.get_enhanced_failed_positions()
             failed_ids = {f.photo_id for f in failed_positions if not f.resolved and f.photo_id}
 
             # Find next unposted photo
-            for photo in sorted(photos, key=lambda x: x.get('album_position', 0)):
-                photo_id = photo.get('id')
-                if photo_id and photo_id not in posted_ids and photo_id not in failed_ids:
+            for photo in sorted(photos, key=lambda x: x.album_position):
+                if photo.id not in posted_ids and photo.id not in failed_ids:
                     return photo
 
             return None
@@ -418,12 +420,12 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to log automation run: {e}")
 
-    def create_post_record(self, photo_data: Dict, instagram_post_id: Optional[str] = None,
+    def create_post_record(self, photo_data, instagram_post_id: Optional[str] = None,
                           is_dry_run: bool = False, create_audit_issue: bool = False) -> Optional[str]:
         """Record a post (successful, failed, or dry run).
 
         Args:
-            photo_data: Photo data dictionary from Flickr
+            photo_data: PhotoListItem or EnrichedPhoto from Flickr
             instagram_post_id: Instagram post ID if successful, None if failed
             is_dry_run: Whether this was a dry run
             create_audit_issue: Whether to create audit issues (unused, kept for API compat)
@@ -432,10 +434,10 @@ class StateManager:
             Post record ID or None if failed
         """
         try:
-            album_position = photo_data.get('album_position', 0)
-            flickr_photo_id = photo_data.get('id', '')
-            title = photo_data.get('title', 'Unknown')
-            flickr_url = photo_data.get('url', '')
+            album_position = photo_data.album_position
+            flickr_photo_id = photo_data.id
+            title = photo_data.title
+            flickr_url = photo_data.url
 
             if is_dry_run:
                 self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")

@@ -8,6 +8,7 @@ the correct behaviour of each workflow phase.
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import main
+from photo_models import PhotoListItem, EnrichedPhoto
 
 
 @pytest.fixture(autouse=True)
@@ -42,10 +43,18 @@ def mock_deps():
         }
 
 
-SAMPLE_PHOTO = {
-    'id': '123', 'title': 'Test Photo', 'album_position': 1,
-    'url': 'http://example.com/photo.jpg',
-}
+SAMPLE_PHOTO = PhotoListItem(
+    id='123', title='Test Photo', album_position=1,
+    url='http://example.com/photo.jpg',
+    server='1234', secret='abc', date_taken='2024-01-01 12:00:00',
+)
+
+SAMPLE_ENRICHED = EnrichedPhoto(
+    id='123', title='Test Photo', album_position=1,
+    url='http://example.com/photo.jpg',
+    server='1234', secret='abc', date_taken='2024-01-01 12:00:00',
+    description='A test photo', hashtags='#test',
+)
 
 
 class TestPostNextPhoto:
@@ -54,7 +63,7 @@ class TestPostNextPhoto:
     def test_successful_post(self, mock_deps):
         """Happy path: select, validate, caption, post, record."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
-        mock_deps['flickr'].enrich_photo.return_value = None
+        mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
         mock_deps['state'].get_next_photo_to_post.return_value = SAMPLE_PHOTO
         mock_deps['instagram'].validate_image_url.return_value = True
@@ -72,7 +81,7 @@ class TestPostNextPhoto:
     def test_dry_run_skips_posting(self, mock_deps):
         """Dry run should NOT call post_with_retry but SHOULD record state."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
-        mock_deps['flickr'].enrich_photo.return_value = None
+        mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
         mock_deps['state'].get_next_photo_to_post.return_value = SAMPLE_PHOTO
         mock_deps['instagram'].validate_image_url.return_value = True
@@ -109,7 +118,7 @@ class TestPostNextPhoto:
     def test_validation_failure_continues(self, mock_deps):
         """Validation failure should record state and return True (non-fatal)."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
-        mock_deps['flickr'].enrich_photo.return_value = None
+        mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
         mock_deps['state'].get_next_photo_to_post.return_value = SAMPLE_PHOTO
         mock_deps['instagram'].validate_image_url.return_value = False
@@ -122,7 +131,7 @@ class TestPostNextPhoto:
     def test_posting_failure_continues(self, mock_deps):
         """Instagram posting failure should record state and return True (non-fatal)."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
-        mock_deps['flickr'].enrich_photo.return_value = None
+        mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
         mock_deps['state'].get_next_photo_to_post.return_value = SAMPLE_PHOTO
         mock_deps['instagram'].validate_image_url.return_value = True
@@ -138,7 +147,7 @@ class TestPostNextPhoto:
     def test_caption_fallback_on_failure(self, mock_deps):
         """Caption generation failure should use fallback text."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
-        mock_deps['flickr'].enrich_photo.return_value = None
+        mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
         mock_deps['state'].get_next_photo_to_post.return_value = SAMPLE_PHOTO
         mock_deps['instagram'].validate_image_url.return_value = True
