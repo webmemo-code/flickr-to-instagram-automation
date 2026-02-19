@@ -123,6 +123,7 @@ class CaptionGenerator:
                     prompt_base = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Erstelle eine Instagram Caption "
                                   "in fünf kurzen Sätzen auf Deutsch. Verwende für jeden Satz einen neuen Absatz. "
                                   "Schreibe sachlich, authentisch, persönlich und duze deine Follower. "
+                                  "Schreibe im PRÄSENS, als wärst du gerade vor Ort — nicht in der Vergangenheitsform. "
                                   "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
                                   "Verwende KEINE Markdown-Formatierung wie **fett** oder *kursiv* - Instagram unterstützt kein Markdown.\n"
                                   "Nutze Emojis nur sparsam und passend.\n\n"
@@ -138,6 +139,7 @@ class CaptionGenerator:
                     prompt_base = ("You are an Instagram influencer who publishes travel photos. Create an Instagram caption "
                                   "in five short sentences. Add a new paragraph for each sentence. "
                                   "Make it factual, authentic and personal. "
+                                  "Write in the PRESENT TENSE, as if you are there right now — not in the past tense. "
                                   "Do not use the terms 'I can\'t wait to share more...' or 'Stay tuned for more...'. "
                                   "Do NOT use markdown formatting like **bold** or *italic*—Instagram does not support markdown. Use plain text only.\n"
                                   "Use emojis sparingly and appropriately.\n\n"
@@ -158,6 +160,7 @@ class CaptionGenerator:
                     prompt = ("Du bist eine Schweizer Instagram Influencerin, die Reisefotos veröffentlicht. Beschreibe dieses Bild in zwei sehr kurzen Absätzen "
                              "mit jeweils zwei Sätzen auf Deutsch. Sie dienen als Instagram Captions. Nummeriere weder die Absätze noch die Sätze. "
                              "Verwende keine Anführungszeichen. Halte es persönlich und authentisch. "
+                             "Schreibe im Präsens, als wärst du gerade vor Ort. "
                              "Verwende kein scharfes 'ß', sondern 'ss' wie in der Schweiz. "
                              "Verwende KEINE Markdown-Formatierung wie **fett** oder *kursiv* - Instagram unterstützt kein Markdown. "
                              "Nutze Emojis nur sparsam und passend.")
@@ -166,6 +169,7 @@ class CaptionGenerator:
                     prompt = ("You are an Instagram influencer. Describe this image in two very short paragraphs "
                              "with two sentences each. They serve as Instagram captions. Do not number the paragraphs nor the sentences. "
                              "Do not use quotation marks. Keep it personal and authentic. "
+                             "Write in the present tense, as if you are there right now. "
                              "Do NOT use markdown formatting like **bold** or *italic*—Instagram does not support markdown. Use plain text only. "
                              "Use emojis sparingly and appropriately.")
                 self.logger.debug(f"Using basic prompt (no context available) for photo {photo_data.id} (account: {self.config.account})")
