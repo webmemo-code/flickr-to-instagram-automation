@@ -95,7 +95,8 @@ graph TB
     class PW,SW account
 ```
 ### Git-Based State Management
-Modern, secure state storage using Git files instead of repository variables:
+Modern, secure state storage using Git files on a dedicated `automation-state` orphan branch, separate from application code:
+- **Isolation**: State data lives on its own branch, keeping the `main` branch clean
 - **Security**: Uses fine-grained PAT permissions (`contents:write` only)
 - **Scalability**: No limits on state data size or complexity
 - **Auditability**: Full Git history of state changes
@@ -484,16 +485,53 @@ python main.py
 python main.py --stats
 ```
 ## State Management
-The system uses **Git-based file storage** for modern, secure state management:
-### State Files Created
-- `state/{account}/{album_id}/posts.json` - Posted photo records with full audit trail
-- `state/{account}/{album_id}/failed.json` - Failed posting attempts for retry logic
-- `state/{account}/{album_id}/metadata.json` - Album statistics and completion tracking
+The system uses **Git-based file storage** for modern, secure state management. All state is stored on a dedicated **orphan branch** called `automation-state`, completely separate from the application code on `main`.
+### The `automation-state` Branch
+The `automation-state` branch is an **orphan branch** — it shares no commit history with `main` and contains only state data files. This separation ensures that:
+- Automated state commits never pollute the source code history
+- State data can be managed with different access permissions
+- The branch can be reset or pruned without affecting application code
+The branch is created automatically by the `GitFileStorageAdapter` on first run if it doesn't already exist.
+### State Files
+Files are stored under `state-data/{account}/album-{album_id}/`:
+| File | Purpose |
+|------|---------|
+| `posts.json` | Array of posted photo records — each entry tracks the Flickr photo ID, Instagram post ID, position in album, posting timestamp, Flickr source URL, retry history, and workflow run ID |
+| `metadata.json` | Album-level statistics — total photos, posted/failed/pending counts, completion percentage, last posted position and timestamp, workflow run count, and error tracking |
+| `failed.json` | Failed posting attempts queued for retry logic |
+#### Example: `metadata.json`
+```json
+{
+  "album_id": "72177720332095960",
+  "account": "primary",
+  "total_photos": 192,
+  "posted_count": 1,
+  "completion_status": "active",
+  "completion_percentage": 0.52,
+  "last_posted_position": 1,
+  "last_posted_at": "2026-02-20T00:19:49.376283"
+}
+```
+#### Example: `posts.json` entry
+```json
+{
+  "position": 1,
+  "photo_id": "55105034063",
+  "instagram_post_id": "18032663015587846",
+  "posted_at": "2026-02-20T00:19:46.811837",
+  "title": "Flying into Lofoten",
+  "status": "posted",
+  "flickr_url": "https://live.staticflickr.com/65535/55105034063_45818af949_c.jpg",
+  "workflow_run_id": "22205809880",
+  "account": "primary"
+}
+```
 ### Security Benefits
 - **Fine-grained permissions**: Only requires `contents:write` PAT scope
 - **Audit trail**: Full Git history of all state changes
 - **Scalability**: No size limits on state data
 - **Reliability**: Atomic Git operations with conflict resolution
+- **Isolation**: State data on a separate branch from application code
 ## Monitoring Progress
 ### View Statistics
 Run the workflow with "Show statistics only" checked, or use:
@@ -507,8 +545,8 @@ This shows:
 - Completion percentage
 - Success rate
 ### Check Individual Posts
-View Git-based state files to see:
-- Each photo that was posted (in `state/{account}/{album_id}/posts.json`)
+View state files on the `automation-state` branch to see:
+- Each photo that was posted (in `state-data/{account}/album-{album_id}/posts.json`)
 - Instagram post IDs and timestamps with full metadata
 - Failed posting attempts and retry information
 - Complete audit trail with Git history
@@ -519,6 +557,7 @@ When all photos in your album have been posted:
 3. 📊 Statistics show 100% completion
 4. 🔄 To start a new album, update the `FLICKR_ALBUM_ID` variable in GitHub repository settings
 ## Project Structure
+### `main` branch (application code)
 ```
 ├── main.py                    # Main automation script with multi-account support
 ├── config.py                 # Configuration management (environment variables)
@@ -542,6 +581,15 @@ When all photos in your album have been posted:
         ├── social-automation.yml          # Reusable workflow (centralized logic)
         ├── primary-flickr-to-insta.yml    # Primary account workflow
         └── secondary-flickr-to-insta.yml  # Secondary account workflow
+```
+### `automation-state` branch (state data only)
+```
+└── state-data/
+    └── {account}/
+        └── album-{album_id}/
+            ├── posts.json       # Per-photo posting records
+            ├── metadata.json    # Album progress and statistics
+            └── failed.json      # Failed attempts for retry
 ```
 ## Common Issues & Troubleshooting
 ### Blog Content Issues
