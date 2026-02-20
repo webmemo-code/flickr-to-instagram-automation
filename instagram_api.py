@@ -16,16 +16,35 @@ class InstagramAPI:
         self.config = config
         self.logger = logging.getLogger(__name__)
     
+    def _validate_credentials(self) -> bool:
+        """Validate that Instagram credentials are configured before making API calls."""
+        if not self.config.instagram_access_token:
+            self.logger.error(
+                "Instagram access token is not configured. "
+                "Check that INSTAGRAM_ACCESS_TOKEN is set in the GitHub environment secrets."
+            )
+            return False
+        if not self.config.instagram_account_id:
+            self.logger.error(
+                "Instagram account ID is not configured. "
+                "Check that INSTAGRAM_ACCOUNT_ID is set in the GitHub environment secrets."
+            )
+            return False
+        return True
+
     def create_media_container(self, image_url: str, caption: str) -> Optional[str]:
         """Create a media container for the image."""
+        if not self._validate_credentials():
+            return None
+
         endpoint = f"{self.config.graph_endpoint_base}{self.config.instagram_account_id}/media"
-        
+
         params = {
             'image_url': image_url,
             'caption': caption,
             'access_token': self.config.instagram_access_token
         }
-        
+
         try:
             self.logger.debug(f"Creating media container at: {endpoint}")
             self.logger.debug(f"Request params: image_url={image_url[:100]}..., caption length={len(caption)}")
@@ -38,9 +57,16 @@ class InstagramAPI:
                     error_data = response.json()
                     error_msg = error_data.get('error', {}).get('message', 'Unknown error')
                     error_code = error_data.get('error', {}).get('code', 'Unknown code')
+                    error_subcode = error_data.get('error', {}).get('error_subcode', '')
                     self.logger.error(f"Instagram API Error {response.status_code}: {error_code} - {error_msg}")
                     self.logger.error(f"Full error response: {error_data}")
-                except:
+                    # Provide actionable guidance for OAuth token errors
+                    if error_code == 190 or 'access token' in str(error_msg).lower():
+                        self.logger.error(
+                            "OAuth token error: The Instagram access token is invalid or expired. "
+                            "Renew the token and update INSTAGRAM_ACCESS_TOKEN in the GitHub environment secrets."
+                        )
+                except Exception:
                     self.logger.error(f"Instagram API Error {response.status_code}: {response.text}")
                 return None
 

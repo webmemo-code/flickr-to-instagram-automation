@@ -135,10 +135,10 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             error_msg = f"Invalid or inaccessible image URL after retries: {selected_photo.url}"
             logger.error(f"Photo validation failed: {error_msg}")
             state_manager.create_post_record(selected_photo, None, is_dry_run=dry_run)
-            _log_run(state_manager, True,
+            _log_run(state_manager, False,
                      f"Skipped photo #{position} due to validation failure",
                      account_display, config)
-            return True  # Non-fatal: continue with next photo on next run
+            return True  # Non-fatal: will try next photo on next run
 
         # --- Caption Generation ---
         logger.info("Generating caption with Claude Vision...")
@@ -164,11 +164,13 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             if not instagram_post_id:
                 logger.error(f"Failed to post photo #{position} to Instagram")
                 state_manager.create_post_record(selected_photo, None, is_dry_run=False)
-                logger.warning("Photo processing failed but automation can continue")
-                _log_run(state_manager, True,
-                         f"Failed to post photo #{position}",
+                state_manager.record_failed_position(
+                    position, selected_photo.id, "Instagram posting failed"
+                )
+                _log_run(state_manager, False,
+                         f"Failed to post photo #{position} to Instagram",
                          account_display, config)
-                return True  # Non-fatal: continue with next photo on next run
+                return False
 
         # --- Record State ---
         logger.info(f"Progress: Posted {position}/{total_photos} photos (just posted #{position})")
@@ -367,10 +369,10 @@ def main():
     success = post_next_photo(args.dry_run, include_dry_runs, args.account)
 
     if success:
-        logger.info("Automation run completed")
+        logger.info("Automation completed successfully")
         sys.exit(0)
     else:
-        logger.error("Automation failed - unable to continue")
+        logger.error("Automation failed - check logs for details")
         sys.exit(1)
 
 

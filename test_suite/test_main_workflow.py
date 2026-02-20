@@ -128,8 +128,8 @@ class TestPostNextPhoto:
         assert result is True
         mock_deps['state'].create_post_record.assert_called_once()
 
-    def test_posting_failure_continues(self, mock_deps):
-        """Instagram posting failure should record state and return True (non-fatal)."""
+    def test_posting_failure_returns_false(self, mock_deps):
+        """Instagram posting failure should record state, track failed position, and return False."""
         mock_deps['flickr'].get_photo_list.return_value = [SAMPLE_PHOTO]
         mock_deps['flickr'].enrich_photo.return_value = SAMPLE_ENRICHED
         mock_deps['state'].is_album_complete.return_value = False
@@ -141,8 +141,9 @@ class TestPostNextPhoto:
 
         result = main.post_next_photo(dry_run=False, account='primary')
 
-        assert result is True
+        assert result is False
         mock_deps['state'].create_post_record.assert_called_once()
+        mock_deps['state'].record_failed_position.assert_called_once()
 
     def test_caption_fallback_on_failure(self, mock_deps):
         """Caption generation failure should use fallback text."""
