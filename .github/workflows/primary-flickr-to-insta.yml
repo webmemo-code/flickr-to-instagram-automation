@@ -9,7 +9,7 @@ on:
   # Scheduled automation - Daily posting at 18:13 UTC (20:13 CEST)
   schedule:
     - cron: '13 18 * * *'
-    - cron: '17 21 * * *'   
+    - cron: '17 20 * * *'   
     - cron: '21 09 * * *'
 
   # Manual execution with configuration options
