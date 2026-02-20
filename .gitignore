@@ -102,6 +102,7 @@ Thumbs.db
 
 # Project specific
 automation_*.log
+album_complete.marker
 processed_images/
 generated_captions/
 api_responses/
