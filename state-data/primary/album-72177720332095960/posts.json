@@ -78,21 +78,21 @@
   {
     "position": 5,
     "photo_id": "55105033878",
-    "instagram_post_id": null,
-    "posted_at": null,
+    "instagram_post_id": "18085125730965026",
+    "posted_at": "2026-02-20T00:07:02.736714",
     "title": "Arch bridge to Henningsv\u00e6r",
     "status": "posted",
     "retry_count": 0,
     "retry_history": [],
-    "workflow_run_id": "22204666339",
+    "workflow_run_id": "22205498553",
     "account": "primary",
-    "created_at": "2026-02-19T23:35:06.116897",
-    "last_update": "2026-02-19T23:35:06.116903",
+    "created_at": "2026-02-20T00:07:02.736701",
+    "last_update": "2026-02-20T00:07:02.736715",
     "flickr_url": "https://live.staticflickr.com/65535/55105033878_ba951dc248_c.jpg",
-    "instagram_url": null,
+    "instagram_url": "https://www.instagram.com/p/18085125730965026/",
     "caption_length": null,
     "hashtags_count": null,
-    "is_dry_run": true
+    "is_dry_run": false
   },
   {
     "position": 6,
