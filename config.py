@@ -51,7 +51,7 @@ class Config:
         
         # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
-        self.graph_api_domain = 'https://graph.facebook.com/'
+        self.graph_api_domain = self._detect_graph_api_domain()
         self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
         self.anthropic_model = os.getenv('ANTHROPIC_MODEL') or 'claude-sonnet-4-6'
         
@@ -131,6 +131,17 @@ class Config:
             account_info = f" for {self.account} account" if self.account != 'primary' else ""
             raise ValueError(f"Missing required account-specific environment variables{account_info}: {', '.join(missing_account_specific)}")
     
+    def _detect_graph_api_domain(self) -> str:
+        """Detect the correct Graph API domain based on the Instagram access token type.
+
+        New Instagram Business API tokens (prefix 'IGAA') require graph.instagram.com.
+        Legacy tokens (prefix 'EAA') use graph.facebook.com.
+        """
+        token = self.instagram_access_token or ''
+        if token.startswith('IGAA') or token.startswith('IGA'):
+            return 'https://graph.instagram.com/'
+        return 'https://graph.facebook.com/'
+
     def _parse_blog_post_urls(self, raw_urls: str) -> List[str]:
         """Parse multi-value blog post URLs from configuration."""
         if not raw_urls:
