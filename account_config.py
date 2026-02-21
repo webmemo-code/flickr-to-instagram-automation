@@ -53,8 +53,8 @@ class AccountConfigManager:
         )
 
         # Secondary account (configurable)
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'secondary')
-        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME', 'Secondary')
+        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
+        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME', 'Reisememo')
         secondary_env = os.getenv('SECONDARY_ENVIRONMENT_NAME', 'secondary-account')
         secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE', 'en')
         secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE', 'travel')
@@ -86,7 +86,7 @@ class AccountConfigManager:
 
     def get_secondary_account_id(self) -> str:
         """Get the configured secondary account ID."""
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'secondary')
+        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
         return secondary_id
 
     def is_secondary_account(self, account_id: str) -> bool:
