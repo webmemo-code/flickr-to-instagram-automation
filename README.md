@@ -454,10 +454,9 @@ graph TB
 2. Create a new app and get your API key
 3. Find your User ID from your Flickr profile URL
 ### Instagram Graph API
-1. Create a Facebook App at [developers.facebook.com](https://developers.facebook.com)
-2. Add Instagram Graph API product
-3. Get a long-lived access token
-4. Connect your Instagram Business account
+See [INSTAGRAM_AUTH_GUIDE.md](INSTAGRAM_AUTH_GUIDE.md) for the full step-by-step setup.
+
+Summary: Create a Facebook App, configure Instagram API permissions, generate a long-lived access token, and get the Instagram Account ID. The code supports both legacy (`EAA...`) and new Instagram Business API (`IGAA...`) tokens with automatic API domain detection.
 ### Anthropic API
 1. Sign up at [console.anthropic.com](https://console.anthropic.com)
 2. Create an API key

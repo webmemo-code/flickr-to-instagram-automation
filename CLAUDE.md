@@ -36,7 +36,7 @@ cd test_suite && python run_tests.py caption  # Caption generation only
 | `account_config.py` | `AccountConfig` dataclass, `AccountManager` for multi-account settings |
 | `flickr_api.py` | Flickr API — fetch album photos, EXIF data, metadata |
 | `caption_generator.py` | Anthropic Claude Vision — multi-language caption generation with blog context |
-| `instagram_api.py` | Instagram Graph API — media container creation, publishing, URL validation |
+| `instagram_api.py` | Instagram Graph API — media container creation, publishing, URL validation. Supports both `graph.facebook.com` (legacy `EAA...` tokens) and `graph.instagram.com` (new `IGAA...` tokens) via auto-detection in `config.py` |
 | `blog_content_extractor.py` | WordPress REST API — authenticated blog content extraction |
 | `blog_url_resolver.py` | Resolves blog post URLs from EXIF data and photo metadata |
 | `state_manager.py` | Orchestrates state operations via storage adapter |
@@ -80,6 +80,12 @@ Types: `fix:`, `enhance:`, `refactor:`, `chore:`, `docs:`
 - `failed.json` — failed attempts for retry
 - Path pattern: `state-data/{account}/album-{album_id}/{file}.json`
 - The `GitFileStorageAdapter` auto-creates the branch on first run
+
+### Instagram API Authentication
+- See `INSTAGRAM_AUTH_GUIDE.md` for full setup instructions (both legacy and new API flows)
+- `config.py:_detect_graph_api_domain()` auto-selects `graph.instagram.com` or `graph.facebook.com` based on token prefix (`IGAA...` vs `EAA...`)
+- Primary account (`travelmemo_blog`) uses legacy `EAA...` token; secondary account (`reisememo`) uses new `IGAA...` token
+- Long-lived tokens expire after 60 days — renewal endpoints differ by token type
 
 ### Things to Watch
 - `.gitignore` excludes `CLAUDE.md`, `CODEX.md`, `TASKS.md`, `TODO.md` — these are local-only files

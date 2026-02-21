@@ -2,58 +2,155 @@
 
 How to obtain `INSTAGRAM_ACCESS_TOKEN` and `INSTAGRAM_ACCOUNT_ID` for this project.
 
+There are two authentication flows depending on when the Facebook App was created. Meta migrated to a new Instagram Business API in 2024. Both flows are documented below.
+
 ## Prerequisites
 
 1. **Instagram Business or Creator account** — Personal accounts cannot use the Graph API. Convert via Instagram Settings > Account > Switch to Professional Account.
 2. **Facebook Page linked to the Instagram account** — Go to your Facebook Page Settings > Linked Accounts > Instagram and connect it.
 3. **Meta Developer account** — Sign up at [developers.facebook.com](https://developers.facebook.com) if you haven't already.
 
-## Step 1: Create or Configure a Facebook App
+## Token Types and API Domains
 
-If you already have a Facebook App (e.g., from a previous Instagram account setup), you can reuse it. Otherwise:
+| Token prefix | API Domain | Flow | Era |
+|---|---|---|---|
+| `EAA...` | `https://graph.facebook.com/` | Legacy Facebook Login | Pre-2024 apps |
+| `IGAA...` | `https://graph.instagram.com/` | New Instagram Business API | 2024+ apps |
+
+The code **auto-detects** the correct API domain based on the token prefix (see `_detect_graph_api_domain()` in [config.py](config.py)). No manual configuration is needed — just set the token and it works.
+
+---
+
+## Flow A: New Instagram Business API (2024+) — Recommended
+
+This is the flow for newly created Facebook Apps. You'll know you're on this path if the developer portal shows "Instagram API" as a Use Case with `instagram_business_*` permission names.
+
+### A1. Create or Configure a Facebook App
 
 1. Go to [Meta Developer Portal — My Apps](https://developers.facebook.com/apps/)
-2. Click **Create App**
-3. Select **Business** as the app type
-4. Fill in the app name and contact email
-5. Under **Add Products**, find **Instagram Graph API** and click **Set Up**
+2. Click **Create App** > select **Business** app type
+3. Under **Use Cases**, select **Instagram API**
+4. The portal will guide you through "API setup with Facebook login"
 
-### Required App Settings
+### A2. Configure Permissions
 
-- **App Mode**: The app must be in **Live** mode (not Development) for publishing to work. Go to the app dashboard and toggle from Development to Live.
-- **Permissions**: The app needs these permissions approved (for Live mode, some may require App Review):
-  - `instagram_basic`
-  - `instagram_content_publish`
-  - `pages_show_list`
-  - `pages_read_engagement`
+Go to **Use Cases > Instagram API > Permissions and features** and ensure these are added:
+- `instagram_business_basic` (auto-included)
+- `instagram_business_content_publish` (must be added manually — this is critical for posting)
+- `instagram_business_manage_comments` (optional)
+- `instagram_business_manage_messages` (optional)
 
-> **Note**: In Development mode, the app works only for users who have a role on the app (Admin, Developer, Tester). This is fine for personal use.
+### A3. Add Instagram Tester Role
 
-## Step 2: Get a Short-Lived Access Token
+Before generating tokens, the Instagram account must be added as a tester:
 
-### Option A: Graph API Explorer (Recommended for first setup)
+1. Go to **App roles > Roles** in the left sidebar
+2. Click **Add People** and add the Instagram account as **Instagram Tester**
+3. Accept the invitation from the Instagram app: Settings > Website > Apps and Websites > Tester Invitations
+
+### A4. Generate Access Token
+
+1. Go to **Use Cases > Instagram API > API setup with Facebook login**
+2. Expand **Step 2: Generate access tokens**
+3. Click **Generate token** for the Instagram account
+4. Authorize the permissions when prompted
+5. Copy the generated token (starts with `IGAA...`)
+
+### A5. Exchange for Long-Lived Token
+
+The token from Step A4 may be short-lived. Exchange it:
+
+```bash
+curl -s "https://graph.instagram.com/access_token?\
+grant_type=ig_exchange_token&\
+client_secret={INSTAGRAM_APP_SECRET}&\
+access_token={SHORT_LIVED_TOKEN}"
+```
+
+Response:
+```json
+{
+  "access_token": "IGAAbF...long-lived-token...",
+  "token_type": "bearer",
+  "expires_in": 5184000
+}
+```
+
+> **Note**: If this returns error 452 ("Session key invalid"), the token is likely already long-lived. Verify by calling the refresh endpoint instead (see Token Renewal below).
+
+The **Instagram App Secret** is found on the Use Cases > API setup page (click "Show" next to the masked secret).
+
+### A6. Get the Instagram Account ID
+
+With your `IGAA...` token:
+
+```bash
+curl -s "https://graph.instagram.com/v21.0/me?fields=id,username&\
+access_token={LONG_LIVED_TOKEN}"
+```
+
+Response:
+```json
+{
+  "id": "8757938867663187",
+  "username": "reisememo"
+}
+```
+
+The `id` field is your `INSTAGRAM_ACCOUNT_ID`.
+
+> **Note**: The response may also include a `user_id` field (legacy format like `17841400...`). Use the `id` field, not `user_id`.
+
+### A7. Complete App Review (if needed)
+
+For the `instagram_business_content_publish` permission, Meta may require:
+
+1. A text description of how the app uses the permission
+2. A screen recording demonstrating usage
+3. At least 1 test API call (shown as "0 of 1 API call(s) required")
+4. Agreement to the data usage policy
+
+Go to **Review > App Review** to submit. The test API call is a content publish to your own account — you can use the dry-run workflow or `curl`:
+
+```bash
+curl -X POST "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/media?\
+image_url={PUBLIC_IMAGE_URL}&\
+caption=Test%20post&\
+access_token={TOKEN}"
+```
+
+> **Note**: App Review is only needed for Advanced Access (Live mode for non-role-holders). In Development mode, the app works for Admin/Developer/Tester roles without App Review.
+
+---
+
+## Flow B: Legacy Facebook Login (Pre-2024 Apps)
+
+This flow applies to apps created before Meta's 2024 migration. These apps use `EAA...` tokens and `graph.facebook.com`.
+
+### B1. Create or Configure a Facebook App
+
+1. Go to [Meta Developer Portal — My Apps](https://developers.facebook.com/apps/)
+2. Click **Create App** > select **Business** app type
+3. Under **Add Products**, find **Instagram Graph API** and click **Set Up**
+
+### B2. Get a Short-Lived Access Token
+
+#### Option 1: Graph API Explorer
 
 1. Go to [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
-2. In the top-right dropdown, select your **Facebook App**
+2. Select your **Facebook App** from the dropdown
 3. Click **Generate Access Token**
-4. In the permissions dialog, select:
-   - `instagram_basic`
-   - `instagram_content_publish`
-   - `pages_show_list`
-   - `pages_read_engagement`
-5. Click **Generate Access Token** and authorize
-6. **Important**: When prompted, select the **Facebook Page** that is linked to your target Instagram account
-7. Copy the token — this is your **short-lived token** (valid ~1 hour)
+4. Select permissions: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`
+5. When prompted, select the **Facebook Page** linked to your target Instagram account
+6. Copy the token (starts with `EAA...`, valid ~1 hour)
 
-### Option B: Manual OAuth Flow
-
-Construct this URL in your browser (replace placeholders):
+#### Option 2: Manual OAuth Flow
 
 ```
 https://www.facebook.com/v21.0/dialog/oauth?client_id={APP_ID}&redirect_uri=https://localhost/&scope=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement&response_type=code
 ```
 
-After authorizing, you'll be redirected to `https://localhost/?code={CODE}`. Extract the code and exchange it:
+After authorizing, extract the code from the redirect URL and exchange:
 
 ```bash
 curl -X GET "https://graph.facebook.com/v21.0/oauth/access_token?\
@@ -63,11 +160,7 @@ client_secret={APP_SECRET}&\
 code={CODE}"
 ```
 
-This returns a short-lived token.
-
-## Step 3: Exchange for a Long-Lived Access Token
-
-The short-lived token expires in ~1 hour. Exchange it for a long-lived token (~60 days):
+### B3. Exchange for Long-Lived Token
 
 ```bash
 curl -X GET "https://graph.facebook.com/v21.0/oauth/access_token?\
@@ -86,63 +179,47 @@ Response:
 }
 ```
 
-Save this **long-lived token** — this is your `INSTAGRAM_ACCESS_TOKEN`.
-
-### Where to find App ID and App Secret
-
-- Go to [Meta Developer Portal — My Apps](https://developers.facebook.com/apps/)
-- Select your app
-- Go to **Settings > Basic**
-- **App ID** is shown at the top
-- **App Secret** — click "Show" to reveal it
-
-## Step 4: Get the Instagram Account ID
-
-### 4a. Get your Facebook Page ID
-
-Using your long-lived token:
+### B4. Get the Instagram Account ID
 
 ```bash
+# Get your Facebook Page ID
 curl -X GET "https://graph.facebook.com/v21.0/me/accounts?\
 access_token={LONG_LIVED_TOKEN}"
-```
 
-Response includes your Pages. Find the one linked to your Instagram account and note its `id`.
-
-### 4b. Get the Instagram Business Account ID
-
-```bash
+# Get the Instagram Business Account ID from the Page
 curl -X GET "https://graph.facebook.com/v21.0/{PAGE_ID}?\
 fields=instagram_business_account&\
 access_token={LONG_LIVED_TOKEN}"
 ```
 
-Response:
-```json
-{
-  "instagram_business_account": {
-    "id": "17841400123456789"
-  },
-  "id": "your-page-id"
-}
-```
-
 The `instagram_business_account.id` is your `INSTAGRAM_ACCOUNT_ID`.
 
-## Step 5: Verify the Setup
+### Where to find App ID and App Secret (legacy)
 
-Test that your token and account ID work:
+- Go to [Meta Developer Portal — My Apps](https://developers.facebook.com/apps/)
+- Select your app > **Settings > Basic**
+- **App ID** is shown at the top
+- **App Secret** — click "Show" to reveal it
+
+---
+
+## Verify the Setup
+
+Test that your token and account ID work (adjust domain based on token type):
 
 ```bash
-# Check account info
-curl -X GET "https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?\
-fields=id,username,name,profile_picture_url&\
-access_token={LONG_LIVED_TOKEN}"
+# For IGAA... tokens
+curl -s "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?\
+fields=id,username,name&access_token={TOKEN}"
+
+# For EAA... tokens
+curl -s "https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?\
+fields=id,username&access_token={TOKEN}"
 ```
 
 You should see your Instagram username in the response.
 
-## Step 6: Store the Credentials
+## Store the Credentials
 
 ### For GitHub Actions (production)
 
@@ -163,17 +240,6 @@ Add to your `.env` file:
 INSTAGRAM_ACCESS_TOKEN=your_long_lived_token
 INSTAGRAM_ACCOUNT_ID=your_instagram_account_id
 ```
-
-## Token Types and API Domains
-
-There are two token formats depending on how the app was set up:
-
-| Token prefix | API Domain | Era |
-|---|---|---|
-| `EAA...` | `https://graph.facebook.com/` | Legacy Facebook Login flow |
-| `IGAA...` | `https://graph.instagram.com/` | New Instagram Business API (2024+) |
-
-The code **auto-detects** the correct API domain based on the token prefix (see `_detect_graph_api_domain()` in [config.py](config.py)). No manual configuration is needed — just set the token and it works.
 
 ## Token Renewal
 
@@ -197,29 +263,32 @@ client_secret={APP_SECRET}&\
 fb_exchange_token={CURRENT_LONG_LIVED_TOKEN}"
 ```
 
-Both return a new long-lived token. Update the token in GitHub Secrets and/or your `.env` file.
+Both return a new long-lived token with a fresh 60-day expiry. Update the token in GitHub Secrets and/or your `.env` file.
 
 > **Tip**: Set a calendar reminder for every 50 days to renew the token before it expires.
 
 ## Troubleshooting
 
 ### Error 190: Invalid OAuth Token
-The token has expired or been revoked. Generate a new one following Steps 2–3.
+The token has expired or been revoked. Generate a new one following the relevant flow above.
+
+### Error 190 with `IGAA...` token on `graph.facebook.com`
+New Instagram Business API tokens (`IGAA...` prefix) only work with `graph.instagram.com`, not `graph.facebook.com`. The code auto-detects this. If you see this error, ensure you're running the latest version of `config.py`.
+
+### Error 452: Session key invalid (during token exchange)
+The token is likely already long-lived. Try the refresh endpoint instead of the exchange endpoint.
 
 ### Error 10: No Page linked
-The Instagram account is not connected to a Facebook Page, or the token doesn't have permission for that Page. Check Step 2 — make sure you selected the correct Page when authorizing.
+The Instagram account is not connected to a Facebook Page, or the token doesn't have permission for that Page. Re-authorize and make sure you select the correct Page.
 
 ### Error 200: Permission denied
-The app doesn't have the required permissions. Check that `instagram_content_publish` is granted. For apps in Live mode, this permission may require App Review.
+The app doesn't have the required permissions. Check that `instagram_business_content_publish` (new) or `instagram_content_publish` (legacy) is granted. For apps in Live mode, this permission may require App Review.
 
 ### "instagram_business_account" field is empty
 The Instagram account is not a Business or Creator account, or it's not linked to the Facebook Page. Check the Prerequisites.
 
 ### Token works in Explorer but not in code
-The Graph API Explorer generates tokens scoped to your user. Make sure you selected the correct Page and Instagram account during authorization. Also verify the API version matches — this project defaults to `v18.0` (configurable via `GRAPH_API_VERSION`).
-
-### Error 190 with `IGAA...` token on `graph.facebook.com`
-New Instagram Business API tokens (`IGAA...` prefix) only work with `graph.instagram.com`, not `graph.facebook.com`. The code auto-detects this. If you see this error, ensure you're running the latest version of `config.py`.
+Make sure you selected the correct Page and Instagram account during authorization. Also verify the API version matches — this project defaults to `v18.0` (configurable via `GRAPH_API_VERSION`).
 
 ## API Version Notes
 
