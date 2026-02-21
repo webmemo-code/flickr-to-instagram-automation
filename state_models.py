@@ -51,6 +51,7 @@ class InstagramPost:
     position: int
     photo_id: str
     instagram_post_id: Optional[str] = None
+    facebook_post_id: Optional[str] = None
     posted_at: Optional[str] = None
     title: Optional[str] = None
     status: PostStatus = PostStatus.PENDING

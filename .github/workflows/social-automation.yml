@@ -253,6 +253,9 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Facebook Page cross-posting (optional)
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID || '' }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN || '' }}
           # Account-specific variables (may be empty for primary)
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}
@@ -293,6 +296,9 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME || '' }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          # Facebook Page cross-posting (optional)
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID || '' }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN || '' }}
           # Account-specific variables (may be empty for primary)
           FAILED_POSITIONS: ${{ vars.FAILED_POSITIONS || '' }}
           INSTAGRAM_POSTS: ${{ vars.INSTAGRAM_POSTS || '' }}

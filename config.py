@@ -48,11 +48,15 @@ class Config:
             self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
             self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
             self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # Optional
-        
+
+        # Facebook Page configuration (optional, for cross-posting)
+        self.facebook_page_id = os.getenv('FACEBOOK_PAGE_ID')
+        self.facebook_page_access_token = os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN')
+
         # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = self._detect_graph_api_domain()
-        self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v18.0')  # Default to v18.0
+        self.graph_api_version = os.getenv('GRAPH_API_VERSION', 'v23.0')  # Default to v23.0
         self.anthropic_model = os.getenv('ANTHROPIC_MODEL') or 'claude-sonnet-4-6'
         
         # State management options
@@ -196,6 +200,11 @@ class Config:
         """Get the Flickr album URL."""
         return f"https://flickr.com/photos/{self.flickr_username}/albums/{self.flickr_album_id}"
     
+    @property
+    def facebook_posting_enabled(self) -> bool:
+        """Check if Facebook Page cross-posting is configured."""
+        return bool(self.facebook_page_id and self.facebook_page_access_token)
+
     @property
     def email_notifications_enabled(self) -> bool:
         """Check if email notifications are properly configured."""

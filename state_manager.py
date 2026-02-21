@@ -421,7 +421,8 @@ class StateManager:
             self.logger.error(f"Failed to log automation run: {e}")
 
     def create_post_record(self, photo_data, instagram_post_id: Optional[str] = None,
-                          is_dry_run: bool = False, create_audit_issue: bool = False) -> Optional[str]:
+                          is_dry_run: bool = False, create_audit_issue: bool = False,
+                          facebook_post_id: Optional[str] = None) -> Optional[str]:
         """Record a post (successful, failed, or dry run).
 
         Args:
@@ -429,6 +430,7 @@ class StateManager:
             instagram_post_id: Instagram post ID if successful, None if failed
             is_dry_run: Whether this was a dry run
             create_audit_issue: Whether to create audit issues (unused, kept for API compat)
+            facebook_post_id: Facebook Page post ID if cross-posted, None otherwise
 
         Returns:
             Post record ID or None if failed
@@ -462,6 +464,7 @@ class StateManager:
                 is_dry_run=is_dry_run,
                 workflow_run_id=os.getenv('GITHUB_RUN_ID'),
                 instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
+                facebook_post_id=facebook_post_id,
             )
             if instagram_post_id:
                 post.mark_as_posted(instagram_post_id)

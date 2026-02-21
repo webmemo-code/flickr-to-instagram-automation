@@ -153,10 +153,13 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
 
         # --- Posting ---
         instagram_post_id = None
+        facebook_post_id = None
         if dry_run:
             logger.info(f"DRY RUN: Would post to Instagram")
             logger.info(f"Image URL: {selected_photo.url}")
             logger.info(f"Caption: {full_caption}")
+            if config.facebook_posting_enabled:
+                logger.info("DRY RUN: Would cross-post to Facebook Page")
             logger.info(f"Dry run completed for photo #{position}")
         else:
             logger.info("Posting to Instagram...")
@@ -172,11 +175,26 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
                          account_display, config)
                 return False
 
+            # --- Facebook Cross-posting (optional, non-blocking) ---
+            if config.facebook_posting_enabled:
+                from facebook_api import FacebookPageAPI
+                facebook_api = FacebookPageAPI(config)
+                logger.info("Cross-posting to Facebook Page...")
+                try:
+                    facebook_post_id = facebook_api.post_with_retry(selected_photo.url, full_caption)
+                    if facebook_post_id:
+                        logger.info(f"Successfully cross-posted to Facebook: {facebook_post_id}")
+                    else:
+                        logger.warning("Facebook cross-posting failed (non-blocking)")
+                except Exception as e:
+                    logger.warning(f"Facebook cross-posting error (non-blocking): {e}")
+
         # --- Record State ---
         logger.info(f"Progress: Posted {position}/{total_photos} photos (just posted #{position})")
         record_id = state_manager.create_post_record(
             selected_photo, instagram_post_id,
-            is_dry_run=dry_run, create_audit_issue=config.create_audit_issues
+            is_dry_run=dry_run, create_audit_issue=config.create_audit_issues,
+            facebook_post_id=facebook_post_id
         )
         if not record_id and not dry_run:
             logger.error("Critical: failed to record post state")
