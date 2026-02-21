@@ -111,10 +111,6 @@ TASKS_REISEMEMO.md
 
 # Diagnostic and internal files
 read_write_github_variables.py
-PLANNING.md
-TASKS.md
-TODO.md
-CODEX.md
 test_account_config.py
 migrate_state_storage.py
 
