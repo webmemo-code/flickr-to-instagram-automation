@@ -158,5 +158,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 9,
+    "photo_id": "55104828256",
+    "instagram_post_id": "17988939794922410",
+    "facebook_post_id": null,
+    "posted_at": "2026-02-22T09:25:49.802119",
+    "title": "Restaurant",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "22274456387",
+    "account": "primary",
+    "created_at": "2026-02-22T09:25:49.802104",
+    "last_update": "2026-02-22T09:25:49.802122",
+    "flickr_url": "https://live.staticflickr.com/65535/55104828256_e72ca54fc9_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/17988939794922410/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
