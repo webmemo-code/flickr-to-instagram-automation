@@ -218,5 +218,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 12,
+    "photo_id": "55104828241",
+    "instagram_post_id": "18112333279579367",
+    "facebook_post_id": null,
+    "posted_at": "2026-02-23T09:35:59.689793",
+    "title": "Classic Norway Hotels Fahne",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "22300355956",
+    "account": "primary",
+    "created_at": "2026-02-23T09:35:59.689780",
+    "last_update": "2026-02-23T09:35:59.689795",
+    "flickr_url": "https://live.staticflickr.com/65535/55104828241_9c75653ca7_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18112333279579367/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
