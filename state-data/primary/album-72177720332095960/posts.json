@@ -678,5 +678,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 35,
+    "photo_id": "55105200650",
+    "instagram_post_id": "18193878592345826",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-03T07:36:36.389611",
+    "title": "svolvaer-at-the-ice-museum",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "22613039783",
+    "account": "primary",
+    "created_at": "2026-03-03T07:36:36.389596",
+    "last_update": "2026-03-03T07:36:36.389613",
+    "flickr_url": "https://live.staticflickr.com/65535/55105200650_0445eab776_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18193878592345826/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
