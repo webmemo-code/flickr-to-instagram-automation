@@ -918,5 +918,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 47,
+    "photo_id": "55103946992",
+    "instagram_post_id": "18161398036424401",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-07T07:33:27.624349",
+    "title": "Tourists in Henningsvaer",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "22794795806",
+    "account": "primary",
+    "created_at": "2026-03-07T07:33:27.624337",
+    "last_update": "2026-03-07T07:33:27.624350",
+    "flickr_url": "https://live.staticflickr.com/65535/55103946992_56a16cc1c6_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18161398036424401/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
