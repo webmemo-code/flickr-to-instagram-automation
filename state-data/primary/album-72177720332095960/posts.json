@@ -1138,5 +1138,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 58,
+    "photo_id": "55105200950",
+    "instagram_post_id": "17988981698949732",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-10T19:30:42.827236",
+    "title": "Lofoten",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "22920581826",
+    "account": "primary",
+    "created_at": "2026-03-10T19:30:42.827221",
+    "last_update": "2026-03-10T19:30:42.827239",
+    "flickr_url": "https://live.staticflickr.com/65535/55105200950_9e841bf348_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/17988981698949732/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
