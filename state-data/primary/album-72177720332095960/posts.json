@@ -1398,5 +1398,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 71,
+    "photo_id": "55103946842",
+    "instagram_post_id": "18121396096526366",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-15T07:37:04.339075",
+    "title": "Fangst gourmet restaurant at Hattvika Lodge",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "23105958290",
+    "account": "primary",
+    "created_at": "2026-03-15T07:37:04.339056",
+    "last_update": "2026-03-15T07:37:04.339078",
+    "flickr_url": "https://live.staticflickr.com/65535/55103946842_a5f8074d4f_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18121396096526366/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
