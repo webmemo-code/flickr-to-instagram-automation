@@ -1578,5 +1578,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 80,
+    "photo_id": "55105200605",
+    "instagram_post_id": "17875585323549537",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-18T07:42:04.992360",
+    "title": "walter-katja-sommer-lofoten",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "23234182442",
+    "account": "primary",
+    "created_at": "2026-03-18T07:42:04.992346",
+    "last_update": "2026-03-18T07:42:04.992362",
+    "flickr_url": "https://live.staticflickr.com/65535/55105200605_f9eacc9a9b_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/17875585323549537/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
