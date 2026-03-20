@@ -1738,5 +1738,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 88,
+    "photo_id": "55105033163",
+    "instagram_post_id": "18058182359430056",
+    "facebook_post_id": null,
+    "posted_at": "2026-03-20T19:30:14.396508",
+    "title": "Stockfish museum near S\u00f8rv\u00e5gen",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "23359269142",
+    "account": "primary",
+    "created_at": "2026-03-20T19:30:14.396495",
+    "last_update": "2026-03-20T19:30:14.396510",
+    "flickr_url": "https://live.staticflickr.com/65535/55105033163_fd9f61f5f1_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18058182359430056/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
