@@ -2,7 +2,7 @@
   "album_id": "72177720332095960",
   "account": "primary",
   "created_at": "2026-02-20T00:18:27.366215",
-  "last_update": "2026-03-20T07:37:17.130198",
+  "last_update": "2026-03-20T07:37:19.236279",
   "total_photos": 192,
   "posted_count": 80,
   "failed_count": 6,
@@ -14,9 +14,9 @@
   "last_posted_at": "2026-03-19T09:30:40.503370",
   "next_scheduled_position": null,
   "estimated_completion_date": null,
-  "workflow_runs_count": 171,
+  "workflow_runs_count": 172,
   "last_workflow_run_id": "23333453488",
-  "error_count": 11,
+  "error_count": 12,
   "last_error_message": "Instagram posting failed",
   "last_error_at": "2026-03-20T07:37:16.748740"
 }
