@@ -68,5 +68,15 @@
     "retry_count": 0,
     "resolved": false,
     "resolved_at": null
+  },
+  {
+    "position": 97,
+    "photo_id": "55105201705",
+    "failed_at": "2026-03-23T19:36:14.909425",
+    "error_message": "Instagram posting failed",
+    "workflow_run_id": "23456403704",
+    "retry_count": 0,
+    "resolved": false,
+    "resolved_at": null
   }
 ]
