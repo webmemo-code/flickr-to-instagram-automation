@@ -2978,5 +2978,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 150,
+    "photo_id": "55105033193",
+    "instagram_post_id": "18040114367782147",
+    "facebook_post_id": null,
+    "posted_at": "2026-04-10T09:41:58.470756",
+    "title": "Hike on the Ryten in the Lofoten Islands",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "24236777548",
+    "account": "primary",
+    "created_at": "2026-04-10T09:41:58.470741",
+    "last_update": "2026-04-10T09:41:58.470758",
+    "flickr_url": "https://live.staticflickr.com/65535/55105033193_e1df3615b0_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18040114367782147/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
