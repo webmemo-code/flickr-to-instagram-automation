@@ -3178,5 +3178,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 160,
+    "photo_id": "55105033913",
+    "instagram_post_id": "18087365696594813",
+    "facebook_post_id": null,
+    "posted_at": "2026-04-15T08:02:06.913958",
+    "title": "Restaurant tip: Hemmingodden Lodge",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "24443287712",
+    "account": "primary",
+    "created_at": "2026-04-15T08:02:06.913944",
+    "last_update": "2026-04-15T08:02:06.913960",
+    "flickr_url": "https://live.staticflickr.com/65535/55105033913_e0acb27cdc_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/18087365696594813/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
