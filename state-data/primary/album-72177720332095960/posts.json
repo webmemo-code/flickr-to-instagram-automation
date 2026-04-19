@@ -3438,5 +3438,25 @@
     "caption_length": null,
     "hashtags_count": null,
     "is_dry_run": false
+  },
+  {
+    "position": 173,
+    "photo_id": "55104827506",
+    "instagram_post_id": "17970955125030583",
+    "facebook_post_id": null,
+    "posted_at": "2026-04-19T09:31:49.138739",
+    "title": "Restaurant Feskarheimen",
+    "status": "posted",
+    "retry_count": 0,
+    "retry_history": [],
+    "workflow_run_id": "24625932330",
+    "account": "primary",
+    "created_at": "2026-04-19T09:31:49.138724",
+    "last_update": "2026-04-19T09:31:49.138741",
+    "flickr_url": "https://live.staticflickr.com/65535/55104827506_f94781b73d_c.jpg",
+    "instagram_url": "https://www.instagram.com/p/17970955125030583/",
+    "caption_length": null,
+    "hashtags_count": null,
+    "is_dry_run": false
   }
 ]
