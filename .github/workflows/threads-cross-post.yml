@@ -1,0 +1,120 @@
+name: Shared Threads Cross-Post Workflow (do not run)
+
+# Reusable workflow for delayed Threads cross-posting.
+# Selects Instagram posts that were published at least
+# THREADS_POST_DELAY_HOURS ago and posts them to Threads.
+# Threads credentials are optional - the script returns success
+# if THREADS_USER_ID / THREADS_ACCESS_TOKEN are missing.
+
+on:
+  workflow_call:
+    inputs:
+      account_id:
+        description: 'Account identifier for logging (e.g. "primary", "secondary")'
+        required: true
+        type: string
+      environment_name:
+        description: 'GitHub environment name for environment-specific secrets and variables'
+        required: true
+        type: string
+      account_flag:
+        description: 'CLI account flag passed to main.py (empty for primary)'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Skip the actual Threads API call'
+        required: false
+        type: boolean
+        default: false
+      threads_limit:
+        description: 'Maximum Threads cross-posts to process in this run'
+        required: false
+        type: number
+        default: 1
+
+concurrency:
+  group: threads-cross-post-${{ inputs.account_id }}
+  cancel-in-progress: false
+
+jobs:
+  threads-cross-post:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Threads cross-posting
+        run: |
+          ACCOUNT_FLAG=""
+          if [ -n "${{ inputs.account_flag }}" ]; then
+            ACCOUNT_FLAG="--account ${{ inputs.account_flag }}"
+          fi
+
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          echo "Running Threads cross-posting for ${{ inputs.account_id }}..."
+          python main.py --threads-only --threads-limit ${{ inputs.threads_limit }} $ACCOUNT_FLAG $DRY_RUN_FLAG
+        env:
+          FLICKR_API_KEY: ${{ secrets.FLICKR_API_KEY }}
+          FLICKR_USER_ID: ${{ secrets.FLICKR_USER_ID }}
+          FLICKR_USERNAME: ${{ vars.FLICKR_USERNAME }}
+          FLICKR_ALBUM_ID: ${{ vars.FLICKR_ALBUM_ID }}
+          # Instagram credentials are still required by Config validation,
+          # but the Threads-only path does not call the Instagram API.
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GRAPH_API_VERSION: ${{ vars.GRAPH_API_VERSION }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          BLOG_POST_URL: ${{ vars.BLOG_POST_URL }}
+          BLOG_POST_URLS: ${{ vars.BLOG_POST_URLS }}
+          WORDPRESS_USERNAME: ${{ secrets.WORDPRESS_USERNAME }}
+          WORDPRESS_APP_PASSWORD: ${{ secrets.WORDPRESS_APP_PASSWORD }}
+          # Threads cross-posting (optional)
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID || '' }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN || '' }}
+          THREADS_POST_DELAY_HOURS: ${{ vars.THREADS_POST_DELAY_HOURS || '' }}
+          THREADS_API_VERSION: ${{ vars.THREADS_API_VERSION || '' }}
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threads-cross-post-logs-${{ inputs.account_id }}-${{ github.run_id }}
+          path: |
+            automation_*.log
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: warn
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Threads Cross-Post Summary - ${{ inputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Account:** ${{ inputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Threads Limit:** ${{ inputs.threads_limit }}" >> $GITHUB_STEP_SUMMARY

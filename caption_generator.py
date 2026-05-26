@@ -247,6 +247,162 @@ class CaptionGenerator:
         
         return "\n\n".join(caption_parts)
     
+    def build_threads_caption(self, photo_data: EnrichedPhoto,
+                              generated_body: Optional[str],
+                              max_chars: int = 500) -> str:
+        """Build a Threads-compliant caption (<= max_chars) for the given photo.
+
+        Strategy (layered, cheapest first):
+          1. Build a candidate from title + AI body + blog URL (no hashtags, no signature).
+          2. If already short enough, return it.
+          3. Ask Claude to rewrite it for Threads.
+          4. As a last resort, truncate with an ellipsis.
+        """
+        title = (photo_data.title or "").strip()
+        body = (generated_body or "").strip()
+        blog_url = resolve_blog_url(self.config, photo_data) or ""
+
+        candidate = self._assemble_threads_candidate(title, body, blog_url)
+        if self._grapheme_len(candidate) <= max_chars:
+            return candidate
+
+        # Layer 2: ask Claude to shorten while preserving voice and the URL.
+        shortened = self._shorten_for_threads(candidate, blog_url, max_chars)
+        if shortened and self._grapheme_len(shortened) <= max_chars:
+            return shortened
+
+        # Layer 3: deterministic truncate fallback. We preserve the blog URL
+        # at the end if possible so readers still have a way out.
+        return self._truncate_for_threads(candidate, blog_url, max_chars)
+
+    @staticmethod
+    def _assemble_threads_candidate(title: str, body: str, blog_url: str) -> str:
+        parts = []
+        if title:
+            parts.append(title)
+        if body:
+            parts.append(body)
+        if blog_url:
+            parts.append(blog_url)
+        return "\n\n".join(parts)
+
+    def _shorten_for_threads(self, candidate: str, blog_url: str,
+                             max_chars: int) -> Optional[str]:
+        """Ask Claude to rewrite the candidate to fit max_chars for Threads."""
+        try:
+            account_config = get_account_config(self.config.account)
+            language = (account_config.language if account_config else 'en') or 'en'
+
+            if language == 'de':
+                system_prompt = (
+                    f"Du kürzt eine Instagram-Caption für Threads. Schreibe das Ergebnis auf Deutsch, "
+                    f"in maximal {max_chars} Zeichen (inklusive Emojis und URL). "
+                    "Behalte die persönliche, authentische Stimme im Präsens. Verwende KEINE Hashtags. "
+                    "Verwende kein scharfes 'ß', sondern 'ss'. "
+                    "Wenn am Ende eine URL steht, behalte sie unverändert am Ende. "
+                    "Gib NUR den überarbeiteten Text aus, keine Erklärungen."
+                )
+            else:
+                system_prompt = (
+                    f"You shorten an Instagram caption for Threads. Rewrite the text in at most "
+                    f"{max_chars} characters total (including emojis and the URL). "
+                    "Keep the personal, authentic voice in present tense. Do NOT use hashtags. "
+                    "If a URL appears at the end, keep it unchanged at the end. "
+                    "Output ONLY the rewritten text, with no commentary."
+                )
+
+            user_prompt = (
+                f"Original caption:\n{candidate}\n\n"
+                f"Rewrite it to fit in {max_chars} characters or fewer for Threads."
+            )
+
+            response = self.client.messages.create(
+                model=self.config.anthropic_model,
+                max_tokens=400,
+                temperature=0.3,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            shortened = response.content[0].text.strip()
+            shortened = shortened.replace('**', '').replace('__', '')
+
+            # Defensive: if Claude dropped the URL, append it back if it still fits.
+            if blog_url and blog_url not in shortened:
+                if self._grapheme_len(shortened) + self._grapheme_len(blog_url) + 2 <= max_chars:
+                    shortened = f"{shortened}\n\n{blog_url}"
+
+            self.logger.info(
+                f"Shortened Threads caption via Claude: "
+                f"{self._grapheme_len(candidate)} -> {self._grapheme_len(shortened)} graphemes"
+            )
+            return shortened
+        except Exception as e:
+            self.logger.warning(f"Threads caption shortening via Claude failed: {e}")
+            return None
+
+    @staticmethod
+    def _grapheme_len(text: str) -> int:
+        """Length counted in user-perceived characters (grapheme clusters)."""
+        try:
+            import grapheme
+            return grapheme.length(text)
+        except ImportError:
+            return len(text)
+
+    @staticmethod
+    def _grapheme_slice(text: str, max_graphemes: int) -> str:
+        """Return the longest prefix of text containing at most max_graphemes clusters.
+
+        Falls back to plain string slicing if the grapheme library is unavailable
+        - acceptable for ASCII-heavy inputs and avoids a hard dependency at import
+        time, but the package is listed in requirements.txt for production use.
+        """
+        if max_graphemes <= 0:
+            return ""
+        try:
+            import grapheme
+            return grapheme.slice(text, 0, max_graphemes)
+        except ImportError:
+            return text[:max_graphemes]
+
+    @classmethod
+    def _truncate_for_threads(cls, candidate: str, blog_url: str, max_chars: int) -> str:
+        """Truncate candidate with an ellipsis, preserving the URL at the end if possible.
+
+        Truncation is performed by grapheme cluster so multi-codepoint emoji
+        (skin-tone modifiers, regional-indicator flags, ZWJ sequences) are
+        never split mid-cluster.
+
+        Guarantees: returned string has grapheme length <= max_chars.
+        """
+        # Pathological budget - nothing fits.
+        if max_chars <= 0:
+            return ""
+
+        ellipsis = "…"
+        ellipsis_len = cls._grapheme_len(ellipsis)
+
+        if blog_url and blog_url in candidate:
+            suffix = f"{ellipsis}\n\n{blog_url}"
+            head_budget = max_chars - cls._grapheme_len(suffix)
+            # >= 0 handles the case where suffix exactly fills max_chars
+            # (head must be empty but the URL still fits).
+            if head_budget >= 0:
+                head = candidate.split(blog_url, 1)[0].rstrip()
+                if cls._grapheme_len(head) > head_budget:
+                    head = cls._grapheme_slice(head, head_budget).rstrip()
+                return f"{head}{suffix}" if head else suffix
+
+        if cls._grapheme_len(candidate) <= max_chars:
+            return candidate
+
+        # If the ellipsis itself doesn't fit, just hard-cut without one.
+        if max_chars < ellipsis_len:
+            return cls._grapheme_slice(candidate, max_chars)
+
+        head_budget = max_chars - ellipsis_len
+        return cls._grapheme_slice(candidate, head_budget).rstrip() + ellipsis
+
     def generate_with_retry(self, photo_data: EnrichedPhoto, max_retries: int = 3) -> Optional[str]:
         """Generate caption with retry logic for rate limiting."""
         for attempt in range(max_retries):

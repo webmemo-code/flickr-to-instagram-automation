@@ -149,6 +149,9 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
             generated_caption = "Beautiful moment captured during our travels."
 
         full_caption = caption_generator.build_full_caption(selected_photo, generated_caption)
+        # Persist the raw AI body alongside the Instagram post so the delayed Threads
+        # cross-post can reuse it deterministically (no second Claude call).
+        generated_body = generated_caption
         logger.info(f"Generated caption: {full_caption[:100]}...")
 
         # --- Posting ---
@@ -194,7 +197,8 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
         record_id = state_manager.create_post_record(
             selected_photo, instagram_post_id,
             is_dry_run=dry_run, create_audit_issue=config.create_audit_issues,
-            facebook_post_id=facebook_post_id
+            facebook_post_id=facebook_post_id,
+            generated_body=generated_body,
         )
         if not record_id and not dry_run:
             logger.error("Critical: failed to record post state")
@@ -212,6 +216,183 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
 
     except Exception as e:
         logger.error(f"Automation failed: {e}")
+        return False
+
+
+def post_due_threads(dry_run: bool = False, account: str = 'primary',
+                     limit: int = 1) -> bool:
+    """Cross-post due Instagram posts to Threads.
+
+    Selects Instagram posts that were published at least
+    ``config.threads_post_delay_hours`` ago and have not yet been mirrored to
+    Threads. Posts up to ``limit`` of them, oldest first. A missing Threads
+    configuration is treated as a no-op success so the workflow can be wired
+    up before credentials are provisioned.
+    """
+    logger = logging.getLogger(__name__)
+
+    # Defensive clamp: a negative limit would slice via Python's negative
+    # indexing and process almost all due posts; a zero limit is treated as
+    # "no posts this run" (explicit no-op). The CLI also validates this via
+    # _non_negative_int but library callers don't go through argparse.
+    if limit < 0:
+        logger.warning(
+            f"Negative --threads-limit ({limit}) is invalid; clamping to 0"
+        )
+        limit = 0
+
+    if limit == 0:
+        # Explicit no-op: skip all external API calls (Flickr photo listing,
+        # state read) since the loop would process zero posts anyway.
+        logger.info("Threads cross-posting limit=0; nothing to do")
+        return True
+
+    try:
+        config = Config(account=account)
+        account_display = account.capitalize() if account != 'primary' else 'Primary'
+
+        if not config.threads_posting_enabled:
+            logger.info(
+                "Threads cross-posting is not configured "
+                "(THREADS_USER_ID/THREADS_ACCESS_TOKEN missing); skipping"
+            )
+            return True
+
+        repo_name = os.getenv('GITHUB_REPOSITORY')
+        if not repo_name:
+            raise ValueError("GITHUB_REPOSITORY environment variable not set")
+
+        environment_name = account_manager.get_environment_name(account)
+        state_manager = StateManager(config, repo_name, environment_name=environment_name)
+
+        due_posts = state_manager.get_posts_due_for_threads(
+            config.threads_post_delay_hours
+        )
+        if not due_posts:
+            logger.info(
+                f"No Instagram posts due for Threads cross-posting "
+                f"(delay={config.threads_post_delay_hours}h)"
+            )
+            _log_run(state_manager, True, "No Threads posts due", account_display, config)
+            return True
+
+        logger.info(
+            f"Found {len(due_posts)} post(s) due for Threads cross-posting; "
+            f"processing up to {limit}"
+        )
+
+        # Photo list is required to reconstruct the live image URL and metadata.
+        flickr_api = FlickrAPI(config)
+        caption_generator = CaptionGenerator(config)
+
+        photo_list = flickr_api.get_photo_list()
+        photos_by_position = {p.album_position: p for p in photo_list}
+
+        # Lazily import so configs without Threads installed never load it.
+        from threads_api import ThreadsAPI
+        threads_api = ThreadsAPI(config)
+
+        all_succeeded = True
+        for post_record in due_posts[:limit]:
+            position = post_record.position
+            photo_stub = photos_by_position.get(position)
+            if photo_stub is None or photo_stub.id != post_record.photo_id:
+                # Don't mutate state during dry runs - retries should reflect
+                # real attempts only.
+                if dry_run:
+                    logger.warning(
+                        f"DRY RUN: would skip Threads post for #{position}: "
+                        "photo not found in current album listing"
+                    )
+                else:
+                    logger.warning(
+                        f"Skipping Threads post for #{position}: photo not found in "
+                        "current album listing (album may have been reordered); "
+                        "counting as a retry"
+                    )
+                    state_manager.increment_threads_retry(position)
+                    all_succeeded = False
+                continue
+
+            enriched = flickr_api.enrich_photo(photo_stub)
+
+            threads_caption = caption_generator.build_threads_caption(
+                enriched, post_record.generated_body, max_chars=config.threads_max_chars
+            )
+            logger.info(
+                f"Threads caption for #{position}: {len(threads_caption)} chars"
+            )
+
+            if dry_run:
+                logger.info(
+                    f"DRY RUN: Would post #{position} to Threads with caption:\n"
+                    f"{threads_caption}"
+                )
+                continue
+
+            if not instagram_api_url_ok(enriched.url):
+                logger.warning(
+                    f"Skipping Threads post for #{position}: image URL no longer accessible"
+                )
+                state_manager.increment_threads_retry(position)
+                all_succeeded = False
+                continue
+
+            threads_post_id = threads_api.post_with_retry(enriched.url, threads_caption)
+            if threads_post_id:
+                persisted = state_manager.update_threads_post_id(
+                    position, threads_post_id, threads_caption
+                )
+                if not persisted:
+                    # The Threads post is already live. If we can't record the
+                    # ID, the next scheduled run will see this post as still
+                    # "due" and publish a duplicate. Abort the loop so the
+                    # operator can intervene before duplicates accumulate.
+                    logger.critical(
+                        f"Threads post #{position} succeeded (ID {threads_post_id}) "
+                        "but state persist FAILED. Aborting Threads run to avoid "
+                        "duplicate cross-posts on the next schedule. Manually record "
+                        f"threads_post_id={threads_post_id} for position {position} "
+                        "in state-data before re-enabling."
+                    )
+                    return False
+                logger.info(
+                    f"Cross-posted #{position} to Threads: {threads_post_id}"
+                )
+            else:
+                logger.error(f"Failed to cross-post #{position} to Threads")
+                state_manager.increment_threads_retry(position)
+                all_succeeded = False
+
+        _log_run(
+            state_manager,
+            all_succeeded,
+            f"{'DRY RUN: ' if dry_run else ''}Threads cross-post run "
+            f"({min(limit, len(due_posts))} processed)",
+            account_display,
+            config,
+        )
+        return all_succeeded
+
+    except Exception as e:
+        logger.error(f"Threads automation failed: {e}")
+        return False
+
+
+def instagram_api_url_ok(image_url: str) -> bool:
+    """Lightweight URL accessibility check for the delayed Threads post path.
+
+    Follows redirects because Flickr and most CDN hosts respond with 301/302
+    for canonical image URLs - treating those as failures would incorrectly
+    burn the Threads retry budget.
+    """
+    import requests
+    try:
+        response = requests.head(image_url, timeout=10, allow_redirects=True)
+        if response.status_code != 200:
+            return False
+        return response.headers.get('content-type', '').startswith('image/')
+    except requests.exceptions.RequestException:
         return False
 
 
@@ -304,6 +485,19 @@ def show_stats(account: str = 'primary') -> None:
         logger.error(f"Failed to show stats: {e}")
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse type that rejects negative integers."""
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"expected an integer, got {value!r}") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(
+            f"value must be >= 0, got {parsed}"
+        )
+    return parsed
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Flickr to Instagram Automation')
@@ -337,6 +531,17 @@ def main():
         '--test-email',
         action='store_true',
         help='Test email notification configuration'
+    )
+    parser.add_argument(
+        '--threads-only',
+        action='store_true',
+        help='Cross-post due Instagram posts to Threads (skips Instagram posting)'
+    )
+    parser.add_argument(
+        '--threads-limit',
+        type=_non_negative_int,
+        default=1,
+        help='Maximum number of Threads cross-posts per run (default: 1, must be >= 0)'
     )
     # Get available account choices dynamically from account configuration
     available_accounts = account_manager.get_all_account_ids()
@@ -382,6 +587,16 @@ def main():
 
     # Run automation
     account_name = args.account.capitalize() if args.account != 'primary' else 'Primary'
+
+    if args.threads_only:
+        logger.info(f"Starting Threads cross-posting for {account_name} account")
+        success = post_due_threads(
+            dry_run=args.dry_run,
+            account=args.account,
+            limit=args.threads_limit,
+        )
+        sys.exit(0 if success else 1)
+
     logger.info(f"Starting Flickr to Instagram automation for {account_name} account")
     include_dry_runs = not args.ignore_dry_runs
     success = post_next_photo(args.dry_run, include_dry_runs, args.account)

@@ -7,7 +7,7 @@ Provides scalable, reliable state management using Git files with fail-safe erro
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Union
 from github import Github
 from config import Config
@@ -422,7 +422,8 @@ class StateManager:
 
     def create_post_record(self, photo_data, instagram_post_id: Optional[str] = None,
                           is_dry_run: bool = False, create_audit_issue: bool = False,
-                          facebook_post_id: Optional[str] = None) -> Optional[str]:
+                          facebook_post_id: Optional[str] = None,
+                          generated_body: Optional[str] = None) -> Optional[str]:
         """Record a post (successful, failed, or dry run).
 
         Args:
@@ -431,6 +432,8 @@ class StateManager:
             is_dry_run: Whether this was a dry run
             create_audit_issue: Whether to create audit issues (unused, kept for API compat)
             facebook_post_id: Facebook Page post ID if cross-posted, None otherwise
+            generated_body: AI-generated caption body (without title/signature/hashtags),
+                            persisted so a delayed Threads cross-post can reuse it.
 
         Returns:
             Post record ID or None if failed
@@ -465,6 +468,7 @@ class StateManager:
                 workflow_run_id=os.getenv('GITHUB_RUN_ID'),
                 instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
                 facebook_post_id=facebook_post_id,
+                generated_body=generated_body,
             )
             if instagram_post_id:
                 post.mark_as_posted(instagram_post_id)
@@ -509,3 +513,96 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to create post record: {e}")
             return None
+
+    def get_posts_due_for_threads(self, delay_hours: int = 8,
+                                  max_retries: int = 5) -> List[InstagramPost]:
+        """Return posts eligible for delayed Threads cross-posting.
+
+        A post is eligible when:
+          - it was actually posted to Instagram (status POSTED, not a dry run, has instagram_post_id),
+          - it has not yet been mirrored to Threads (no threads_post_id),
+          - it was posted to Instagram at least `delay_hours` ago,
+          - it has not exhausted the Threads retry budget.
+
+        Returned oldest-first so callers process the longest-waiting post first.
+        """
+        try:
+            cutoff = datetime.now() - timedelta(hours=delay_hours)
+            posts = self.get_instagram_posts()
+
+            due: List[InstagramPost] = []
+            for post in posts:
+                if post.status != PostStatus.POSTED:
+                    continue
+                if post.is_dry_run:
+                    continue
+                if not post.instagram_post_id:
+                    continue
+                if post.threads_post_id:
+                    continue
+                if post.threads_retry_count >= max_retries:
+                    continue
+                if not post.posted_at:
+                    continue
+                try:
+                    posted_dt = datetime.fromisoformat(post.posted_at)
+                except (TypeError, ValueError):
+                    self.logger.warning(
+                        f"Skipping post #{post.position}: unparseable posted_at={post.posted_at!r}"
+                    )
+                    continue
+                if posted_dt > cutoff:
+                    continue
+                due.append(post)
+
+            due.sort(key=lambda p: p.posted_at)
+            return due
+
+        except Exception as e:
+            self.logger.error(f"Failed to find posts due for Threads cross-posting: {e}")
+            return []
+
+    def _persist_posts(self, posts: List[InstagramPost]) -> bool:
+        """Persist the full posts list to storage."""
+        return self.storage_adapter.write_posts(
+            self.get_account_normalized(),
+            self.current_album_id,
+            [p.to_dict() for p in posts]
+        )
+
+    def update_threads_post_id(self, position: int, threads_post_id: str,
+                               caption: str) -> bool:
+        """Update an existing post record with a successful Threads cross-post ID."""
+        try:
+            posts = self.get_instagram_posts()
+            idx = next((i for i, p in enumerate(posts) if p.position == position), None)
+            if idx is None:
+                self.logger.error(
+                    f"Cannot update Threads post: no record at position {position}"
+                )
+                return False
+            posts[idx].mark_threads_posted(threads_post_id, caption)
+            return self._persist_posts(posts)
+        except Exception as e:
+            self.logger.error(
+                f"Failed to update Threads post ID for position {position}: {e}"
+            )
+            return False
+
+    def increment_threads_retry(self, position: int) -> bool:
+        """Record a failed Threads attempt so retries eventually back off."""
+        try:
+            posts = self.get_instagram_posts()
+            idx = next((i for i, p in enumerate(posts) if p.position == position), None)
+            if idx is None:
+                self.logger.error(
+                    f"Cannot increment Threads retry: no record at position {position}"
+                )
+                return False
+            posts[idx].add_threads_retry()
+            return self._persist_posts(posts)
+        except Exception as e:
+            self.logger.error(
+                f"Failed to increment Threads retry for position {position}: {e}"
+            )
+            return False
