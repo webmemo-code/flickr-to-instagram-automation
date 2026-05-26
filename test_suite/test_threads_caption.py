@@ -116,3 +116,24 @@ class TestBuildThreadsCaption:
             _photo(title='Solo Title'), generated_body=None, max_chars=500
         )
         assert 'Solo Title' in caption
+
+    def test_truncation_does_not_split_multi_codepoint_emoji(self, generator):
+        # Family ZWJ sequence: 👨‍👩‍👧‍👦 is one grapheme but 7 codepoints.
+        # We assemble a body whose plain-codepoint slice would fall mid-cluster.
+        body = 'A ' + ('\U0001F468‍\U0001F469‍\U0001F467‍\U0001F466 ' * 20)
+        photo = _photo(source_url=None)
+        with patch.object(generator.client.messages, 'create',
+                          side_effect=RuntimeError('skip claude')), \
+             patch('caption_generator.resolve_blog_url', return_value=None):
+            caption = generator.build_threads_caption(
+                photo, generated_body=body, max_chars=60
+            )
+
+        # If we split mid-cluster we'd see a dangling ZWJ (U+200D) or a stray
+        # combining sequence at the end. After grapheme-safe truncate, the
+        # trailing character before the ellipsis should not be a ZWJ.
+        ellipsis_idx = caption.rfind('…')
+        if ellipsis_idx > 0:
+            assert caption[ellipsis_idx - 1] != '‍', (
+                f"Truncation split a ZWJ-joined emoji cluster: {caption!r}"
+            )

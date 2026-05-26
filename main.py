@@ -283,15 +283,13 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
             if photo_stub is None or photo_stub.id != post_record.photo_id:
                 logger.warning(
                     f"Skipping Threads post for #{position}: photo not found in current "
-                    "album listing (album may have been reordered)"
+                    "album listing (album may have been reordered); counting as a retry"
                 )
+                state_manager.increment_threads_retry(position)
+                all_succeeded = False
                 continue
 
             enriched = flickr_api.enrich_photo(photo_stub)
-
-            if not threads_api._validate_credentials():
-                logger.error("Threads credentials invalid; aborting Threads run")
-                return False
 
             threads_caption = caption_generator.build_threads_caption(
                 enriched, post_record.generated_body, max_chars=config.threads_max_chars

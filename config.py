@@ -58,9 +58,12 @@ class Config:
         self.threads_access_token = os.getenv('THREADS_ACCESS_TOKEN')
         self.threads_api_version = os.getenv('THREADS_API_VERSION', 'v1.0')
         try:
-            self.threads_post_delay_hours = int(os.getenv('THREADS_POST_DELAY_HOURS', '8'))
+            delay_hours = int(os.getenv('THREADS_POST_DELAY_HOURS', '8'))
         except ValueError:
-            self.threads_post_delay_hours = 8
+            delay_hours = 8
+        # Negative delays would mark every posted record as immediately due,
+        # which is almost certainly not what the operator intended.
+        self.threads_post_delay_hours = max(0, delay_hours)
         self.threads_max_chars = 500
 
         # API endpoints and versions

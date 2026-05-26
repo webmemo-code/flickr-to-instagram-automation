@@ -263,12 +263,12 @@ class CaptionGenerator:
         blog_url = resolve_blog_url(self.config, photo_data) or ""
 
         candidate = self._assemble_threads_candidate(title, body, blog_url)
-        if len(candidate) <= max_chars:
+        if self._grapheme_len(candidate) <= max_chars:
             return candidate
 
         # Layer 2: ask Claude to shorten while preserving voice and the URL.
         shortened = self._shorten_for_threads(candidate, blog_url, max_chars)
-        if shortened and len(shortened) <= max_chars:
+        if shortened and self._grapheme_len(shortened) <= max_chars:
             return shortened
 
         # Layer 3: deterministic truncate fallback. We preserve the blog URL
@@ -328,11 +328,12 @@ class CaptionGenerator:
 
             # Defensive: if Claude dropped the URL, append it back if it still fits.
             if blog_url and blog_url not in shortened:
-                if len(shortened) + len(blog_url) + 2 <= max_chars:
+                if self._grapheme_len(shortened) + self._grapheme_len(blog_url) + 2 <= max_chars:
                     shortened = f"{shortened}\n\n{blog_url}"
 
             self.logger.info(
-                f"Shortened Threads caption via Claude: {len(candidate)} -> {len(shortened)} chars"
+                f"Shortened Threads caption via Claude: "
+                f"{self._grapheme_len(candidate)} -> {self._grapheme_len(shortened)} graphemes"
             )
             return shortened
         except Exception as e:
@@ -340,22 +341,52 @@ class CaptionGenerator:
             return None
 
     @staticmethod
-    def _truncate_for_threads(candidate: str, blog_url: str, max_chars: int) -> str:
-        """Truncate candidate with an ellipsis, preserving the URL at the end if possible."""
+    def _grapheme_len(text: str) -> int:
+        """Length counted in user-perceived characters (grapheme clusters)."""
+        try:
+            import grapheme
+            return grapheme.length(text)
+        except ImportError:
+            return len(text)
+
+    @staticmethod
+    def _grapheme_slice(text: str, max_graphemes: int) -> str:
+        """Return the longest prefix of text containing at most max_graphemes clusters.
+
+        Falls back to plain string slicing if the grapheme library is unavailable
+        - acceptable for ASCII-heavy inputs and avoids a hard dependency at import
+        time, but the package is listed in requirements.txt for production use.
+        """
+        if max_graphemes <= 0:
+            return ""
+        try:
+            import grapheme
+            return grapheme.slice(text, 0, max_graphemes)
+        except ImportError:
+            return text[:max_graphemes]
+
+    @classmethod
+    def _truncate_for_threads(cls, candidate: str, blog_url: str, max_chars: int) -> str:
+        """Truncate candidate with an ellipsis, preserving the URL at the end if possible.
+
+        Truncation is performed by grapheme cluster so multi-codepoint emoji
+        (skin-tone modifiers, regional-indicator flags, ZWJ sequences) are
+        never split mid-cluster.
+        """
         ellipsis = "…"
         if blog_url and blog_url in candidate:
-            # Reserve room for "<ellipsis>\n\n<url>"
             suffix = f"{ellipsis}\n\n{blog_url}"
-            head_budget = max_chars - len(suffix)
+            head_budget = max_chars - cls._grapheme_len(suffix)
             if head_budget > 0:
                 head = candidate.split(blog_url, 1)[0].rstrip()
-                if len(head) > head_budget:
-                    head = head[:head_budget].rstrip()
+                if cls._grapheme_len(head) > head_budget:
+                    head = cls._grapheme_slice(head, head_budget).rstrip()
                 return f"{head}{suffix}"
 
-        if len(candidate) <= max_chars:
+        if cls._grapheme_len(candidate) <= max_chars:
             return candidate
-        return candidate[: max_chars - len(ellipsis)].rstrip() + ellipsis
+        head_budget = max_chars - cls._grapheme_len(ellipsis)
+        return cls._grapheme_slice(candidate, head_budget).rstrip() + ellipsis
 
     def generate_with_retry(self, photo_data: EnrichedPhoto, max_retries: int = 3) -> Optional[str]:
         """Generate caption with retry logic for rate limiting."""

@@ -55,7 +55,13 @@ class ThreadsAPI:
                 f"Threads API {phase} error {response.status_code}: {error_code} - {error_msg}"
             )
             self.logger.error(f"Full error response: {error_data}")
-            if error_code == 190 or 'access token' in str(error_msg).lower():
+            # The API has historically returned error_code as either an int or
+            # a numeric string; normalize before comparing.
+            try:
+                normalized_code = int(error_code)
+            except (TypeError, ValueError):
+                normalized_code = None
+            if normalized_code == 190 or 'access token' in str(error_msg).lower():
                 self.logger.error(
                     "OAuth token error: The Threads access token is invalid or expired. "
                     "Renew it and update THREADS_ACCESS_TOKEN in the GitHub environment secrets."
