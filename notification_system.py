@@ -29,8 +29,12 @@ class CriticalFailureNotifier:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-        # Email configuration from environment variables (using existing config)
-        self.smtp_server = os.getenv('SMTP_HOST', os.getenv('SMTP_SERVER', 'smtp.gmail.com'))
+        # Email configuration from environment variables (using existing config).
+        # `or` chain (not getenv defaults) so empty strings — which the workflow
+        # emits via `${{ secrets.SMTP_HOST || '' }}` when the secret is unset —
+        # fall through to the next candidate. Otherwise smtplib.SMTP('', 587)
+        # skips connect() and the next call raises "please run connect() first".
+        self.smtp_server = os.getenv('SMTP_HOST') or os.getenv('SMTP_SERVER') or 'smtp.gmail.com'
 
         # Handle SMTP_PORT safely - default to 587 if empty or invalid
         smtp_port_str = os.getenv('SMTP_PORT', '587').strip()
