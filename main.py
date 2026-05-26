@@ -324,9 +324,22 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
 
             threads_post_id = threads_api.post_with_retry(enriched.url, threads_caption)
             if threads_post_id:
-                state_manager.update_threads_post_id(
+                persisted = state_manager.update_threads_post_id(
                     position, threads_post_id, threads_caption
                 )
+                if not persisted:
+                    # The Threads post is already live. If we can't record the
+                    # ID, the next scheduled run will see this post as still
+                    # "due" and publish a duplicate. Abort the loop so the
+                    # operator can intervene before duplicates accumulate.
+                    logger.critical(
+                        f"Threads post #{position} succeeded (ID {threads_post_id}) "
+                        "but state persist FAILED. Aborting Threads run to avoid "
+                        "duplicate cross-posts on the next schedule. Manually record "
+                        f"threads_post_id={threads_post_id} for position {position} "
+                        "in state-data before re-enabling."
+                    )
+                    return False
                 logger.info(
                     f"Cross-posted #{position} to Threads: {threads_post_id}"
                 )

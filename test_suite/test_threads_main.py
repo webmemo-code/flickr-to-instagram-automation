@@ -108,10 +108,44 @@ class TestPostDueThreadsDisabled:
         threads_mocks['state'].get_posts_due_for_threads.assert_not_called()
 
 
+class TestPostDueThreadsPersistFailure:
+    def test_state_persist_failure_after_publish_aborts_run(self, threads_mocks):
+        """If Threads publish succeeds but state write fails, the run must
+        abort with a hard failure so the next schedule doesn't duplicate."""
+        m = threads_mocks
+        # Two due posts: first one is the persist-failure case; second one
+        # must NOT be processed (we abort after the failure).
+        m['state'].get_posts_due_for_threads.return_value = [
+            _post_record(position=1),
+            _post_record(position=2, photo_id='photo-2'),
+        ]
+        m['flickr'].get_photo_list.return_value = [
+            _photo(position=1, photo_id='photo-1'),
+            _photo(position=2, photo_id='photo-2'),
+        ]
+        m['flickr'].enrich_photo.return_value = MagicMock(url='http://x/p.jpg')
+        m['caption'].build_threads_caption.return_value = 'caption'
+        # Persist returns False (e.g. GitHub Contents API 5xx)
+        m['state'].update_threads_post_id.return_value = False
+
+        with patch('threads_api.ThreadsAPI') as MockThreads, \
+             patch('main.instagram_api_url_ok', return_value=True):
+            MockThreads.return_value.post_with_retry.return_value = 'th-1'
+            ok = main.post_due_threads(
+                dry_run=False, account='primary', limit=2
+            )
+
+        assert ok is False
+        # First post attempted exactly once; persist failed once.
+        assert MockThreads.return_value.post_with_retry.call_count == 1
+        assert m['state'].update_threads_post_id.call_count == 1
+        # Loop aborted - no retry increment for the post that already went live.
+        m['state'].increment_threads_retry.assert_not_called()
+
+
 class TestInstagramApiUrlOk:
     def test_follows_redirects(self):
-        with patch('main.requests' if False else 'requests.head') as mock_head:
-            # head should be called with allow_redirects=True
+        with patch('requests.head') as mock_head:
             mock_head.return_value = MagicMock(
                 status_code=200,
                 headers={'content-type': 'image/jpeg'},
