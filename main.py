@@ -231,6 +231,16 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
     """
     logger = logging.getLogger(__name__)
 
+    # Defensive clamp: a negative limit would slice via Python's negative
+    # indexing and process almost all due posts; a zero limit is treated as
+    # "no posts this run" (explicit no-op). The CLI also validates this via
+    # _non_negative_int but library callers don't go through argparse.
+    if limit < 0:
+        logger.warning(
+            f"Negative --threads-limit ({limit}) is invalid; clamping to 0"
+        )
+        limit = 0
+
     try:
         config = Config(account=account)
         account_display = account.capitalize() if account != 'primary' else 'Primary'
@@ -469,6 +479,19 @@ def show_stats(account: str = 'primary') -> None:
         logger.error(f"Failed to show stats: {e}")
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse type that rejects negative integers."""
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"expected an integer, got {value!r}") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(
+            f"value must be >= 0, got {parsed}"
+        )
+    return parsed
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Flickr to Instagram Automation')
@@ -510,9 +533,9 @@ def main():
     )
     parser.add_argument(
         '--threads-limit',
-        type=int,
+        type=_non_negative_int,
         default=1,
-        help='Maximum number of Threads cross-posts per run (default: 1)'
+        help='Maximum number of Threads cross-posts per run (default: 1, must be >= 0)'
     )
     # Get available account choices dynamically from account configuration
     available_accounts = account_manager.get_all_account_ids()

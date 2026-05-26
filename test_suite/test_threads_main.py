@@ -108,6 +108,51 @@ class TestPostDueThreadsDisabled:
         threads_mocks['state'].get_posts_due_for_threads.assert_not_called()
 
 
+class TestThreadsLimitValidation:
+    def test_argparse_rejects_negative_limit(self):
+        import argparse
+        with pytest.raises(argparse.ArgumentTypeError):
+            main._non_negative_int('-1')
+
+    def test_argparse_accepts_zero(self):
+        assert main._non_negative_int('0') == 0
+
+    def test_argparse_accepts_positive(self):
+        assert main._non_negative_int('5') == 5
+
+    def test_argparse_rejects_non_integer(self):
+        import argparse
+        with pytest.raises(argparse.ArgumentTypeError):
+            main._non_negative_int('abc')
+
+    def test_negative_limit_clamped_to_zero_in_function(self, threads_mocks):
+        """If a library caller bypasses argparse and passes a negative limit,
+        the function must clamp rather than slice via Python's negative indexing.
+        """
+        m = threads_mocks
+        # Three due posts. With limit=-1 a naive `due[:limit]` would process
+        # the first two ("everything but the last") - which we must NOT do.
+        m['state'].get_posts_due_for_threads.return_value = [
+            _post_record(position=i, photo_id=f'photo-{i}')
+            for i in (1, 2, 3)
+        ]
+        m['flickr'].get_photo_list.return_value = [
+            _photo(position=i, photo_id=f'photo-{i}')
+            for i in (1, 2, 3)
+        ]
+
+        with patch('threads_api.ThreadsAPI') as MockThreads:
+            ok = main.post_due_threads(
+                dry_run=False, account='primary', limit=-1
+            )
+            MockThreads.return_value.post_with_retry.assert_not_called()
+        # No posts processed; the function returns success because it had
+        # nothing to do.
+        assert ok is True
+        m['state'].update_threads_post_id.assert_not_called()
+        m['state'].increment_threads_retry.assert_not_called()
+
+
 class TestPostDueThreadsPersistFailure:
     def test_state_persist_failure_after_publish_aborts_run(self, threads_mocks):
         """If Threads publish succeeds but state write fails, the run must
