@@ -1,0 +1,43 @@
+name: Secondary Threads Delayed Cross-Post
+run-name: "Secondary Threads - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
+
+# Delayed Threads cross-posting for the secondary Instagram account (reisememo).
+# Scheduled crons are currently disabled to match the Instagram secondary
+# workflow. Enable by uncommenting once Instagram posting is scheduled and
+# THREADS_USER_ID / THREADS_ACCESS_TOKEN are populated in the
+# secondary-account environment.
+
+on:
+  # schedule:
+  #   - cron: '11 13 * * *'    # +8h from a hypothetical 05:11 UTC Instagram cron
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Test mode - select due posts and build captions without posting to Threads'
+        type: boolean
+        default: false
+      threads_limit:
+        description: 'Maximum Threads cross-posts to process in this run'
+        type: number
+        default: 1
+
+concurrency:
+  group: threads-cross-post-secondary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  threads:
+    name: Cross-post secondary Instagram posts to Threads
+    uses: ./.github/workflows/threads-cross-post.yml
+    with:
+      account_id: reisememo
+      environment_name: secondary-account
+      account_flag: reisememo
+      dry_run: ${{ inputs.dry_run || false }}
+      threads_limit: ${{ inputs.threads_limit || 1 }}
+    secrets: inherit

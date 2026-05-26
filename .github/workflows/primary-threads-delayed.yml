@@ -1,0 +1,45 @@
+name: Primary Threads Delayed Cross-Post
+run-name: "Primary Threads - ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }} Run (${{ github.run_number }})"
+
+# Delayed Threads cross-posting for the primary Instagram account.
+# Crons are offset +8h from the Instagram crons in primary-flickr-to-insta.yml:
+#   Instagram 09:13 UTC -> Threads 17:13 UTC
+#   Instagram 19:17 UTC -> Threads 03:17 UTC (next day)
+#   Instagram 07:21 UTC -> Threads 15:21 UTC
+
+on:
+  schedule:
+    - cron: '13 17 * * *'
+    - cron: '17 03 * * *'
+    - cron: '21 15 * * *'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Test mode - select due posts and build captions without posting to Threads'
+        type: boolean
+        default: false
+      threads_limit:
+        description: 'Maximum Threads cross-posts to process in this run'
+        type: number
+        default: 1
+
+concurrency:
+  group: threads-cross-post-primary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  threads:
+    name: Cross-post primary Instagram posts to Threads
+    uses: ./.github/workflows/threads-cross-post.yml
+    with:
+      account_id: primary
+      environment_name: primary-account
+      account_flag: ''
+      dry_run: ${{ inputs.dry_run || false }}
+      threads_limit: ${{ inputs.threads_limit || 1 }}
+    secrets: inherit

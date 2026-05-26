@@ -52,6 +52,11 @@ class InstagramPost:
     photo_id: str
     instagram_post_id: Optional[str] = None
     facebook_post_id: Optional[str] = None
+    threads_post_id: Optional[str] = None
+    threads_posted_at: Optional[str] = None
+    threads_caption: Optional[str] = None
+    threads_retry_count: int = 0
+    generated_body: Optional[str] = None
     posted_at: Optional[str] = None
     title: Optional[str] = None
     status: PostStatus = PostStatus.PENDING
@@ -108,6 +113,18 @@ class InstagramPost:
         self.last_update = datetime.now().isoformat()
         if instagram_url:
             self.instagram_url = instagram_url
+
+    def mark_threads_posted(self, threads_post_id: str, caption: str):
+        """Record a successful Threads cross-post on this record."""
+        self.threads_post_id = threads_post_id
+        self.threads_caption = caption
+        self.threads_posted_at = datetime.now().isoformat()
+        self.last_update = datetime.now().isoformat()
+
+    def add_threads_retry(self):
+        """Increment the Threads retry counter on this record."""
+        self.threads_retry_count += 1
+        self.last_update = datetime.now().isoformat()
 
     def mark_as_failed(self, error_message: str, workflow_run_id: Optional[str] = None):
         """Mark the post as failed."""

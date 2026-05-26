@@ -31,9 +31,10 @@ def main():
         print("\nAvailable test types:")
         print("  all           - Run all tests")
         print("  blog          - Test blog content extraction only")
-        print("  caption       - Test caption generation only") 
+        print("  caption       - Test caption generation only")
         print("  integration   - Test full integration pipeline")
         print("  quick         - Run quick tests (no live APIs)")
+        print("  threads       - Test Threads cross-posting (API, caption, state)")
         print("  install       - Install test dependencies")
         sys.exit(1)
     
@@ -83,9 +84,17 @@ def main():
         
     elif test_type == 'quick':
         print("QUICK: Running quick tests (no live APIs)...")
-        success &= run_command([sys.executable, '-m', 'pytest', '-v', '-k', 'not live'], 
+        success &= run_command([sys.executable, '-m', 'pytest', '-v', '-k', 'not live'],
                              "Quick tests")
-        
+
+    elif test_type == 'threads':
+        print("THREADS: Testing Threads cross-posting (API + caption + state)...")
+        success &= run_command(
+            [sys.executable, '-m', 'pytest', '-v',
+             'test_threads_api.py', 'test_threads_caption.py', 'test_threads_state.py'],
+            "Threads cross-posting tests"
+        )
+
     else:
         print(f"FAIL: Unknown test type: {test_type}")
         sys.exit(1)

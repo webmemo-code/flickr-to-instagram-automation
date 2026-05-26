@@ -53,6 +53,16 @@ class Config:
         self.facebook_page_id = os.getenv('FACEBOOK_PAGE_ID')
         self.facebook_page_access_token = os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN')
 
+        # Threads configuration (optional, for delayed cross-posting)
+        self.threads_user_id = os.getenv('THREADS_USER_ID')
+        self.threads_access_token = os.getenv('THREADS_ACCESS_TOKEN')
+        self.threads_api_version = os.getenv('THREADS_API_VERSION', 'v1.0')
+        try:
+            self.threads_post_delay_hours = int(os.getenv('THREADS_POST_DELAY_HOURS', '8'))
+        except ValueError:
+            self.threads_post_delay_hours = 8
+        self.threads_max_chars = 500
+
         # API endpoints and versions
         self.flickr_api_url = 'https://www.flickr.com/services/rest/'
         self.graph_api_domain = self._detect_graph_api_domain()
@@ -204,6 +214,16 @@ class Config:
     def facebook_posting_enabled(self) -> bool:
         """Check if Facebook Page cross-posting is configured."""
         return bool(self.facebook_page_id and self.facebook_page_access_token)
+
+    @property
+    def threads_posting_enabled(self) -> bool:
+        """Check if Threads delayed cross-posting is configured."""
+        return bool(self.threads_user_id and self.threads_access_token)
+
+    @property
+    def threads_endpoint_base(self) -> str:
+        """Get the complete Threads API endpoint base URL."""
+        return f"https://graph.threads.net/{self.threads_api_version}/"
 
     @property
     def email_notifications_enabled(self) -> bool:
