@@ -56,9 +56,14 @@ class Config:
         # Threads configuration (optional, for delayed cross-posting)
         self.threads_user_id = os.getenv('THREADS_USER_ID')
         self.threads_access_token = os.getenv('THREADS_ACCESS_TOKEN')
-        self.threads_api_version = os.getenv('THREADS_API_VERSION', 'v1.0')
+        # os.getenv only falls back when the var is unset; GitHub Actions
+        # `${{ vars.X || '' }}` plumbing exports an *empty string* when unset,
+        # which would override the default and produce e.g. an invalid
+        # `https://graph.threads.net//` base URL. Treat empty as unset.
+        self.threads_api_version = os.getenv('THREADS_API_VERSION') or 'v1.0'
+        raw_delay = os.getenv('THREADS_POST_DELAY_HOURS') or '8'
         try:
-            delay_hours = int(os.getenv('THREADS_POST_DELAY_HOURS', '8'))
+            delay_hours = int(raw_delay)
         except ValueError:
             delay_hours = 8
         # Negative delays would mark every posted record as immediately due,

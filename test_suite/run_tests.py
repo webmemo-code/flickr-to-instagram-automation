@@ -88,10 +88,12 @@ def main():
                              "Quick tests")
 
     elif test_type == 'threads':
-        print("THREADS: Testing Threads cross-posting (API + caption + state)...")
+        print("THREADS: Testing Threads cross-posting (API + caption + state + config + main)...")
         success &= run_command(
             [sys.executable, '-m', 'pytest', '-v',
-             'test_threads_api.py', 'test_threads_caption.py', 'test_threads_state.py'],
+             'test_threads_api.py', 'test_threads_caption.py',
+             'test_threads_state.py', 'test_threads_config.py',
+             'test_threads_main.py'],
             "Threads cross-posting tests"
         )
 

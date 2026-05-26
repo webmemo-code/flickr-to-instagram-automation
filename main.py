@@ -281,12 +281,21 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
             position = post_record.position
             photo_stub = photos_by_position.get(position)
             if photo_stub is None or photo_stub.id != post_record.photo_id:
-                logger.warning(
-                    f"Skipping Threads post for #{position}: photo not found in current "
-                    "album listing (album may have been reordered); counting as a retry"
-                )
-                state_manager.increment_threads_retry(position)
-                all_succeeded = False
+                # Don't mutate state during dry runs - retries should reflect
+                # real attempts only.
+                if dry_run:
+                    logger.warning(
+                        f"DRY RUN: would skip Threads post for #{position}: "
+                        "photo not found in current album listing"
+                    )
+                else:
+                    logger.warning(
+                        f"Skipping Threads post for #{position}: photo not found in "
+                        "current album listing (album may have been reordered); "
+                        "counting as a retry"
+                    )
+                    state_manager.increment_threads_retry(position)
+                    all_succeeded = False
                 continue
 
             enriched = flickr_api.enrich_photo(photo_stub)
@@ -342,10 +351,15 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
 
 
 def instagram_api_url_ok(image_url: str) -> bool:
-    """Lightweight URL accessibility check for the delayed Threads post path."""
+    """Lightweight URL accessibility check for the delayed Threads post path.
+
+    Follows redirects because Flickr and most CDN hosts respond with 301/302
+    for canonical image URLs - treating those as failures would incorrectly
+    burn the Threads retry budget.
+    """
     import requests
     try:
-        response = requests.head(image_url, timeout=10)
+        response = requests.head(image_url, timeout=10, allow_redirects=True)
         if response.status_code != 200:
             return False
         return response.headers.get('content-type', '').startswith('image/')
