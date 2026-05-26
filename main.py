@@ -241,6 +241,12 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
         )
         limit = 0
 
+    if limit == 0:
+        # Explicit no-op: skip all external API calls (Flickr photo listing,
+        # state read) since the loop would process zero posts anyway.
+        logger.info("Threads cross-posting limit=0; nothing to do")
+        return True
+
     try:
         config = Config(account=account)
         account_display = account.capitalize() if account != 'primary' else 'Primary'

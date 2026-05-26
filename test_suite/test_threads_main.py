@@ -125,6 +125,14 @@ class TestThreadsLimitValidation:
         with pytest.raises(argparse.ArgumentTypeError):
             main._non_negative_int('abc')
 
+    def test_zero_limit_short_circuits_without_flickr_call(self, threads_mocks):
+        """limit=0 must not even call Flickr or read state - it's an explicit no-op."""
+        m = threads_mocks
+        ok = main.post_due_threads(dry_run=False, account='primary', limit=0)
+        assert ok is True
+        m['state'].get_posts_due_for_threads.assert_not_called()
+        m['flickr'].get_photo_list.assert_not_called()
+
     def test_negative_limit_clamped_to_zero_in_function(self, threads_mocks):
         """If a library caller bypasses argparse and passes a negative limit,
         the function must clamp rather than slice via Python's negative indexing.

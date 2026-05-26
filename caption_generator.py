@@ -372,20 +372,35 @@ class CaptionGenerator:
         Truncation is performed by grapheme cluster so multi-codepoint emoji
         (skin-tone modifiers, regional-indicator flags, ZWJ sequences) are
         never split mid-cluster.
+
+        Guarantees: returned string has grapheme length <= max_chars.
         """
+        # Pathological budget - nothing fits.
+        if max_chars <= 0:
+            return ""
+
         ellipsis = "…"
+        ellipsis_len = cls._grapheme_len(ellipsis)
+
         if blog_url and blog_url in candidate:
             suffix = f"{ellipsis}\n\n{blog_url}"
             head_budget = max_chars - cls._grapheme_len(suffix)
-            if head_budget > 0:
+            # >= 0 handles the case where suffix exactly fills max_chars
+            # (head must be empty but the URL still fits).
+            if head_budget >= 0:
                 head = candidate.split(blog_url, 1)[0].rstrip()
                 if cls._grapheme_len(head) > head_budget:
                     head = cls._grapheme_slice(head, head_budget).rstrip()
-                return f"{head}{suffix}"
+                return f"{head}{suffix}" if head else suffix
 
         if cls._grapheme_len(candidate) <= max_chars:
             return candidate
-        head_budget = max_chars - cls._grapheme_len(ellipsis)
+
+        # If the ellipsis itself doesn't fit, just hard-cut without one.
+        if max_chars < ellipsis_len:
+            return cls._grapheme_slice(candidate, max_chars)
+
+        head_budget = max_chars - ellipsis_len
         return cls._grapheme_slice(candidate, head_budget).rstrip() + ellipsis
 
     def generate_with_retry(self, photo_data: EnrichedPhoto, max_retries: int = 3) -> Optional[str]:

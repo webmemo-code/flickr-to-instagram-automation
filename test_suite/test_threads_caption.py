@@ -117,6 +117,41 @@ class TestBuildThreadsCaption:
         )
         assert 'Solo Title' in caption
 
+    def test_truncate_respects_zero_max_chars(self, generator):
+        # _truncate_for_threads must never return more graphemes than the budget.
+        result = generator._truncate_for_threads(
+            'some long candidate', 'http://example.com/post', max_chars=0
+        )
+        assert result == ''
+
+    def test_truncate_respects_negative_max_chars(self, generator):
+        result = generator._truncate_for_threads(
+            'some long candidate', 'http://example.com/post', max_chars=-5
+        )
+        assert result == ''
+
+    def test_truncate_smaller_than_ellipsis_returns_hard_cut(self, generator):
+        # max_chars=1 can't fit the ellipsis or the URL; result must still
+        # be within budget rather than overflowing with a stray ellipsis.
+        result = generator._truncate_for_threads(
+            'abcdefghij', 'http://example.com/post', max_chars=1
+        )
+        assert len(result) <= 1
+
+    def test_truncate_preserves_url_when_head_budget_is_zero(self, generator):
+        # The suffix "…\n\n{url}" exactly fills max_chars - the prior code
+        # dropped the URL because the budget check was `> 0`. With `>= 0`
+        # the URL is preserved with an empty head.
+        url = 'http://x.test/p'
+        candidate = f'long head text here\n\n{url}'
+        ellipsis_suffix_len = 1 + 2 + len(url)  # '…' + '\n\n' + url
+        result = generator._truncate_for_threads(
+            candidate, url, max_chars=ellipsis_suffix_len
+        )
+        assert url in result
+        assert result.startswith('…')
+        assert len(result) <= ellipsis_suffix_len
+
     def test_truncation_does_not_split_multi_codepoint_emoji(self, generator):
         # Family ZWJ sequence: 👨‍👩‍👧‍👦 is one grapheme but 7 codepoints.
         # We assemble a body whose plain-codepoint slice would fall mid-cluster.
