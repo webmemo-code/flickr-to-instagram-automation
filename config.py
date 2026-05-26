@@ -88,7 +88,11 @@ class Config:
         
         # Email notification settings (optional)
         self.notification_email = os.getenv('NOTIFICATION_EMAIL')  # Manager's email address
-        self.smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')  # SMTP server
+        # `or` (not getenv default) so an empty SMTP_HOST env var — which the
+        # workflow emits when the secret is unset via `${{ secrets.SMTP_HOST || '' }}`
+        # — also falls back to the Gmail default. Without this, smtplib.SMTP('', 587)
+        # silently skips connect() and the next call raises "please run connect() first".
+        self.smtp_host = os.getenv('SMTP_HOST') or 'smtp.gmail.com'
 
         # Handle SMTP_PORT safely - default to 587 if empty or invalid
         smtp_port_str = os.getenv('SMTP_PORT', '587').strip()
