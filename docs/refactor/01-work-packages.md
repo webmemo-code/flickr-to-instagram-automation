@@ -179,12 +179,12 @@ Full spec: [04-token-refresh-spec.md](04-token-refresh-spec.md). Runbook: [runbo
 
 | WP | GitHub issue |
 |----|--------------|
-| WP1 | _filled after issue creation_ |
-| WP2 | _filled after issue creation_ |
-| WP3 | _filled after issue creation_ |
-| WP4 | _filled after issue creation_ |
-| WP5 | _filled after issue creation_ |
-| WP6 | _filled after issue creation_ |
-| WP7 | _filled after issue creation_ |
-| WP8 | _filled after issue creation_ |
-| WP9 | _filled after issue creation_ |
+| WP1 | [#174](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/174) |
+| WP2 | [#175](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/175) |
+| WP3 | [#176](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/176) |
+| WP4 | [#177](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/177) |
+| WP5 | [#178](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/178) |
+| WP6 | [#179](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/179) |
+| WP7 | [#180](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/180) |
+| WP8 | [#181](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/181) |
+| WP9 | [#182](https://github.com/webmemo-code/flickr-to-instagram-automation/issues/182) |
