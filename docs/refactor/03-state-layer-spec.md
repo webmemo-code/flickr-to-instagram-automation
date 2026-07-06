@@ -37,7 +37,7 @@ Implementation notes:
 
 ## Other removals/fixes in this WP
 
-- Delete `StateManager.self.github`/`self.repo` (lines 40-41) and their construction.
+- Delete `self.github`/`self.repo` from `StateManager` (lines 40-41) and their construction.
 - Cache `is_available()`: one `get_branch` per process lifetime (per `GitFileStorageAdapter` instance is fine — one instance per run).
 - Optional (may defer to WP5): collapse the abstract `StateStorageAdapter` base into the concrete class, keeping the public method surface identical. Note the `fake_storage` test fixture subclasses the adapter interface — keep it subclassable.
 
