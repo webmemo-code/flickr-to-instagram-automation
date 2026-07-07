@@ -15,11 +15,10 @@ python main.py --account primary --stats      # Show progress
 # Secondary account
 python main.py --account reisememo --dry-run
 
-# Run tests
-cd test_suite && python run_tests.py all      # All tests
-cd test_suite && python run_tests.py quick    # No live API calls
-cd test_suite && python run_tests.py blog     # Blog extraction only
-cd test_suite && python run_tests.py caption  # Caption generation only
+# Run tests (from repo root — pytest.ini sets testpaths/pythonpath)
+python -m pytest -m "not live_api"            # All tests except live-API ones (what CI runs)
+python -m pytest                              # Everything, including live-API tests (needs real credentials)
+python -m pytest test_suite/test_blog_content_extractor.py  # A single file
 ```
 
 ## Architecture
