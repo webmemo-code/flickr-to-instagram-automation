@@ -2,10 +2,14 @@
 """Thin alias for the pytest markers used by this suite.
 
 Prefer calling pytest directly (see README.md). This exists for muscle-memory
-compatibility with the old `python run_tests.py <type>` invocation.
+compatibility with the old `python run_tests.py <type>` invocation. Works
+whether invoked from the repo root or from test_suite/.
 """
 import subprocess
 import sys
+from pathlib import Path
+
+TEST_SUITE_DIR = Path(__file__).resolve().parent
 
 ALIASES = {
     'all': ['-m', 'not live_api'],
@@ -28,8 +32,12 @@ def main():
         print("For anything else, call pytest directly: python -m pytest <args>")
         sys.exit(1)
 
-    args = [sys.executable, '-m', 'pytest', '-v', *ALIASES[sys.argv[1]]]
-    sys.exit(subprocess.run(args).returncode)
+    alias_args = [
+        str(TEST_SUITE_DIR / arg) if arg.endswith('.py') else arg
+        for arg in ALIASES[sys.argv[1]]
+    ]
+    args = [sys.executable, '-m', 'pytest', '-v', *alias_args]
+    sys.exit(subprocess.run(args, cwd=TEST_SUITE_DIR.parent).returncode)
 
 
 if __name__ == '__main__':

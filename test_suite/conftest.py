@@ -31,16 +31,35 @@ REQUIRED_ENV = {
     'INSTAGRAM_ACCOUNT_ID': 'acc',
 }
 
+# Every env var Config() reads (config.py), cleared before REQUIRED_ENV +
+# overrides are applied so a developer/CI environment with e.g. SMTP_HOST or
+# THREADS_API_VERSION already set can't leak into a test and make defaulting
+# assertions flaky.
+_CONFIG_ENV_KEYS = (
+    'FLICKR_API_KEY', 'FLICKR_USER_ID', 'FLICKR_USERNAME', 'ANTHROPIC_API_KEY',
+    'GITHUB_TOKEN', 'WORDPRESS_USERNAME', 'WORDPRESS_APP_PASSWORD',
+    'FLICKR_ALBUM_ID', 'INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID',
+    'INSTAGRAM_APP_ID', 'FACEBOOK_PAGE_ID', 'FACEBOOK_PAGE_ACCESS_TOKEN',
+    'THREADS_USER_ID', 'THREADS_ACCESS_TOKEN', 'THREADS_API_VERSION',
+    'THREADS_POST_DELAY_HOURS', 'GRAPH_API_VERSION', 'ANTHROPIC_MODEL',
+    'CREATE_AUDIT_ISSUES', 'BLOG_POST_URL', 'BLOG_POST_URLS',
+    'NOTIFICATION_EMAIL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME',
+    'SMTP_PASSWORD', 'GITHUB_ACTIONS',
+)
+
 
 @pytest.fixture
 def full_env(monkeypatch):
     """Factory fixture: set a complete, valid environment.
 
-    Callable as ``full_env(**overrides)``; monkeypatch-sets every env var a
-    default Config() needs, with realistic dummy values, then applies
-    overrides. Returns the effective env dict.
+    Callable as ``full_env(**overrides)``; clears every env var Config()
+    reads (so ambient developer/CI env vars can't leak in), monkeypatch-sets
+    realistic dummy values for the required ones, then applies overrides.
+    Returns the effective env dict.
     """
     def _apply(**overrides):
+        for key in _CONFIG_ENV_KEYS:
+            monkeypatch.delenv(key, raising=False)
         env = {**REQUIRED_ENV, **overrides}
         for key, value in env.items():
             monkeypatch.setenv(key, value)
@@ -367,9 +386,20 @@ def captured_emails(monkeypatch):
     sent = []
 
     class FakeSMTP:
+        """Supports both current call sites: email_notifier.py's
+        sendmail()/quit() and notification_system.py's
+        `with smtplib.SMTP(...) as server: ... server.send_message(msg)`.
+        """
+
         def __init__(self, host, port):
             self.host = host
             self.port = port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
 
         def starttls(self):
             pass
@@ -382,6 +412,14 @@ def captured_emails(monkeypatch):
                 'recipient': to_addr,
                 'from': from_addr,
                 'raw': text,
+            })
+
+        def send_message(self, msg):
+            sent.append({
+                'recipient': msg.get('To'),
+                'from': msg.get('From'),
+                'subject': msg.get('Subject'),
+                'message': msg,
             })
 
         def quit(self):
