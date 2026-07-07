@@ -83,25 +83,25 @@ class TestInstagramPostSerialization:
 
 @pytest.fixture
 def state_manager():
-    """A StateManager whose dependencies are stubbed enough to exercise the filter."""
+    """A StateManager whose dependencies are stubbed enough to exercise the filter.
+
+    Built via __new__ so no GitHub client is constructed (WP3 removed
+    StateManager's own Github/repo — storage goes solely through the adapter).
+    """
     from state_manager import StateManager
-    with patch('state_manager.Github'), \
-         patch('state_manager.GitFileStorageAdapter'):
-        config = MagicMock()
-        config.flickr_album_id = 'album-1'
-        config.account = 'primary'
-        config.github_token = 'token'
-        manager = StateManager.__new__(StateManager)
-        manager.config = config
-        manager.repo_name = 'test/repo'
-        manager.current_album_id = 'album-1'
-        manager.environment_name = 'primary-account'
-        manager.storage_adapter = MagicMock()
-        manager.github = MagicMock()
-        manager.repo = MagicMock()
-        import logging
-        manager.logger = logging.getLogger('test')
-        yield manager
+    config = MagicMock()
+    config.flickr_album_id = 'album-1'
+    config.account = 'primary'
+    config.github_token = 'token'
+    manager = StateManager.__new__(StateManager)
+    manager.config = config
+    manager.repo_name = 'test/repo'
+    manager.current_album_id = 'album-1'
+    manager.environment_name = 'primary-account'
+    manager.storage_adapter = MagicMock()
+    import logging
+    manager.logger = logging.getLogger('test')
+    yield manager
 
 
 def _hours_ago(hours):

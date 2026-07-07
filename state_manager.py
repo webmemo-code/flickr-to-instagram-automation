@@ -9,9 +9,8 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Union
-from github import Github
 from config import Config
-from storage_adapter import GitFileStorageAdapter
+from storage_adapter import GitFileStorageAdapter, StateStorageError
 from state_models import InstagramPost, AlbumMetadata, FailedPosition, PostStatus, AlbumStatus
 from photo_models import PhotoListItem, EnrichedPhoto
 from notification_system import notifier, CriticalStateFailure
@@ -36,11 +35,8 @@ class StateManager:
         self.current_album_id = config.flickr_album_id
         self.environment_name = environment_name or self._detect_environment_name(config.account)
 
-        # Initialize GitHub client for Git operations
-        self.github = Github(config.github_token)
-        self.repo = self.github.get_repo(repo_name)
-
-        # Initialize Git-based storage adapter
+        # Initialize Git-based storage adapter. All GitHub access goes through
+        # this adapter — StateManager holds no GitHub client of its own.
         self.storage_adapter = GitFileStorageAdapter(
             repo_name=self.repo_name,
             github_token=self.config.github_token
@@ -60,97 +56,117 @@ class StateManager:
             return 'secondary'
         return 'primary'
 
+    def _fail_loud(self, method: str, error: Exception) -> 'CriticalStateFailure':
+        """Alert and build a CriticalStateFailure for a failed state read.
+
+        Any storage read that fails for a non-absent reason must stop the run
+        rather than return empty — an empty posted list would silently restart
+        a half-posted album from photo 1. The storage adapter already
+        distinguishes 'absent' (StateFileNotFound, handled as empty inside the
+        adapter) from failures (StateStorageError), so anything reaching here
+        is a genuine failure.
+        """
+        error_msg = (
+            f"CRITICAL: Cannot access state data via {method} for album "
+            f"{self.current_album_id} - STOPPING to prevent wrong photo posting: {error}"
+        )
+        self.logger.critical(error_msg)
+        notifier.send_critical_failure_alert(
+            "STATE_ACCESS_FAILURE",
+            error_msg,
+            {"method": method, "exception": str(error), "album_id": self.current_album_id},
+        )
+        return CriticalStateFailure(error_msg)
+
     def get_instagram_posts(self) -> List[InstagramPost]:
-        """Get all Instagram post records for the current album."""
+        """Get all Instagram post records for the current album.
+
+        Raises CriticalStateFailure if the read fails — never returns [] on a
+        failed read (which would silently restart the album from photo 1).
+        An absent posts file (first run) returns [] normally.
+        """
         try:
             posts_data = self.storage_adapter.read_posts(
                 self.get_account_normalized(),
                 self.current_album_id
             )
+        except StateStorageError as e:
+            raise self._fail_loud("get_instagram_posts", e) from e
 
-            posts: List[InstagramPost] = []
-            for post_data in posts_data:
-                try:
-                    posts.append(InstagramPost.from_dict(post_data))
-                except Exception as conversion_error:
-                    self.logger.error(
-                        f"Failed to load stored post record: {conversion_error} | data={post_data}"
-                    )
-
-            return posts
-
-        except Exception as e:
-            if "403" in str(e) or "permission" in str(e).lower() or "forbidden" in str(e).lower():
-                error_msg = f"CRITICAL: Cannot access Instagram posts data - STOPPING to prevent wrong photo posting: {e}"
-                self.logger.critical(error_msg)
-                notifier.send_critical_failure_alert(
-                    "STATE_ACCESS_DENIED",
-                    error_msg,
-                    {"method": "get_instagram_posts", "exception": str(e), "album_id": self.current_album_id}
+        posts: List[InstagramPost] = []
+        for post_data in posts_data:
+            try:
+                posts.append(InstagramPost.from_dict(post_data))
+            except Exception as conversion_error:
+                # A single malformed record is logged and skipped (kept
+                # behavior); it is not an access failure.
+                self.logger.error(
+                    f"Failed to load stored post record: {conversion_error} | data={post_data}"
                 )
-                raise CriticalStateFailure(error_msg) from e
 
-            self.logger.error(f"Failed to get Instagram posts: {e}")
-            return []
+        return posts
 
     def get_failed_positions(self) -> List[int]:
-        """Get list of failed positions that still require attention."""
+        """Get list of failed positions that still require attention.
+
+        Raises CriticalStateFailure on a failed read; absent file returns [].
+        """
         try:
             failed_data = self.storage_adapter.read_failed_positions(
                 self.get_account_normalized(),
                 self.current_album_id
             )
+        except StateStorageError as e:
+            raise self._fail_loud("get_failed_positions", e) from e
 
-            return [
-                pos['position']
-                for pos in failed_data
-                if isinstance(pos, dict) and not pos.get('resolved', False)
-            ]
-
-        except Exception as e:
-            self.logger.error(f"Failed to get failed positions: {e}")
-            return []
+        return [
+            pos['position']
+            for pos in failed_data
+            if isinstance(pos, dict) and not pos.get('resolved', False)
+        ]
 
     def get_enhanced_failed_positions(self) -> List[FailedPosition]:
-        """Get enhanced failed position records."""
+        """Get enhanced failed position records.
+
+        Raises CriticalStateFailure on a failed read; absent file returns [].
+        """
         try:
             failed_data = self.storage_adapter.read_failed_positions(
                 self.get_account_normalized(),
                 self.current_album_id
             )
+        except StateStorageError as e:
+            raise self._fail_loud("get_enhanced_failed_positions", e) from e
 
-            return [FailedPosition.from_dict(item) for item in failed_data]
-
-        except Exception as e:
-            self.logger.error(f"Failed to get enhanced failed positions: {e}")
-            return []
+        return [FailedPosition.from_dict(item) for item in failed_data]
 
     def get_album_metadata(self) -> AlbumMetadata:
-        """Get album metadata."""
+        """Get album metadata.
+
+        Raises CriticalStateFailure on a failed read. An absent metadata file
+        (first run) yields fresh metadata, not an error.
+        """
         try:
             metadata_data = self.storage_adapter.read_metadata(
                 self.get_account_normalized(),
                 self.current_album_id
             )
+        except StateStorageError as e:
+            raise self._fail_loud("get_album_metadata", e) from e
 
-            if metadata_data and 'album_id' in metadata_data:
-                return AlbumMetadata.from_dict(metadata_data)
-            else:
-                # Create new metadata
-                return AlbumMetadata.create_new(
-                    self.current_album_id,
-                    self.get_account_normalized()
-                )
-
-        except Exception as e:
-            self.logger.error(f"Failed to get album metadata: {e}")
-            return AlbumMetadata.create_new(
-                self.current_album_id,
-                self.get_account_normalized()
-            )
+        if metadata_data and 'album_id' in metadata_data:
+            return AlbumMetadata.from_dict(metadata_data)
+        # Absent file → adapter returned its default dict → create fresh
+        return AlbumMetadata.create_new(
+            self.current_album_id,
+            self.get_account_normalized()
+        )
 
     def clear_dry_run_records(self) -> int:
-        """Clear dry-run post records from Git-based storage."""
+        """Clear dry-run post records from Git-based storage.
+
+        Raises CriticalStateFailure if reading current state fails.
+        """
         try:
             posts = self.get_instagram_posts()
             if not posts:
@@ -166,13 +182,11 @@ class StateManager:
                 self.logger.info("No dry run records to clear")
                 return 0
 
-            if not self.storage_adapter.write_posts(
+            self.storage_adapter.write_posts(
                 self.get_account_normalized(),
                 self.current_album_id,
                 [post.to_dict() for post in remaining_posts]
-            ):
-                self.logger.error("Failed to persist updated post records after clearing dry runs")
-                return 0
+            )
 
             metadata = self.get_album_metadata()
             metadata.update_counts(remaining_posts)
@@ -185,6 +199,8 @@ class StateManager:
             self.logger.info(f"Cleared {cleared_count} dry run records")
             return cleared_count
 
+        except CriticalStateFailure:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to clear dry run records: {e}")
             return 0
@@ -221,35 +237,35 @@ class StateManager:
 
             # Write updated failed positions
             failed_data = [failed.to_dict() for failed in failed_positions]
-            success = self.storage_adapter.write_failed_positions(
+            self.storage_adapter.write_failed_positions(
                 self.get_account_normalized(),
                 self.current_album_id,
                 failed_data
             )
 
-            if success:
-                # Update metadata
-                metadata = self.get_album_metadata()
-                metadata.add_error(error_message or f"Failed to post position {position}")
-                self.storage_adapter.write_metadata(
-                    self.get_account_normalized(),
-                    self.current_album_id,
-                    metadata.to_dict()
-                )
+            # Update metadata
+            metadata = self.get_album_metadata()
+            metadata.add_error(error_message or f"Failed to post position {position}")
+            self.storage_adapter.write_metadata(
+                self.get_account_normalized(),
+                self.current_album_id,
+                metadata.to_dict()
+            )
 
+            self.logger.info(f"Recorded failed position {position}")
+            return True
 
-                self.logger.info(f"Recorded failed position {position}")
-                return True
-            else:
-                self.logger.error(f"Failed to write failed position record for {position}")
-                return False
-
+        except CriticalStateFailure:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to record failed position {position}: {e}")
             return False
 
     def remove_failed_position(self, position: int) -> bool:
-        """Remove a position from failed positions list."""
+        """Remove a position from failed positions list.
+
+        Raises CriticalStateFailure if reading current state fails.
+        """
         try:
             failed_positions = self.get_enhanced_failed_positions()
 
@@ -263,80 +279,66 @@ class StateManager:
             if updated:
                 # Write updated failed positions
                 failed_data = [failed.to_dict() for failed in failed_positions]
-                success = self.storage_adapter.write_failed_positions(
+                self.storage_adapter.write_failed_positions(
                     self.get_account_normalized(),
                     self.current_album_id,
                     failed_data
                 )
-
-
-                return success
             return True
 
+        except CriticalStateFailure:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to remove failed position {position}: {e}")
             return False
 
     def is_album_complete(self, total_photos: int) -> bool:
-        """Check if the album is complete."""
-        try:
-            posts = self.get_instagram_posts()
-            posted_count = InstagramPost.count_real_posted(posts)
+        """Check if the album is complete.
 
-            # Update metadata with current photo count
-            metadata = self.get_album_metadata()
-            metadata.total_photos = total_photos
-            metadata.update_counts(posts)
-            self.storage_adapter.write_metadata(
-                self.get_account_normalized(),
-                self.current_album_id,
-                metadata.to_dict()
-            )
+        Read-only: performs NO storage writes (metadata is persisted only as
+        part of a posting/failure/reset operation). A failed state read raises
+        CriticalStateFailure via get_instagram_posts rather than returning a
+        misleading False.
+        """
+        posts = self.get_instagram_posts()
+        posted_count = InstagramPost.count_real_posted(posts)
 
-            is_complete = posted_count >= total_photos
-            self.logger.debug(f"Album completion check: {posted_count}/{total_photos} = {is_complete}")
-            return is_complete
-
-        except Exception as e:
-            self.logger.error(f"Failed to check album completion: {e}")
-            return False
+        is_complete = posted_count >= total_photos
+        self.logger.debug(f"Album completion check: {posted_count}/{total_photos} = {is_complete}")
+        return is_complete
 
     def get_statistics(self) -> Dict:
-        """Get comprehensive statistics about the current album."""
-        try:
-            posts = self.get_instagram_posts()
-            failed_positions = self.get_enhanced_failed_positions()
-            metadata = self.get_album_metadata()
+        """Get comprehensive statistics about the current album.
 
-            # Calculate statistics
-            total_posts = len(posts)
-            posted_count = InstagramPost.count_real_posted(posts)
-            failed_count = len([f for f in failed_positions if not f.resolved])
-            pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
+        Read-only. A failed state read raises CriticalStateFailure (via the
+        getters) rather than being masked as an error-dict result.
+        """
+        posts = self.get_instagram_posts()
+        failed_positions = self.get_enhanced_failed_positions()
+        metadata = self.get_album_metadata()
 
-            return {
-                "album_id": self.current_album_id,
-                "account": self.get_account_normalized(),
-                "total_photos": metadata.total_photos,
-                "total_posts": total_posts,
-                "posted_count": posted_count,
-                "failed_count": failed_count,
-                "pending_count": pending_count,
-                "completion_percentage": metadata.completion_percentage,
-                "completion_status": metadata.completion_status.value,
-                "last_posted_at": metadata.last_posted_at,
-                "last_update": metadata.last_update,
-                "workflow_runs_count": metadata.workflow_runs_count,
-                "error_count": metadata.error_count,
-                "storage_backend": type(self.storage_adapter).__name__
-            }
+        # Calculate statistics
+        total_posts = len(posts)
+        posted_count = InstagramPost.count_real_posted(posts)
+        failed_count = len([f for f in failed_positions if not f.resolved])
+        pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
 
-        except Exception as e:
-            self.logger.error(f"Failed to get statistics: {e}")
-            return {
-                "error": str(e),
-                "storage_backend": type(self.storage_adapter).__name__
-            }
+        return {
+            "album_id": self.current_album_id,
+            "account": self.get_account_normalized(),
+            "total_photos": metadata.total_photos,
+            "total_posts": total_posts,
+            "posted_count": posted_count,
+            "failed_count": failed_count,
+            "pending_count": pending_count,
+            "completion_percentage": metadata.completion_percentage,
+            "completion_status": metadata.completion_status.value,
+            "last_posted_at": metadata.last_posted_at,
+            "last_update": metadata.last_update,
+            "workflow_runs_count": metadata.workflow_runs_count,
+            "error_count": metadata.error_count,
+            "storage_backend": type(self.storage_adapter).__name__
+        }
 
 
     def get_next_photo_to_post(self, photos: List[PhotoListItem], include_dry_runs: bool = False) -> Optional[PhotoListItem]:
@@ -349,34 +351,35 @@ class StateManager:
 
         Returns:
             Next photo to post or None if all are posted
+
+        Raises:
+            CriticalStateFailure: if reading posted/failed state fails. This
+            must propagate — swallowing it and returning photo 1 is exactly
+            the silent album-restart this refactor exists to prevent.
         """
-        try:
-            if not photos:
-                self.logger.warning("No photos provided to get_next_photo_to_post")
-                return None
-
-            # Get posted photos
-            posted_photos = self.get_instagram_posts()
-            if include_dry_runs:
-                real_posted = [p for p in posted_photos if p.status == PostStatus.POSTED]
-            else:
-                real_posted = InstagramPost.get_real_posted(posted_photos)
-            posted_ids = {p.photo_id for p in real_posted if p.photo_id}
-
-            # Get failed positions that should be retried
-            failed_positions = self.get_enhanced_failed_positions()
-            failed_ids = {f.photo_id for f in failed_positions if not f.resolved and f.photo_id}
-
-            # Find next unposted photo
-            for photo in sorted(photos, key=lambda x: x.album_position):
-                if photo.id not in posted_ids and photo.id not in failed_ids:
-                    return photo
-
+        if not photos:
+            self.logger.warning("No photos provided to get_next_photo_to_post")
             return None
 
-        except Exception as e:
-            self.logger.error(f"Error in get_next_photo_to_post: {e}")
-            return None
+        # Get posted photos — a failed read raises CriticalStateFailure here
+        # rather than yielding an empty list (which would select photo 1).
+        posted_photos = self.get_instagram_posts()
+        if include_dry_runs:
+            real_posted = [p for p in posted_photos if p.status == PostStatus.POSTED]
+        else:
+            real_posted = InstagramPost.get_real_posted(posted_photos)
+        posted_ids = {p.photo_id for p in real_posted if p.photo_id}
+
+        # Get failed positions that should be retried
+        failed_positions = self.get_enhanced_failed_positions()
+        failed_ids = {f.photo_id for f in failed_positions if not f.resolved and f.photo_id}
+
+        # Find next unposted photo
+        for photo in sorted(photos, key=lambda x: x.album_position):
+            if photo.id not in posted_ids and photo.id not in failed_ids:
+                return photo
+
+        return None
 
     def log_automation_run(self, success: bool, details: str = "", account_name: str = "",
                           album_name: str = "", album_url: str = "") -> None:
@@ -417,6 +420,8 @@ class StateManager:
             if album_url:
                 self.logger.info(f"Album URL: {album_url}")
 
+        except CriticalStateFailure:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to log automation run: {e}")
 
@@ -436,83 +441,91 @@ class StateManager:
                             persisted so a delayed Threads cross-post can reuse it.
 
         Returns:
-            Post record ID or None if failed
+            Post record ID, or None if the record could not be persisted.
+
+        Raises:
+            CriticalStateFailure: if reading current state fails (must halt the
+                run rather than post without a durable record).
         """
+        album_position = photo_data.album_position
+        flickr_photo_id = photo_data.id
+        title = photo_data.title
+        flickr_url = photo_data.url
+
+        if is_dry_run:
+            self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")
+
+        # Build the post record
+        if instagram_post_id:
+            status = PostStatus.POSTED
+            self.logger.info(f"Recording successful post for photo #{album_position}")
+        elif is_dry_run:
+            status = PostStatus.POSTED
+        else:
+            status = PostStatus.FAILED
+            self.logger.warning(f"Recording failed post for photo #{album_position}")
+
+        post = InstagramPost(
+            position=album_position,
+            photo_id=flickr_photo_id,
+            title=title,
+            status=status,
+            account=self.get_account_normalized(),
+            flickr_url=flickr_url,
+            is_dry_run=is_dry_run,
+            workflow_run_id=os.getenv('GITHUB_RUN_ID'),
+            instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
+            facebook_post_id=facebook_post_id,
+            generated_body=generated_body,
+        )
+        if instagram_post_id:
+            post.mark_as_posted(instagram_post_id)
+
+        # Upsert into posts list (a failed read here raises CriticalStateFailure)
+        posts = self.get_instagram_posts()
+        existing_idx = next(
+            (i for i, p in enumerate(posts) if p.position == album_position), None
+        )
+        if existing_idx is not None:
+            posts[existing_idx] = post
+        else:
+            posts.append(post)
+
+        # Persist. Write ORDER is a compatibility contract: the posts file is
+        # written FIRST — this is the effective commit point a concurrently
+        # scheduled delayed-Threads run keys off, so it never observes a post
+        # without its threads-due record. Do not reorder posts vs failed writes.
+        # A write failure now raises StateStorageError; catch it to preserve the
+        # historical "return None on write failure" contract that main.py reads.
         try:
-            album_position = photo_data.album_position
-            flickr_photo_id = photo_data.id
-            title = photo_data.title
-            flickr_url = photo_data.url
-
-            if is_dry_run:
-                self.logger.info(f"DRY RUN: Would post photo #{album_position} - {title}")
-
-            # Build the post record
-            if instagram_post_id:
-                status = PostStatus.POSTED
-                self.logger.info(f"Recording successful post for photo #{album_position}")
-            elif is_dry_run:
-                status = PostStatus.POSTED
-            else:
-                status = PostStatus.FAILED
-                self.logger.warning(f"Recording failed post for photo #{album_position}")
-
-            post = InstagramPost(
-                position=album_position,
-                photo_id=flickr_photo_id,
-                title=title,
-                status=status,
-                account=self.get_account_normalized(),
-                flickr_url=flickr_url,
-                is_dry_run=is_dry_run,
-                workflow_run_id=os.getenv('GITHUB_RUN_ID'),
-                instagram_url=f"https://www.instagram.com/p/{instagram_post_id}/" if instagram_post_id else None,
-                facebook_post_id=facebook_post_id,
-                generated_body=generated_body,
-            )
-            if instagram_post_id:
-                post.mark_as_posted(instagram_post_id)
-
-            # Upsert into posts list
-            posts = self.get_instagram_posts()
-            existing_idx = next(
-                (i for i, p in enumerate(posts) if p.position == album_position), None
-            )
-            if existing_idx is not None:
-                posts[existing_idx] = post
-            else:
-                posts.append(post)
-
-            # Persist
-            if not self.storage_adapter.write_posts(
+            self.storage_adapter.write_posts(
                 self.get_account_normalized(), self.current_album_id,
                 [p.to_dict() for p in posts]
-            ):
-                self.logger.error(f"Failed to write post record for photo #{album_position}")
-                return None
-
-            # Update metadata
-            metadata = self.get_album_metadata()
-            metadata.update_counts(posts)
-            metadata.last_update = datetime.now().isoformat()
-            if instagram_post_id:
-                metadata.last_posted_at = datetime.now().isoformat()
-            workflow_run_id = os.getenv('GITHUB_RUN_ID')
-            if workflow_run_id:
-                metadata.add_workflow_run(workflow_run_id)
-            self.storage_adapter.write_metadata(
-                self.get_account_normalized(), self.current_album_id, metadata.to_dict()
             )
-
-            # Clear from failed positions on success
-            if instagram_post_id:
-                self.remove_failed_position(album_position)
-
-            return "dry_run" if is_dry_run else flickr_photo_id
-
-        except Exception as e:
-            self.logger.error(f"Failed to create post record: {e}")
+        except StateStorageError as e:
+            self.logger.error(f"Failed to write post record for photo #{album_position}: {e}")
             return None
+
+        # Update metadata (write #2). Batched into this posting cycle so a
+        # successful post is at most 2 writes (posts + metadata).
+        metadata = self.get_album_metadata()
+        metadata.update_counts(posts)
+        metadata.last_update = datetime.now().isoformat()
+        if instagram_post_id:
+            metadata.last_posted_at = datetime.now().isoformat()
+        workflow_run_id = os.getenv('GITHUB_RUN_ID')
+        if workflow_run_id:
+            metadata.add_workflow_run(workflow_run_id)
+        self.storage_adapter.write_metadata(
+            self.get_account_normalized(), self.current_album_id, metadata.to_dict()
+        )
+
+        # Clear from failed positions on success (only writes when the photo
+        # was previously failed — unchanged behavior, outside the base 2 writes)
+        if instagram_post_id:
+            self.remove_failed_position(album_position)
+
+        return "dry_run" if is_dry_run else flickr_photo_id
 
     def get_posts_due_for_threads(self, delay_hours: int = 8,
                                   max_retries: int = 5) -> List[InstagramPost]:
@@ -558,51 +571,55 @@ class StateManager:
             due.sort(key=lambda p: p.posted_at)
             return due
 
+        except CriticalStateFailure:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to find posts due for Threads cross-posting: {e}")
             return []
 
     def _persist_posts(self, posts: List[InstagramPost]) -> bool:
-        """Persist the full posts list to storage."""
-        return self.storage_adapter.write_posts(
-            self.get_account_normalized(),
-            self.current_album_id,
-            [p.to_dict() for p in posts]
-        )
+        """Persist the full posts list to storage.
+
+        Returns False (rather than propagating) on a write failure so Threads
+        callers can record a retry; the read that precedes it still fails loud.
+        """
+        try:
+            return self.storage_adapter.write_posts(
+                self.get_account_normalized(),
+                self.current_album_id,
+                [p.to_dict() for p in posts]
+            )
+        except StateStorageError as e:
+            self.logger.error(f"Failed to persist posts: {e}")
+            return False
 
     def update_threads_post_id(self, position: int, threads_post_id: str,
                                caption: str) -> bool:
-        """Update an existing post record with a successful Threads cross-post ID."""
-        try:
-            posts = self.get_instagram_posts()
-            idx = next((i for i, p in enumerate(posts) if p.position == position), None)
-            if idx is None:
-                self.logger.error(
-                    f"Cannot update Threads post: no record at position {position}"
-                )
-                return False
-            posts[idx].mark_threads_posted(threads_post_id, caption)
-            return self._persist_posts(posts)
-        except Exception as e:
+        """Update an existing post record with a successful Threads cross-post ID.
+
+        Raises CriticalStateFailure if reading current state fails.
+        """
+        posts = self.get_instagram_posts()
+        idx = next((i for i, p in enumerate(posts) if p.position == position), None)
+        if idx is None:
             self.logger.error(
-                f"Failed to update Threads post ID for position {position}: {e}"
+                f"Cannot update Threads post: no record at position {position}"
             )
             return False
+        posts[idx].mark_threads_posted(threads_post_id, caption)
+        return self._persist_posts(posts)
 
     def increment_threads_retry(self, position: int) -> bool:
-        """Record a failed Threads attempt so retries eventually back off."""
-        try:
-            posts = self.get_instagram_posts()
-            idx = next((i for i, p in enumerate(posts) if p.position == position), None)
-            if idx is None:
-                self.logger.error(
-                    f"Cannot increment Threads retry: no record at position {position}"
-                )
-                return False
-            posts[idx].add_threads_retry()
-            return self._persist_posts(posts)
-        except Exception as e:
+        """Record a failed Threads attempt so retries eventually back off.
+
+        Raises CriticalStateFailure if reading current state fails.
+        """
+        posts = self.get_instagram_posts()
+        idx = next((i for i, p in enumerate(posts) if p.position == position), None)
+        if idx is None:
             self.logger.error(
-                f"Failed to increment Threads retry for position {position}: {e}"
+                f"Cannot increment Threads retry: no record at position {position}"
             )
             return False
+        posts[idx].add_threads_retry()
+        return self._persist_posts(posts)
