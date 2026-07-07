@@ -26,6 +26,7 @@ class TestBlogContentExtractor:
         """Create BlogContentExtractor instance."""
         return BlogContentExtractor(config)
     
+    @pytest.mark.live_api
     def test_extract_blog_content_live_mauritius_url(self, extractor):
         """Test extracting content from live Mauritius blog URL."""
         blog_url = "https://travelmemo.com/mauritius/mauritius-what-to-do"
@@ -109,6 +110,7 @@ class TestBlogContentExtractor:
         assert 'gallura' in keyword_map
         assert keyword_map['gallura']['weight'] >= 4
 
+    @pytest.mark.live_api
     def test_find_relevant_content_mauritius_beach_photo(self, extractor):
         """Test finding relevant blog content for a Mauritius beach photo."""
         # First extract the blog content
@@ -173,6 +175,7 @@ class TestBlogContentExtractor:
 
         print(f"PASS: Scoring works: relevant={high_score}, irrelevant={low_score}")
 
+    @pytest.mark.live_api
     def test_image_context_extraction_mauritius_blog(self, extractor):
         """Test extracting image context from Mauritius blog."""
         blog_content = extractor.extract_blog_content("https://travelmemo.com/mauritius/mauritius-what-to-do")
