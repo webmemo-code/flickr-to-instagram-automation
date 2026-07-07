@@ -2,13 +2,100 @@
 Email notification system for Flickr to Instagram automation.
 Sends completion notifications to social media managers.
 """
+import os
 import smtplib
 import logging
 from datetime import datetime
+from email.message import Message
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from config import Config
+
+_logger = logging.getLogger(__name__)
+
+
+def _smtp_config():
+    """Read SMTP configuration from the environment.
+
+    This is the single place SMTP host/port/credentials are read — every
+    sender (EmailNotifier, CriticalFailureNotifier) goes through send_email()
+    below rather than reading these vars or constructing smtplib.SMTP itself.
+
+    Defaulting rules (unchanged, see issue #171): GitHub Actions exports unset
+    optional secrets as "" rather than omitting them, so `or`-chains (not
+    getenv defaults) are used to fall through empty strings. SMTP_HOST is
+    tried before the legacy SMTP_SERVER name, then a gmail default.
+    """
+    smtp_host = os.getenv('SMTP_HOST') or os.getenv('SMTP_SERVER') or 'smtp.gmail.com'
+
+    smtp_port_str = (os.getenv('SMTP_PORT') or '587').strip()
+    try:
+        smtp_port = int(smtp_port_str) if smtp_port_str else 587
+    except ValueError:
+        _logger.debug("Invalid SMTP_PORT value, defaulting to 587")
+        smtp_port = 587
+
+    return {
+        'host': smtp_host,
+        'port': smtp_port,
+        'username': os.getenv('SMTP_USERNAME'),
+        'password': os.getenv('SMTP_PASSWORD'),
+        'recipient': os.getenv('NOTIFICATION_EMAIL'),
+    }
+
+
+def send_email(subject: str, text_body: str, html_body: Optional[str] = None) -> bool:
+    """Send an email. The single production code path that constructs
+    smtplib.SMTP — every notification sender routes through this function.
+
+    Args:
+        subject: Email subject line.
+        text_body: Plain-text body (always included).
+        html_body: Optional HTML body; when given, the message is sent as
+            multipart/alternative with both parts attached.
+
+    Returns:
+        True if the email was sent successfully, False otherwise (including
+        when SMTP credentials/recipient are not configured).
+    """
+    cfg = _smtp_config()
+    if not all([cfg['username'], cfg['password'], cfg['recipient']]):
+        _logger.warning("Email notification not configured - skipping send")
+        return False
+
+    if html_body is not None:
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(text_body, 'plain'))
+        msg.attach(MIMEText(html_body, 'html'))
+    else:
+        msg = MIMEText(text_body)
+
+    msg['Subject'] = subject
+    msg['From'] = cfg['username']
+    msg['To'] = cfg['recipient']
+
+    try:
+        with smtplib.SMTP(cfg['host'], cfg['port']) as server:
+            server.starttls()
+            server.login(cfg['username'], cfg['password'])
+            server.send_message(msg)
+        _logger.info(f"Email sent to {cfg['recipient']}: {subject}")
+        return True
+    except smtplib.SMTPAuthenticationError as e:
+        _logger.error(f"SMTP authentication failed: {e}")
+        _logger.error("Check SMTP_USERNAME and SMTP_PASSWORD credentials")
+        return False
+    except smtplib.SMTPConnectError as e:
+        _logger.error(f"SMTP connection failed: {e}")
+        _logger.error(f"Check SMTP_HOST ({cfg['host']}) and SMTP_PORT ({cfg['port']})")
+        return False
+    except smtplib.SMTPException as e:
+        _logger.error(f"SMTP error occurred: {e}")
+        return False
+    except Exception as e:
+        _logger.error(f"Unexpected error sending email: {e}")
+        return False
 
 
 class EmailNotifier:
@@ -142,37 +229,41 @@ Generated automatically on {completion_date}
         </html>
         """
     
-    def _send_email(self, msg: MIMEMultipart) -> bool:
-        """Send email using SMTP."""
-        try:
-            # Create SMTP session
-            server = smtplib.SMTP(self.config.smtp_host, self.config.smtp_port)
-            server.starttls()  # Enable TLS encryption
-            
-            # Login to the SMTP server
-            server.login(self.config.smtp_username, self.config.smtp_password)
-            
-            # Send email
-            text = msg.as_string()
-            server.sendmail(self.config.smtp_username, self.config.notification_email, text)
-            server.quit()
-            
-            return True
-            
-        except smtplib.SMTPAuthenticationError as e:
-            self.logger.error(f"SMTP authentication failed: {e}")
-            self.logger.error("Check SMTP_USERNAME and SMTP_PASSWORD credentials")
-            return False
-        except smtplib.SMTPConnectError as e:
-            self.logger.error(f"SMTP connection failed: {e}")
-            self.logger.error(f"Check SMTP_HOST ({self.config.smtp_host}) and SMTP_PORT ({self.config.smtp_port})")
-            return False
-        except smtplib.SMTPException as e:
-            self.logger.error(f"SMTP error occurred: {e}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error sending email: {e}")
-            return False
+    def _send_email(self, msg: Message) -> bool:
+        """Send a pre-built email message via the shared send_email() core.
+
+        Extracts subject/text/html from the message built by
+        _create_completion_email / _create_api_failure_email / the plain
+        MIMEText test message, so message CONTENT is unchanged while sending
+        goes through the single production SMTP path in this module.
+        """
+        def _decoded_payload(part: Message) -> str:
+            # get_payload() without decode=True returns the RAW transfer-encoded
+            # form (e.g. base64) whenever the content isn't plain ASCII — which
+            # every template using emoji (🚨/✅/❌) triggers. decode=True applies
+            # the Content-Transfer-Encoding, then we decode bytes -> str using
+            # the part's declared charset (defaulting to utf-8).
+            raw = part.get_payload(decode=True)
+            if raw is None:
+                return part.get_payload() or ''
+            charset = part.get_content_charset() or 'utf-8'
+            return raw.decode(charset)
+
+        subject = msg['Subject'] or ''
+        text_body = ''
+        html_body = None
+
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                if content_type == 'text/plain':
+                    text_body = _decoded_payload(part)
+                elif content_type == 'text/html':
+                    html_body = _decoded_payload(part)
+        else:
+            text_body = _decoded_payload(msg)
+
+        return send_email(subject, text_body, html_body)
     
     def send_api_failure_alert(self,
                                 blog_url: str,
