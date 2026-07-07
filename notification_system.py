@@ -6,21 +6,12 @@ preventing wrong photos from being posted due to state tracking errors.
 """
 
 import os
-import smtplib
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import json
 
-# Email imports with fallback
-try:
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    EMAIL_AVAILABLE = True
-except ImportError:
-    EMAIL_AVAILABLE = False
-    MIMEText = None
-    MIMEMultipart = None
+from email_notifier import send_email, _smtp_config
 
 
 class CriticalFailureNotifier:
@@ -29,28 +20,14 @@ class CriticalFailureNotifier:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-        # Email configuration from environment variables (using existing config).
-        # `or` chain (not getenv defaults) so empty strings — which the workflow
-        # emits via `${{ secrets.SMTP_HOST || '' }}` when the secret is unset —
-        # fall through to the next candidate. Otherwise smtplib.SMTP('', 587)
-        # skips connect() and the next call raises "please run connect() first".
-        self.smtp_server = os.getenv('SMTP_HOST') or os.getenv('SMTP_SERVER') or 'smtp.gmail.com'
-
-        # Handle SMTP_PORT safely - default to 587 if empty or invalid
-        smtp_port_str = os.getenv('SMTP_PORT', '587').strip()
-        try:
-            self.smtp_port = int(smtp_port_str) if smtp_port_str else 587
-        except ValueError:
-            self.logger.debug("Invalid SMTP_PORT value, defaulting to 587")
-            self.smtp_port = 587
-
-        self.email_user = os.getenv('SMTP_USERNAME')
-        self.email_password = os.getenv('SMTP_PASSWORD')
-        self.notification_recipient = os.getenv('NOTIFICATION_EMAIL')
-
         # GitHub Actions notification (fallback)
         self.github_run_id = os.getenv('GITHUB_RUN_ID')
         self.github_repository = os.getenv('GITHUB_REPOSITORY')
+
+    @property
+    def smtp_server(self) -> str:
+        """SMTP host, resolved via email_notifier's single config-read point."""
+        return _smtp_config()['host']
 
     def send_critical_failure_alert(self, error_type: str, error_details: str,
                                   context: Dict[str, Any] = None) -> bool:
@@ -128,50 +105,24 @@ This is an automated safety alert. The automation has been halted to prevent pos
             return False
 
     def _send_email_alert(self, subject: str, body: str) -> bool:
-        """Send email alert if email configuration is available."""
+        """Send email alert via the shared send_email() core.
+
+        Delegates to email_notifier.send_email — CriticalFailureNotifier does
+        not build its own SMTP connection or re-read SMTP env vars.
+        """
         try:
-            if not EMAIL_AVAILABLE:
-                self.logger.warning("Email libraries not available - using GitHub Actions annotations only")
-                return False
-
-            if not all([self.email_user, self.email_password, self.notification_recipient]):
-                self.logger.warning("Email notification not configured - using GitHub Actions annotations only")
-                return False
-
-            # Create email message
-            msg = MIMEMultipart()
-            msg['From'] = self.email_user
-            msg['To'] = self.notification_recipient
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
-
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.email_user, self.email_password)
-                server.send_message(msg)
-
-            self.logger.info(f"Critical failure email sent to {self.notification_recipient}")
-            return True
-
+            sent = send_email(subject, body)
+            if sent:
+                self.logger.info("Critical failure email sent")
+            else:
+                self.logger.warning(
+                    "Email notification not configured or failed - "
+                    "using GitHub Actions annotations only"
+                )
+            return sent
         except Exception as e:
             self.logger.error(f"Failed to send email notification: {e}")
             return False
-
-    def validate_state_access_or_fail(self, operation: str) -> None:
-        """
-        Validate that state management operations can proceed safely.
-        If not, send alert and raise exception to stop automation.
-
-        Args:
-            operation: Description of the operation being attempted
-
-        Raises:
-            CriticalStateFailure: If state management is compromised
-        """
-        # This method should be called before any state-dependent operations
-        # Implementation will be added based on specific state management needs
-        pass
 
 
 class CriticalStateFailure(Exception):
@@ -181,43 +132,3 @@ class CriticalStateFailure(Exception):
 
 # Global notifier instance
 notifier = CriticalFailureNotifier()
-
-
-def fail_safe_state_operation(operation_name: str, operation_func, *args, **kwargs):
-    """
-    Wrapper for state operations that must not fail silently.
-
-    Args:
-        operation_name: Name of the operation for error reporting
-        operation_func: Function to execute
-        *args, **kwargs: Arguments for the operation function
-
-    Returns:
-        Result of operation_func
-
-    Raises:
-        CriticalStateFailure: If operation fails and automation should stop
-    """
-    try:
-        result = operation_func(*args, **kwargs)
-
-        # Validate result is not a dangerous fallback
-        if result is None and operation_name in ['get_last_posted_position', 'get_instagram_posts']:
-            error_msg = f"State operation '{operation_name}' returned None - possible permission/access failure"
-            notifier.send_critical_failure_alert(
-                "STATE_ACCESS_FAILURE",
-                error_msg,
-                {"operation": operation_name, "args": str(args), "kwargs": str(kwargs)}
-            )
-            raise CriticalStateFailure(error_msg)
-
-        return result
-
-    except Exception as e:
-        error_msg = f"Critical failure in state operation '{operation_name}': {str(e)}"
-        notifier.send_critical_failure_alert(
-            "STATE_OPERATION_FAILURE",
-            error_msg,
-            {"operation": operation_name, "exception": str(e), "args": str(args)}
-        )
-        raise CriticalStateFailure(error_msg) from e

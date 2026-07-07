@@ -32,15 +32,19 @@ class TestSmtpHostDefault:
 
 
 class TestCriticalFailureNotifierSmtpServer:
+    """smtp_server is now a live property (reads email_notifier._smtp_config()
+    at access time, WP4's single config-read point) rather than captured at
+    __init__ — assert inside the patched environment."""
+
     def test_unset_smtp_host_uses_gmail_default(self):
         with patch.dict(os.environ, {}, clear=True):
             notifier = CriticalFailureNotifier()
-        assert notifier.smtp_server == 'smtp.gmail.com'
+            assert notifier.smtp_server == 'smtp.gmail.com'
 
     def test_empty_smtp_host_uses_gmail_default(self):
         with patch.dict(os.environ, {'SMTP_HOST': ''}, clear=True):
             notifier = CriticalFailureNotifier()
-        assert notifier.smtp_server == 'smtp.gmail.com'
+            assert notifier.smtp_server == 'smtp.gmail.com'
 
     def test_empty_smtp_host_falls_through_to_smtp_server(self):
         with patch.dict(
@@ -49,7 +53,7 @@ class TestCriticalFailureNotifierSmtpServer:
             clear=True,
         ):
             notifier = CriticalFailureNotifier()
-        assert notifier.smtp_server == 'smtp.legacy.example.com'
+            assert notifier.smtp_server == 'smtp.legacy.example.com'
 
     def test_explicit_smtp_host_takes_precedence(self):
         with patch.dict(
@@ -58,4 +62,4 @@ class TestCriticalFailureNotifierSmtpServer:
             clear=True,
         ):
             notifier = CriticalFailureNotifier()
-        assert notifier.smtp_server == 'smtp.primary.example.com'
+            assert notifier.smtp_server == 'smtp.primary.example.com'
