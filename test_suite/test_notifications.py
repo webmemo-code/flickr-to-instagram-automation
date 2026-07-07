@@ -141,3 +141,41 @@ class TestContentUnchanged:
         assert '<td style="padding: 8px;"><strong>42</strong></td>' in html
         assert '<td style="padding: 8px;">2026-07-07 12:00 UTC</td>' in html
         assert f'href="{config.album_url}"' in html
+
+
+class TestNonAsciiPayloadDecoding:
+    def test_emoji_body_decoded_not_base64(self, full_env):
+        """REGRESSION: _send_email must decode transfer-encoded (base64/
+        quoted-printable) payloads before handing them to send_email(). The
+        API-failure templates contain emoji (🚨/✅/❌), which forces MIMEText
+        to base64-encode the part — get_payload() without decode=True returns
+        that raw encoded string, corrupting the delivered body if sent as-is.
+
+        Asserts on the arguments send_email() actually receives (the
+        production boundary the bug crossed), rather than re-parsing a
+        reconstructed message, which has its own separate encoding step."""
+        full_env(
+            SMTP_USERNAME='bot@example.com',
+            SMTP_PASSWORD='pw',
+            NOTIFICATION_EMAIL='manager@example.com',
+        )
+        config = Config()
+        notifier = EmailNotifier(config)
+
+        with patch.object(email_notifier, 'send_email', return_value=True) as mock_send:
+            notifier.send_api_failure_alert(
+                'https://example.com', {'http_status': 500}, 'primary'
+            )
+
+        mock_send.assert_called_once()
+        subject, text_body, html_body = mock_send.call_args[0]
+
+        assert '🚨' in subject
+        # A corrupted (still-encoded) body would be an opaque base64 blob,
+        # not readable text containing the known template content.
+        assert 'WordPress API Access Failure Alert' in text_body
+        assert 'ACCOUNT: primary' in text_body
+        # The HTML template's Yes/No cells use ✅/❌, forcing base64 transfer
+        # encoding — this is the exact content that exposed the bug.
+        assert '✅' in html_body or '❌' in html_body
+        assert '<html>' in html_body

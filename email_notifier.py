@@ -237,6 +237,18 @@ Generated automatically on {completion_date}
         MIMEText test message, so message CONTENT is unchanged while sending
         goes through the single production SMTP path in this module.
         """
+        def _decoded_payload(part: Message) -> str:
+            # get_payload() without decode=True returns the RAW transfer-encoded
+            # form (e.g. base64) whenever the content isn't plain ASCII — which
+            # every template using emoji (🚨/✅/❌) triggers. decode=True applies
+            # the Content-Transfer-Encoding, then we decode bytes -> str using
+            # the part's declared charset (defaulting to utf-8).
+            raw = part.get_payload(decode=True)
+            if raw is None:
+                return part.get_payload() or ''
+            charset = part.get_content_charset() or 'utf-8'
+            return raw.decode(charset)
+
         subject = msg['Subject'] or ''
         text_body = ''
         html_body = None
@@ -245,11 +257,11 @@ Generated automatically on {completion_date}
             for part in msg.walk():
                 content_type = part.get_content_type()
                 if content_type == 'text/plain':
-                    text_body = part.get_payload()
+                    text_body = _decoded_payload(part)
                 elif content_type == 'text/html':
-                    html_body = part.get_payload()
+                    html_body = _decoded_payload(part)
         else:
-            text_body = msg.get_payload()
+            text_body = _decoded_payload(msg)
 
         return send_email(subject, text_body, html_body)
     

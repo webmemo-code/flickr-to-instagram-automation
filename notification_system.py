@@ -8,7 +8,7 @@ preventing wrong photos from being posted due to state tracking errors.
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 
 from email_notifier import send_email, _smtp_config
@@ -30,7 +30,7 @@ class CriticalFailureNotifier:
         return _smtp_config()['host']
 
     def send_critical_failure_alert(self, error_type: str, error_details: str,
-                                  context: Dict[str, Any] = None) -> bool:
+                                  context: Optional[Dict[str, Any]] = None) -> bool:
         """
         Send immediate alert for critical state management failures.
 
