@@ -16,6 +16,7 @@ from instagram_api import InstagramAPI
 from state_manager import StateManager
 from email_notifier import EmailNotifier
 from account_config import account_manager
+from notification_system import CriticalStateFailure
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -214,6 +215,11 @@ def post_next_photo(dry_run: bool = False, include_dry_runs: bool = True, accoun
                  account_display, config)
         return True
 
+    except CriticalStateFailure:
+        # State access is compromised — the alert already fired in StateManager.
+        # Re-raise so main() exits non-zero and the run visibly fails instead of
+        # silently continuing (a re-run is the fix; no state repair needed).
+        raise
     except Exception as e:
         logger.error(f"Automation failed: {e}")
         return False
@@ -374,6 +380,9 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
         )
         return all_succeeded
 
+    except CriticalStateFailure:
+        # State read failed — alert already fired; re-raise for a non-zero exit.
+        raise
     except Exception as e:
         logger.error(f"Threads automation failed: {e}")
         return False
@@ -481,6 +490,10 @@ def show_stats(account: str = 'primary') -> None:
         else:
             print(f"\nStatus: IN PROGRESS")
 
+    except CriticalStateFailure:
+        # A failed state read on the read-only stats path must still surface as
+        # a hard failure rather than printing partial/misleading numbers.
+        raise
     except Exception as e:
         logger.error(f"Failed to show stats: {e}")
 
@@ -610,4 +623,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CriticalStateFailure as e:
+        # State access was compromised anywhere in the run. The critical-failure
+        # alert already fired inside StateManager; exit non-zero so the workflow
+        # is marked failed. Re-running is the fix — no state repair is needed.
+        logging.getLogger(__name__).critical(
+            f"Automation stopped due to critical state failure: {e}"
+        )
+        sys.exit(1)

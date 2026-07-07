@@ -16,6 +16,27 @@ from github.Repository import Repository
 from github.GithubException import GithubException
 
 
+class StateFileNotFound(Exception):
+    """Raised when a state file (or its branch) does not exist yet.
+
+    This is the ONLY 'absent' outcome — a fresh album or first-ever run where
+    the Contents API returns 404. Callers translate it into an empty default.
+    Every other read failure (401/403, 5xx, rate-limit, connection error,
+    malformed JSON) propagates as a real exception so it can never be mistaken
+    for empty state (see docs/refactor/03-state-layer-spec.md, error taxonomy).
+    """
+    pass
+
+
+class StateStorageError(Exception):
+    """Raised when a storage read/write fails for any non-absent reason.
+
+    Distinct from StateFileNotFound so StateManager can fail loud
+    (CriticalStateFailure) instead of silently returning empty/false.
+    """
+    pass
+
+
 class StateStorageAdapter(ABC):
     """Abstract base class for state storage backends."""
 
@@ -30,12 +51,12 @@ class StateStorageAdapter(ABC):
         pass
 
     @abstractmethod
-    def read_failed_positions(self, account: str, album_id: str) -> List[int]:
+    def read_failed_positions(self, account: str, album_id: str) -> List[Dict]:
         """Read failed position records for an account/album."""
         pass
 
     @abstractmethod
-    def write_failed_positions(self, account: str, album_id: str, positions: List[int]) -> bool:
+    def write_failed_positions(self, account: str, album_id: str, positions: List[Dict]) -> bool:
         """Write failed position records for an account/album."""
         pass
 
@@ -71,6 +92,11 @@ class GitFileStorageAdapter(StateStorageAdapter):
         self.github_token = github_token
         self.branch = branch
         self.logger = logging.getLogger(__name__)
+
+        # is_available() result is cached for the adapter instance lifetime
+        # (one instance per run) so reads/writes don't each issue a live
+        # get_branch call. None = not yet checked.
+        self._available: Optional[bool] = None
 
         # Initialize GitHub client
         try:
@@ -114,25 +140,49 @@ class GitFileStorageAdapter(StateStorageAdapter):
         account_normalized = account.lower().replace('-', '_')
         return f"state-data/{account_normalized}/album-{album_id}/{file_type}.json"
 
-    def _read_json_file(self, file_path: str, default: Any = None) -> Any:
-        """Read and parse JSON file from repository."""
+    def _read_json_file(self, file_path: str) -> Any:
+        """Read and parse a JSON file from the repository.
+
+        Returns the parsed JSON on success.
+
+        Raises:
+            StateFileNotFound: the file does not exist yet (Contents API 404).
+                This is the ONLY 'absent' outcome; callers translate it into
+                their empty default.
+            StateStorageError: any other failure (401/403, 5xx, rate-limit,
+                connection error, malformed JSON). Never silently downgraded
+                to an empty result.
+        """
         try:
             file_content = self.repo.get_contents(file_path, ref=self.branch)
             content_decoded = base64.b64decode(file_content.content).decode('utf-8')
             return json.loads(content_decoded)
         except GithubException as e:
             if e.status == 404:
-                self.logger.debug(f"File {file_path} not found, returning default")
-                return default if default is not None else []
-            else:
-                self.logger.error(f"Error reading file {file_path}: {e}")
-                return default if default is not None else []
+                self.logger.debug(f"File {file_path} not found (absent)")
+                raise StateFileNotFound(file_path) from e
+            self.logger.error(f"Error reading file {file_path}: {e}")
+            raise StateStorageError(f"Failed to read {file_path}: {e}") from e
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON in file {file_path}: {e}")
-            return default if default is not None else []
+            raise StateStorageError(f"Malformed JSON in {file_path}: {e}") from e
+        except StateFileNotFound:
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error reading file {file_path}: {e}")
+            raise StateStorageError(f"Failed to read {file_path}: {e}") from e
 
     def _write_json_file(self, file_path: str, data: Any, commit_message: str) -> bool:
-        """Write JSON data to repository file."""
+        """Write JSON data to a repository file.
+
+        Returns True on success.
+
+        Raises:
+            StateStorageError: the write failed (stale sha from a concurrent
+                update, 5xx, permission error, connection error, ...). A failed
+                write must never be reported to StateManager as success, or a
+                post could be published without its state record being saved.
+        """
         try:
             content = json.dumps(data, indent=2, default=str)
             # GitHub Contents API automatically handles base64 encoding - don't encode manually
@@ -160,26 +210,43 @@ class GitFileStorageAdapter(StateStorageAdapter):
                     )
                     self.logger.debug(f"Created file {file_path}")
                 else:
-                    raise e
+                    raise
 
             return True
 
         except Exception as e:
             self.logger.error(f"Failed to write file {file_path}: {e}")
-            return False
+            raise StateStorageError(f"Failed to write {file_path}: {e}") from e
+
+    def _require_available(self) -> None:
+        """Raise StateStorageError if the storage backend can't be reached.
+
+        An unreachable branch is a Denied/Failed outcome, not Absent — it must
+        never be silently downgraded to an empty read or a no-op write.
+        """
+        if not self.is_available():
+            raise StateStorageError(
+                f"State storage unavailable: cannot reach branch "
+                f"'{self.branch}' on {self.repo_name}"
+            )
 
     def read_posts(self, account: str, album_id: str) -> List[Dict]:
-        """Read Instagram post records for an account/album."""
-        if not self.is_available():
-            return []
+        """Read Instagram post records for an account/album.
+
+        Returns [] only when the file is absent (first run). Any access
+        failure raises StateStorageError — never a spurious empty list.
+        """
+        self._require_available()
 
         file_path = self._get_file_path(account, album_id, "posts")
-        return self._read_json_file(file_path, [])
+        try:
+            return self._read_json_file(file_path)
+        except StateFileNotFound:
+            return []
 
     def write_posts(self, account: str, album_id: str, posts: List[Dict]) -> bool:
         """Write Instagram post records for an account/album."""
-        if not self.is_available():
-            return False
+        self._require_available()
 
         file_path = self._get_file_path(account, album_id, "posts")
         timestamp = datetime.now().isoformat()
@@ -187,18 +254,22 @@ class GitFileStorageAdapter(StateStorageAdapter):
 
         return self._write_json_file(file_path, posts, commit_message)
 
-    def read_failed_positions(self, account: str, album_id: str) -> List[int]:
-        """Read failed position records for an account/album."""
-        if not self.is_available():
-            return []
+    def read_failed_positions(self, account: str, album_id: str) -> List[Dict]:
+        """Read failed position records for an account/album.
+
+        Returns [] only when the file is absent; access failures raise.
+        """
+        self._require_available()
 
         file_path = self._get_file_path(account, album_id, "failed")
-        return self._read_json_file(file_path, [])
+        try:
+            return self._read_json_file(file_path)
+        except StateFileNotFound:
+            return []
 
-    def write_failed_positions(self, account: str, album_id: str, positions: List[int]) -> bool:
+    def write_failed_positions(self, account: str, album_id: str, positions: List[Dict]) -> bool:
         """Write failed position records for an account/album."""
-        if not self.is_available():
-            return False
+        self._require_available()
 
         file_path = self._get_file_path(account, album_id, "failed")
         timestamp = datetime.now().isoformat()
@@ -207,27 +278,31 @@ class GitFileStorageAdapter(StateStorageAdapter):
         return self._write_json_file(file_path, positions, commit_message)
 
     def read_metadata(self, account: str, album_id: str) -> Dict:
-        """Read metadata for an account/album."""
-        if not self.is_available():
-            return {}
+        """Read metadata for an account/album.
+
+        Returns a fresh default dict only when the file is absent (first run);
+        access failures raise.
+        """
+        self._require_available()
 
         file_path = self._get_file_path(account, album_id, "metadata")
-        default_metadata = {
-            "album_id": album_id,
-            "account": account,
-            "created_at": datetime.now().isoformat(),
-            "last_update": datetime.now().isoformat(),
-            "total_photos": 0,
-            "posted_count": 0,
-            "failed_count": 0,
-            "completion_status": "active"
-        }
-        return self._read_json_file(file_path, default_metadata)
+        try:
+            return self._read_json_file(file_path)
+        except StateFileNotFound:
+            return {
+                "album_id": album_id,
+                "account": account,
+                "created_at": datetime.now().isoformat(),
+                "last_update": datetime.now().isoformat(),
+                "total_photos": 0,
+                "posted_count": 0,
+                "failed_count": 0,
+                "completion_status": "active"
+            }
 
     def write_metadata(self, account: str, album_id: str, metadata: Dict) -> bool:
         """Write metadata for an account/album."""
-        if not self.is_available():
-            return False
+        self._require_available()
 
         # Update last_update timestamp
         metadata["last_update"] = datetime.now().isoformat()
@@ -239,14 +314,25 @@ class GitFileStorageAdapter(StateStorageAdapter):
         return self._write_json_file(file_path, metadata, commit_message)
 
     def is_available(self) -> bool:
-        """Check if the storage backend is available and accessible."""
+        """Check if the storage backend is available and accessible.
+
+        The result is cached for the adapter instance lifetime (one instance
+        per run), so consecutive reads/writes issue exactly one get_branch
+        call rather than one per operation.
+        """
+        if self._available is not None:
+            return self._available
+
         if not self.github or not self.repo:
+            self._available = False
             return False
 
         try:
             # Try to access the repository to verify credentials
             self.repo.get_branch(self.branch)
-            return True
+            self._available = True
         except Exception as e:
             self.logger.debug(f"Git storage not available: {e}")
-            return False
+            self._available = False
+
+        return self._available

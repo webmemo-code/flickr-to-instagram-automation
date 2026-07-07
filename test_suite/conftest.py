@@ -115,12 +115,28 @@ class FakeStorageAdapter:
         self._pending_failures[method] = exc
 
     def _maybe_raise(self, method):
-        if method in self._pending_failures:
-            raise self._pending_failures.pop(method)
+        """Mirror the real GitFileStorageAdapter taxonomy for injected failures.
+
+        An injected StateFileNotFound is the 'absent' case — the real adapter's
+        public read methods translate that to an empty default, so we swallow it
+        here too. Anything else surfaces as StateStorageError (the real adapter
+        wraps ConnectionError/5xx/etc. that way), so StateManager's fail-loud
+        translation to CriticalStateFailure is exercised faithfully.
+        """
+        from storage_adapter import StateFileNotFound, StateStorageError
+        if method not in self._pending_failures:
+            return False
+        exc = self._pending_failures.pop(method)
+        if isinstance(exc, StateFileNotFound):
+            return True  # absent -> caller returns empty default
+        if isinstance(exc, StateStorageError):
+            raise exc
+        raise StateStorageError(str(exc)) from exc
 
     def read_posts(self, account, album_id):
         self.calls.append(('read_posts', (account, album_id)))
-        self._maybe_raise('read_posts')
+        if self._maybe_raise('read_posts'):
+            return []
         return copy.deepcopy(self._posts.get((account, album_id), []))
 
     def write_posts(self, account, album_id, posts):
@@ -132,7 +148,8 @@ class FakeStorageAdapter:
 
     def read_failed_positions(self, account, album_id):
         self.calls.append(('read_failed_positions', (account, album_id)))
-        self._maybe_raise('read_failed_positions')
+        if self._maybe_raise('read_failed_positions'):
+            return []
         return copy.deepcopy(self._failed.get((account, album_id), []))
 
     def write_failed_positions(self, account, album_id, positions):
@@ -144,7 +161,8 @@ class FakeStorageAdapter:
 
     def read_metadata(self, account, album_id):
         self.calls.append(('read_metadata', (account, album_id)))
-        self._maybe_raise('read_metadata')
+        if self._maybe_raise('read_metadata'):
+            return {}
         return copy.deepcopy(self._metadata.get((account, album_id), {}))
 
     def write_metadata(self, account, album_id, metadata):
