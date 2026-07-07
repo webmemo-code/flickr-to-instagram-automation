@@ -11,6 +11,8 @@ from flickr_api import FlickrAPI
 from caption_generator import CaptionGenerator
 from blog_content_extractor import BlogContentExtractor
 
+pytestmark = pytest.mark.live_api
+
 
 def safe_print(text):
     """Print text with Unicode characters safely on Windows."""
