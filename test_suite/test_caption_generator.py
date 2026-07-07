@@ -12,15 +12,7 @@ from account_config import AccountConfig
 from config import Config
 from blog_content_extractor import BlogContextMatch
 from photo_models import EnrichedPhoto
-
-
-def safe_print(text):
-    """Print text with Unicode characters safely on Windows."""
-    try:
-        print(text)
-    except UnicodeEncodeError:
-        safe_text = text.encode('ascii', 'ignore').decode('ascii')
-        print(safe_text)
+from conftest import safe_print
 
 
 class TestCaptionGenerator:
