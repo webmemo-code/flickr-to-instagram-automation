@@ -441,7 +441,9 @@ class StateManager:
                             persisted so a delayed Threads cross-post can reuse it.
 
         Returns:
-            Post record ID, or None if the record could not be persisted.
+            Post record ID, or None if the authoritative posts file could not
+            be written. A metadata-only write failure still returns success
+            (the post is durably recorded; derived stats self-heal next run).
 
         Raises:
             CriticalStateFailure: if reading current state fails (must halt the
@@ -508,6 +510,16 @@ class StateManager:
 
         # Update metadata (write #2). Batched into this posting cycle so a
         # successful post is at most 2 writes (posts + metadata).
+        #
+        # The posts file (written above) is the source of truth and is already
+        # durable at this point. metadata.json holds only derived stats, which
+        # self-heal on the next run's update_counts. So a metadata WRITE failure
+        # must NOT return None — that would tell main.py the post failed and
+        # trigger a spurious re-post / failed-position record for a photo that
+        # was in fact posted and recorded. Log it and still report success.
+        # (A metadata READ failure below is a different matter — it raises
+        # CriticalStateFailure via get_album_metadata and halts the run, which
+        # is correct: we could not even determine current state.)
         metadata = self.get_album_metadata()
         metadata.update_counts(posts)
         metadata.last_update = datetime.now().isoformat()
@@ -516,9 +528,15 @@ class StateManager:
         workflow_run_id = os.getenv('GITHUB_RUN_ID')
         if workflow_run_id:
             metadata.add_workflow_run(workflow_run_id)
-        self.storage_adapter.write_metadata(
-            self.get_account_normalized(), self.current_album_id, metadata.to_dict()
-        )
+        try:
+            self.storage_adapter.write_metadata(
+                self.get_account_normalized(), self.current_album_id, metadata.to_dict()
+            )
+        except StateStorageError as e:
+            self.logger.error(
+                f"Post #{album_position} recorded, but metadata write failed "
+                f"(derived stats will self-heal next run): {e}"
+            )
 
         # Clear from failed positions on success (only writes when the photo
         # was previously failed — unchanged behavior, outside the base 2 writes)

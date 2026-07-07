@@ -150,6 +150,22 @@ class TestWriteBatching:
         assert result is None
         assert 'write_metadata' not in [w[0] for w in fake_storage.writes]
 
+    def test_metadata_write_failure_still_reports_success(self, fake_storage, sample_photo, monkeypatch):
+        """The posts file is the source of truth and is written first. If only
+        the derived metadata write fails, the post is already durable, so
+        create_post_record returns success (not None) — returning None would
+        trigger a spurious re-post of an already-recorded photo. The derived
+        stats self-heal on the next run."""
+        monkeypatch.setattr('state_manager.os.getenv', lambda *a, **k: None)
+        sm = _make_state_manager(fake_storage)
+        fake_storage.fail_next('write_metadata', StateStorageError('500 on metadata'))
+
+        result = sm.create_post_record(sample_photo(position=1), instagram_post_id='ig1')
+
+        # Posts write succeeded -> post is recorded -> success id returned
+        assert result == sample_photo(position=1).id
+        assert 'write_posts' in [w[0] for w in fake_storage.writes]
+
 
 class TestCleanup:
     def test_state_manager_has_no_direct_github_client(self, fake_storage):

@@ -51,12 +51,12 @@ class StateStorageAdapter(ABC):
         pass
 
     @abstractmethod
-    def read_failed_positions(self, account: str, album_id: str) -> List[int]:
+    def read_failed_positions(self, account: str, album_id: str) -> List[Dict]:
         """Read failed position records for an account/album."""
         pass
 
     @abstractmethod
-    def write_failed_positions(self, account: str, album_id: str, positions: List[int]) -> bool:
+    def write_failed_positions(self, account: str, album_id: str, positions: List[Dict]) -> bool:
         """Write failed position records for an account/album."""
         pass
 
@@ -254,7 +254,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
 
         return self._write_json_file(file_path, posts, commit_message)
 
-    def read_failed_positions(self, account: str, album_id: str) -> List[int]:
+    def read_failed_positions(self, account: str, album_id: str) -> List[Dict]:
         """Read failed position records for an account/album.
 
         Returns [] only when the file is absent; access failures raise.
@@ -267,7 +267,7 @@ class GitFileStorageAdapter(StateStorageAdapter):
         except StateFileNotFound:
             return []
 
-    def write_failed_positions(self, account: str, album_id: str, positions: List[int]) -> bool:
+    def write_failed_positions(self, account: str, album_id: str, positions: List[Dict]) -> bool:
         """Write failed position records for an account/album."""
         self._require_available()
 
