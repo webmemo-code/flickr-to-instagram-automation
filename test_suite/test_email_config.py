@@ -14,39 +14,21 @@ from config import Config
 from notification_system import CriticalFailureNotifier
 
 
-REQUIRED_ENV = {
-    'FLICKR_API_KEY': 'k',
-    'FLICKR_USER_ID': 'u',
-    'FLICKR_USERNAME': 'n',
-    'ANTHROPIC_API_KEY': 'a',
-    'GITHUB_TOKEN': 't',
-    'FLICKR_ALBUM_ID': '123',
-    'INSTAGRAM_ACCESS_TOKEN': 'tok',
-    'INSTAGRAM_ACCOUNT_ID': 'acc',
-}
-
-
-def _build_config(extra_env):
-    env = {**REQUIRED_ENV, **extra_env}
-    with patch.dict(os.environ, env, clear=True):
-        return Config()
-
-
 class TestSmtpHostDefault:
-    def test_unset_smtp_host_uses_gmail_default(self):
-        config = _build_config({})
-        assert config.smtp_host == 'smtp.gmail.com'
+    def test_unset_smtp_host_uses_gmail_default(self, full_env):
+        full_env()
+        assert Config().smtp_host == 'smtp.gmail.com'
 
-    def test_empty_smtp_host_uses_gmail_default(self):
+    def test_empty_smtp_host_uses_gmail_default(self, full_env):
         # Reproduces the issue #171 production state: GitHub Actions exports
         # `SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}` as "" when the secret
         # is unset; without the fallback, smtplib.SMTP('', 587) hangs at starttls.
-        config = _build_config({'SMTP_HOST': ''})
-        assert config.smtp_host == 'smtp.gmail.com'
+        full_env(SMTP_HOST='')
+        assert Config().smtp_host == 'smtp.gmail.com'
 
-    def test_explicit_smtp_host_used_verbatim(self):
-        config = _build_config({'SMTP_HOST': 'smtp.example.com'})
-        assert config.smtp_host == 'smtp.example.com'
+    def test_explicit_smtp_host_used_verbatim(self, full_env):
+        full_env(SMTP_HOST='smtp.example.com')
+        assert Config().smtp_host == 'smtp.example.com'
 
 
 class TestCriticalFailureNotifierSmtpServer:

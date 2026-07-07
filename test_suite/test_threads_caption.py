@@ -6,6 +6,7 @@ The Claude call is always mocked. Tests cover:
   - candidate too long, Claude shortens successfully
   - candidate too long, Claude fails -> deterministic truncate fallback preserves URL
 """
+import importlib.util
 import os
 from unittest.mock import MagicMock, patch
 
@@ -152,6 +153,10 @@ class TestBuildThreadsCaption:
         assert result.startswith('…')
         assert len(result) <= ellipsis_suffix_len
 
+    @pytest.mark.skipif(
+        not importlib.util.find_spec('grapheme'),
+        reason="grapheme library not installed; production falls back to codepoint slicing",
+    )
     def test_truncation_does_not_split_multi_codepoint_emoji(self, generator):
         # Family ZWJ sequence: 👨‍👩‍👧‍👦 is one grapheme but 7 codepoints.
         # We assemble a body whose plain-codepoint slice would fall mid-cluster.
