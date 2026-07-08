@@ -72,7 +72,10 @@ def refresh_igaa_token(token: str) -> RefreshResult:
             timeout=30,
         )
     except requests.exceptions.RequestException as e:
-        raise TokenRefreshError(f"Instagram refresh request failed: {e}") from e
+        # requests/urllib3 exception strings often embed the full request URL
+        # (including the access_token query param) - log only the exception
+        # type, never str(e), to preserve the no-token-in-logs guarantee.
+        raise TokenRefreshError(f"Instagram refresh request failed: {type(e).__name__}") from e
 
     return _parse_refresh_response(response, 'Instagram')
 
@@ -93,7 +96,9 @@ def refresh_threads_token(token: str) -> RefreshResult:
             timeout=30,
         )
     except requests.exceptions.RequestException as e:
-        raise TokenRefreshError(f"Threads refresh request failed: {e}") from e
+        # See refresh_igaa_token: never interpolate str(e) - it can embed the
+        # request URL with access_token in it.
+        raise TokenRefreshError(f"Threads refresh request failed: {type(e).__name__}") from e
 
     return _parse_refresh_response(response, 'Threads')
 

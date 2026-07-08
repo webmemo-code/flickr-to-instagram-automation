@@ -176,6 +176,39 @@ class TestNoTokenLeaks:
             if message is not None:
                 assert old_token not in str(message.get_payload())
 
+    def test_token_value_never_logged_on_connection_error(self, captured_emails, caplog, monkeypatch):
+        """REGRESSION: requests/urllib3 exception __str__ representations
+        often embed the full request URL - including the access_token query
+        param - so a ConnectionError/Timeout must never be interpolated
+        raw into the error message, log, or alert email."""
+        import requests
+        from token_refresh import run_refresh
+
+        monkeypatch.setenv('SMTP_USERNAME', 'bot@example.com')
+        monkeypatch.setenv('SMTP_PASSWORD', 'secret')
+        monkeypatch.setenv('NOTIFICATION_EMAIL', 'ops@example.com')
+
+        old_token = 'IGAA-super-secret-connection-error-token'
+
+        def _raise_with_url_in_message(*args, **kwargs):
+            # Simulates the real urllib3 behavior: the exception's string
+            # representation includes the full request URL (token and all).
+            url = f'https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token={old_token}'
+            raise requests.exceptions.ConnectionError(f"Failed to establish connection: {url}")
+
+        with patch('token_refresh.requests.get', side_effect=_raise_with_url_in_message):
+            with caplog.at_level(logging.DEBUG):
+                with pytest.raises(SystemExit):
+                    run_refresh('primary-account', old_token)
+
+        for record in caplog.records:
+            assert old_token not in record.getMessage()
+        for email in captured_emails:
+            assert old_token not in email.get('subject', '')
+            message = email.get('message')
+            if message is not None:
+                assert old_token not in str(message.get_payload())
+
 
 class TestThreads:
     def test_threads_token_refresh(self, graph_api):
@@ -188,14 +221,13 @@ class TestThreads:
         from token_refresh import refresh_threads_token
         import responses as responses_lib
 
-        with responses_lib.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            rsps.add(
-                responses_lib.GET,
-                'https://graph.threads.net/refresh_access_token',
-                json={'access_token': 'THREADS-new-token', 'token_type': 'bearer', 'expires_in': 5183944},
-                status=200,
-            )
-            result = refresh_threads_token('THREADS-old-token')
+        graph_api._rsps.add(
+            responses_lib.GET,
+            'https://graph.threads.net/refresh_access_token',
+            json={'access_token': 'THREADS-new-token', 'token_type': 'bearer', 'expires_in': 5183944},
+            status=200,
+        )
+        result = refresh_threads_token('THREADS-old-token')
 
         assert result.access_token == 'THREADS-new-token'
         assert result.expires_in_seconds == 5183944
