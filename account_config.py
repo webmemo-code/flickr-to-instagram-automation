@@ -65,13 +65,16 @@ class AccountConfigManager:
             user_agent=os.getenv('PRIMARY_USER_AGENT') or 'TravelMemo-ContentFetcher/1.0',
         )
 
-        # Secondary account (configurable)
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
-        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME', 'Reisememo')
-        secondary_env = os.getenv('SECONDARY_ENVIRONMENT_NAME', 'secondary-account')
-        secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE', 'en')
-        secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE', 'travel')
-        secondary_signature = os.getenv('SECONDARY_BRAND_SIGNATURE')
+        # Secondary account (configurable). `or` (not getenv's default arg) so
+        # an empty-string env var - which GitHub Actions `${{ vars.X || '' }}`
+        # plumbing exports when a var is unset - doesn't override the default
+        # (getenv's default only applies when the var is truly absent).
+        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID') or 'reisememo'
+        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME') or 'Reisememo'
+        secondary_env = os.getenv('SECONDARY_ENVIRONMENT_NAME') or 'secondary-account'
+        secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE') or 'en'
+        secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE') or 'travel'
+        secondary_signature = os.getenv('SECONDARY_BRAND_SIGNATURE') or None
         secondary_domains = self._get_domains('SECONDARY_BLOG_DOMAINS', ['reisememo.ch', 'travelmemo.com'])
         secondary_namespace = os.getenv('SECONDARY_WP_ENDPOINT_NAMESPACE') or 'travelmemo-content/v1'
         secondary_auth_key = os.getenv('SECONDARY_WP_AUTH_KEY') or 'tm-post-retrieval'
@@ -105,8 +108,7 @@ class AccountConfigManager:
 
     def get_secondary_account_id(self) -> str:
         """Get the configured secondary account ID."""
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
-        return secondary_id
+        return os.getenv('SECONDARY_ACCOUNT_ID') or 'reisememo'
 
     def is_secondary_account(self, account_id: str) -> bool:
         """Check if the given account ID is the secondary account."""
