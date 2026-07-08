@@ -43,6 +43,7 @@ def threads_mocks():
     with patch('main.Config') as MockConfig, \
          patch('main.FlickrAPI') as MockFlickr, \
          patch('main.CaptionGenerator') as MockCap, \
+         patch('main.InstagramAPI') as MockInstagram, \
          patch('main.StateManager') as MockState, \
          patch('main.account_manager') as MockAcct, \
          patch('threads_api.ThreadsAPI') as MockThreads:
@@ -53,11 +54,13 @@ def threads_mocks():
         config.threads_max_chars = 500
 
         MockAcct.get_environment_name.return_value = 'primary-account'
+        MockInstagram.return_value.validate_image_url.return_value = True
 
         yield {
             'config': config,
             'flickr': MockFlickr.return_value,
             'caption': MockCap.return_value,
+            'instagram': MockInstagram.return_value,
             'state': MockState.return_value,
             'threads': MockThreads.return_value,
         }
@@ -181,8 +184,7 @@ class TestPostDueThreadsPersistFailure:
         # Persist returns False (e.g. GitHub Contents API 5xx)
         m['state'].update_threads_post_id.return_value = False
 
-        with patch('threads_api.ThreadsAPI') as MockThreads, \
-             patch('main.instagram_api_url_ok', return_value=True):
+        with patch('threads_api.ThreadsAPI') as MockThreads:
             MockThreads.return_value.post_with_retry.return_value = 'th-1'
             ok = main.post_due_threads(
                 dry_run=False, account='primary', limit=2
@@ -196,34 +198,23 @@ class TestPostDueThreadsPersistFailure:
         m['state'].increment_threads_retry.assert_not_called()
 
 
-class TestInstagramApiUrlOk:
-    def test_follows_redirects(self):
-        with patch('requests.head') as mock_head:
-            mock_head.return_value = MagicMock(
-                status_code=200,
-                headers={'content-type': 'image/jpeg'},
-            )
-            ok = main.instagram_api_url_ok('http://example.com/p.jpg')
-            assert ok is True
-            assert mock_head.call_args.kwargs.get('allow_redirects') is True
+class TestPostDueThreadsUrlValidation:
+    def test_inaccessible_url_skips_post_and_increments_retry(self, threads_mocks):
+        """URL validation is delegated to InstagramAPI.validate_image_url
+        (canonical semantics: retries, requires 200 + image/* content type).
+        An inaccessible URL must skip the Threads post without calling the
+        Threads API."""
+        m = threads_mocks
+        m['state'].get_posts_due_for_threads.return_value = [_post_record()]
+        m['flickr'].get_photo_list.return_value = [_photo()]
+        m['flickr'].enrich_photo.return_value = MagicMock(url='http://x/p.jpg')
+        m['caption'].build_threads_caption.return_value = 'caption'
+        m['instagram'].validate_image_url.return_value = False
 
-    def test_non_image_content_type_rejected(self):
-        with patch('requests.head') as mock_head:
-            mock_head.return_value = MagicMock(
-                status_code=200,
-                headers={'content-type': 'text/html'},
-            )
-            assert main.instagram_api_url_ok('http://example.com/x') is False
+        with patch('threads_api.ThreadsAPI') as MockThreads:
+            ok = main.post_due_threads(dry_run=False, account='primary')
+            MockThreads.return_value.post_with_retry.assert_not_called()
 
-    def test_non_200_rejected(self):
-        with patch('requests.head') as mock_head:
-            mock_head.return_value = MagicMock(
-                status_code=404,
-                headers={'content-type': 'image/jpeg'},
-            )
-            assert main.instagram_api_url_ok('http://example.com/x') is False
-
-    def test_request_exception_returns_false(self):
-        import requests
-        with patch('requests.head', side_effect=requests.exceptions.Timeout):
-            assert main.instagram_api_url_ok('http://example.com/x') is False
+        assert ok is False
+        m['instagram'].validate_image_url.assert_called_once_with('http://x/p.jpg')
+        m['state'].increment_threads_retry.assert_called_once_with(1)

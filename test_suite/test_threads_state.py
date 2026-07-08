@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from state_models import InstagramPost, PostStatus, RetryAttempt
+from state_models import InstagramPost, PostStatus
 
 
 def _post(position=1, posted_at=None, status=PostStatus.POSTED,

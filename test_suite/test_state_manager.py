@@ -198,11 +198,13 @@ class TestDataCompatibility:
         assert posts[0].status == PostStatus.POSTED
         assert posts[1].status == PostStatus.FAILED
 
-        # Round-trip back to dict preserves the canonical shape
+        # Round-trip back to dict preserves the canonical shape. retry_history
+        # is a legacy key (WP5 removed it from the schema) — it must be
+        # tolerated on load but is not re-emitted on save.
         dumped = posts[0].to_dict()
         assert dumped['photo_id'] == '5388301001'
         assert dumped['status'] == 'posted'
-        assert 'retry_history' in dumped
+        assert 'retry_history' not in dumped
 
     def test_load_via_state_manager_skips_only_bad_records(self, fake_storage, sample_posts_json):
         """A single malformed record is skipped (logged), not treated as an
@@ -219,18 +221,31 @@ class TestDataCompatibility:
 class TestWP5Additions:
     """Scaffolded here because WP5 edits the same module family."""
 
-    XFAIL_WP5 = pytest.mark.xfail(reason="WP5 not implemented", strict=False)
-
-    @XFAIL_WP5
     def test_legacy_retry_history_ignored_on_load(self):
         """After WP5 removes RetryAttempt/retry_history/RETRYING, loading a
         stored post that still contains those keys succeeds (unknown keys
         ignored, never required)."""
-        pytest.fail("scaffold: implement per docstring")
+        legacy = {
+            'position': 1,
+            'photo_id': 'p1',
+            'status': 'posted',
+            'retry_count': 2,
+            'retry_history': [
+                {'timestamp': '2025-01-01T00:00:00', 'error_message': 'boom',
+                 'workflow_run_id': '1', 'retry_count': 1},
+            ],
+        }
+        post = InstagramPost.from_dict(legacy)
+        assert post.position == 1
+        assert post.photo_id == 'p1'
+        assert post.status == PostStatus.POSTED
+        assert not hasattr(post, 'retry_history')
 
-    @XFAIL_WP5
     def test_main_uses_instagram_api_validate_image_url(self):
-        """main.instagram_api_url_ok is deleted; the posting path validates
-        image URLs via InstagramAPI.validate_image_url (canonical semantics:
-        retries, requires 200 + image/* content type)."""
-        pytest.fail("scaffold: implement per docstring")
+        """main.instagram_api_url_ok is deleted. The behavioral proof that
+        post_due_threads calls InstagramAPI.validate_image_url (canonical
+        semantics: retries, requires 200 + image/* content type) lives in
+        test_threads_main.py::TestPostDueThreadsUrlValidation, which exercises
+        the call via mocks rather than inspecting source."""
+        import main
+        assert not hasattr(main, 'instagram_api_url_ok')

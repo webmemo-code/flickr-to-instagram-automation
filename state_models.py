@@ -16,7 +16,6 @@ class PostStatus(Enum):
     PENDING = "pending"
     POSTED = "posted"
     FAILED = "failed"
-    RETRYING = "retrying"
 
 
 class AlbumStatus(Enum):
@@ -25,24 +24,6 @@ class AlbumStatus(Enum):
     COMPLETED = "completed"
     PAUSED = "paused"
     ERROR = "error"
-
-
-@dataclass
-class RetryAttempt:
-    """Information about a retry attempt."""
-    timestamp: str
-    error_message: str
-    workflow_run_id: Optional[str] = None
-    retry_count: int = 0
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'RetryAttempt':
-        """Create from dictionary (JSON deserialization)."""
-        return cls(**data)
 
 
 @dataclass
@@ -61,7 +42,6 @@ class InstagramPost:
     title: Optional[str] = None
     status: PostStatus = PostStatus.PENDING
     retry_count: int = 0
-    retry_history: List[RetryAttempt] = None
     workflow_run_id: Optional[str] = None
     account: Optional[str] = None
     created_at: Optional[str] = None
@@ -74,8 +54,6 @@ class InstagramPost:
 
     def __post_init__(self):
         """Initialize default values after creation."""
-        if self.retry_history is None:
-            self.retry_history = []
         if self.created_at is None:
             self.created_at = datetime.now().isoformat()
         if self.last_update is None:
@@ -90,20 +68,6 @@ class InstagramPost:
     def count_real_posted(posts: List['InstagramPost']) -> int:
         """Count posts that were actually posted (excludes dry runs)."""
         return len(InstagramPost.get_real_posted(posts))
-
-    def add_retry_attempt(self, error_message: str, workflow_run_id: Optional[str] = None):
-        """Add a retry attempt to the history."""
-        self.retry_count += 1
-        self.status = PostStatus.RETRYING
-        self.last_update = datetime.now().isoformat()
-
-        retry_attempt = RetryAttempt(
-            timestamp=datetime.now().isoformat(),
-            error_message=error_message,
-            workflow_run_id=workflow_run_id,
-            retry_count=self.retry_count
-        )
-        self.retry_history.append(retry_attempt)
 
     def mark_as_posted(self, instagram_post_id: str, instagram_url: Optional[str] = None):
         """Mark the post as successfully posted."""
@@ -126,19 +90,11 @@ class InstagramPost:
         self.threads_retry_count += 1
         self.last_update = datetime.now().isoformat()
 
-    def mark_as_failed(self, error_message: str, workflow_run_id: Optional[str] = None):
-        """Mark the post as failed."""
-        self.status = PostStatus.FAILED
-        self.last_update = datetime.now().isoformat()
-        self.add_retry_attempt(error_message, workflow_run_id)
-
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         data = asdict(self)
         # Convert enum to string
         data['status'] = self.status.value
-        # Convert retry history
-        data['retry_history'] = [attempt.to_dict() for attempt in self.retry_history]
         return data
 
     @classmethod
@@ -154,11 +110,11 @@ class InstagramPost:
         if 'status' in payload:
             payload['status'] = PostStatus(payload['status'])
 
-        # Convert retry history
-        if 'retry_history' in payload and payload['retry_history']:
-            payload['retry_history'] = [
-                RetryAttempt.from_dict(attempt) for attempt in payload['retry_history']
-            ]
+        # Drop unknown legacy fields (e.g. retry_history from pre-WP5 records)
+        allowed = {field.name for field in fields(cls)}
+        for key in list(payload.keys()):
+            if key not in allowed:
+                payload.pop(key)
 
         return cls(**payload)
 
@@ -173,15 +129,11 @@ class AlbumMetadata:
     posted_count: int = 0
     failed_count: int = 0
     pending_count: int = 0
-    retrying_count: int = 0
     completion_status: AlbumStatus = AlbumStatus.ACTIVE
     completion_percentage: float = 0.0
     last_posted_position: Optional[int] = None
     last_posted_at: Optional[str] = None
-    next_scheduled_position: Optional[int] = None
-    estimated_completion_date: Optional[str] = None
     workflow_runs_count: int = 0
-    last_workflow_run_id: Optional[str] = None
     error_count: int = 0
     last_error_message: Optional[str] = None
     last_error_at: Optional[str] = None
@@ -191,7 +143,6 @@ class AlbumMetadata:
         self.posted_count = InstagramPost.count_real_posted(posts)
         self.failed_count = len([p for p in posts if p.status == PostStatus.FAILED])
         self.pending_count = len([p for p in posts if p.status == PostStatus.PENDING])
-        self.retrying_count = len([p for p in posts if p.status == PostStatus.RETRYING])
 
         # Update completion percentage
         if self.total_photos > 0:
@@ -214,18 +165,11 @@ class AlbumMetadata:
             self.last_posted_position = latest_post.position
             self.last_posted_at = latest_post.posted_at
 
-        # Update next scheduled position
-        if self.completion_status == AlbumStatus.ACTIVE:
-            pending_posts = [p for p in posts if p.status == PostStatus.PENDING]
-            if pending_posts:
-                self.next_scheduled_position = min(pending_posts, key=lambda p: p.position).position
-
         self.last_update = datetime.now().isoformat()
 
     def add_workflow_run(self, workflow_run_id: str):
         """Record a new workflow run."""
         self.workflow_runs_count += 1
-        self.last_workflow_run_id = workflow_run_id
         self.last_update = datetime.now().isoformat()
 
     def add_error(self, error_message: str):

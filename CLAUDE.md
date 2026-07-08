@@ -40,7 +40,7 @@ python -m pytest test_suite/test_blog_content_extractor.py  # A single file
 | `blog_url_resolver.py` | Resolves blog post URLs from EXIF data and photo metadata |
 | `state_manager.py` | Orchestrates state operations via storage adapter |
 | `storage_adapter.py` | `GitFileStorageAdapter` — reads/writes JSON state on `automation-state` branch via GitHub Contents API |
-| `state_models.py` | Dataclasses: `PostRecord`, `AlbumMetadata`, `RetryAttempt`; enums: `PostStatus`, `AlbumStatus` |
+| `state_models.py` | Dataclasses: `InstagramPost`, `AlbumMetadata`, `FailedPosition`; enums: `PostStatus`, `AlbumStatus` |
 | `photo_models.py` | Photo data models (e.g., `EnrichedPhoto`) |
 | `email_notifier.py` | SMTP email notifications for album completion and critical failures |
 | `notification_system.py` | Higher-level notification orchestration |

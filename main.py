@@ -290,6 +290,7 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
         # Photo list is required to reconstruct the live image URL and metadata.
         flickr_api = FlickrAPI(config)
         caption_generator = CaptionGenerator(config)
+        instagram_api = InstagramAPI(config)
 
         photo_list = flickr_api.get_photo_list()
         photos_by_position = {p.album_position: p for p in photo_list}
@@ -336,7 +337,7 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
                 )
                 continue
 
-            if not instagram_api_url_ok(enriched.url):
+            if not instagram_api.validate_image_url(enriched.url):
                 logger.warning(
                     f"Skipping Threads post for #{position}: image URL no longer accessible"
                 )
@@ -385,23 +386,6 @@ def post_due_threads(dry_run: bool = False, account: str = 'primary',
         raise
     except Exception as e:
         logger.error(f"Threads automation failed: {e}")
-        return False
-
-
-def instagram_api_url_ok(image_url: str) -> bool:
-    """Lightweight URL accessibility check for the delayed Threads post path.
-
-    Follows redirects because Flickr and most CDN hosts respond with 301/302
-    for canonical image URLs - treating those as failures would incorrectly
-    burn the Threads retry budget.
-    """
-    import requests
-    try:
-        response = requests.head(image_url, timeout=10, allow_redirects=True)
-        if response.status_code != 200:
-            return False
-        return response.headers.get('content-type', '').startswith('image/')
-    except requests.exceptions.RequestException:
         return False
 
 

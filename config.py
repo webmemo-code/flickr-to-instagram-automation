@@ -14,13 +14,12 @@ load_dotenv()
 class Config:
     """Configuration class for social media automation."""
 
-    def __init__(self, account: str = 'primary', email_test_mode: bool = False, skip_environment_validation: bool = False):
+    def __init__(self, account: str = 'primary', email_test_mode: bool = False):
         """Initialize configuration for specified account.
 
         Args:
             account: Account type - 'primary' (default) or secondary account ID
             email_test_mode: Skip validation for email testing mode
-            skip_environment_validation: Skip validation of environment-specific variables (for secondary account workflow validation step)
         """
         self.account = account
         self.account_config = get_account_config(account)
@@ -36,18 +35,13 @@ class Config:
         self.wordpress_username = os.getenv('WORDPRESS_USERNAME')
         self.wordpress_app_password = os.getenv('WORDPRESS_APP_PASSWORD')
         
-        # Account-specific configuration
-        if is_secondary_account(account):
-            # Secondary account - use environment-specific variables
-            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
-            self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
-            self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
-            self.instagram_app_id = os.getenv(f'INSTAGRAM_APP_ID_{account.upper()}')  # Optional
-        else:  # primary account (default)
-            self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
-            self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
-            self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
-            self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # Optional
+        # Account-specific configuration. Both account types read the same
+        # unsuffixed env vars - separation happens via GitHub Environments,
+        # not via variable naming.
+        self.flickr_album_id = os.getenv('FLICKR_ALBUM_ID')
+        self.instagram_access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
+        self.instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
+        self.instagram_app_id = os.getenv('INSTAGRAM_APP_ID')  # Optional
 
         # Facebook Page configuration (optional, for cross-posting)
         self.facebook_page_id = os.getenv('FACEBOOK_PAGE_ID')
@@ -104,59 +98,32 @@ class Config:
         self.smtp_username = os.getenv('SMTP_USERNAME')  # Email account for sending
         self.smtp_password = os.getenv('SMTP_PASSWORD')  # Email password/app password
         
-        # Validate required environment variables (skip for email test mode or environment validation step)
-        if not email_test_mode and not skip_environment_validation:
+        # Validate required environment variables (skip for email test mode)
+        if not email_test_mode:
             self._validate_config()
-        elif email_test_mode:
+        else:
             # Provide mock values for email testing
             self.flickr_username = self.flickr_username or "testuser"
             self.flickr_album_id = self.flickr_album_id or "12345678"
-        # If skip_environment_validation is True, don't validate environment-specific variables
-        # This allows the workflow validation step to run before environment scope is available
-    
+
     def _validate_config(self):
         """Validate that all required environment variables are set."""
-        # Common required variables (these should always be available at repository level)
         required_vars = {
             'FLICKR_API_KEY': self.flickr_api_key,
             'FLICKR_USER_ID': self.flickr_user_id,
             'FLICKR_USERNAME': self.flickr_username,
             'ANTHROPIC_API_KEY': self.anthropic_api_key,
             'GITHUB_TOKEN': self.github_token,
-        }
-
-        # Account-specific required variables
-        # For secondary accounts, these are environment-specific and might not be available during early workflow validation
-        account_specific_vars = {
             'FLICKR_ALBUM_ID': self.flickr_album_id,
             'INSTAGRAM_ACCESS_TOKEN': self.instagram_access_token,
             'INSTAGRAM_ACCOUNT_ID': self.instagram_account_id,
         }
 
-        # Always check common variables
-        missing_common = [var for var, value in required_vars.items() if not value]
-        if missing_common:
+        missing = [var for var, value in required_vars.items() if not value]
+        if missing:
             account_info = f" for {self.account} account" if self.account != 'primary' else ""
-            raise ValueError(f"Missing required repository-level environment variables{account_info}: {', '.join(missing_common)}")
+            raise ValueError(f"Missing required environment variables{account_info}: {', '.join(missing)}")
 
-        # For account-specific variables, only validate if we have at least one of them
-        # This allows for the workflow validation step to run before environment scope
-        missing_account_specific = [var for var, value in account_specific_vars.items() if not value]
-        if missing_account_specific:
-            # If we have NONE of the account-specific variables, this might be the validation step
-            if len(missing_account_specific) == len(account_specific_vars):
-                # All account-specific variables are missing - this might be expected during validation step
-                import os
-                if os.getenv('GITHUB_ACTIONS') and is_secondary_account(self.account):
-                    # We're in GitHub Actions for secondary account and all account-specific vars are missing
-                    # This is expected for the validation step that runs outside environment scope
-                    print(f"Warning: Account-specific variables not available yet for {self.account} account (expected during validation step)")
-                    return
-
-            # If we have some but not all, or if this is primary account, it's an error
-            account_info = f" for {self.account} account" if self.account != 'primary' else ""
-            raise ValueError(f"Missing required account-specific environment variables{account_info}: {', '.join(missing_account_specific)}")
-    
     def _detect_graph_api_domain(self) -> str:
         """Detect the correct Graph API domain based on the Instagram access token type.
 
