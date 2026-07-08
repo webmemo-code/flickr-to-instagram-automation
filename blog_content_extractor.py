@@ -12,6 +12,7 @@ from urllib.parse import urlparse, urljoin
 import base64
 from custom_endpoint_extractor import CustomEndpointExtractor
 from account_config import get_account_config
+from blog_url_resolver import extract_url_slug
 
 
 
@@ -46,7 +47,8 @@ class BlogContentExtractor:
             self.logger.debug("Email notifier not available")
 
         # Use consistent User-Agent to avoid Cloudflare bot detection
-        self.user_agent = 'TravelMemo-ContentFetcher/1.0'
+        account_config = get_account_config(config.account)
+        self.user_agent = account_config.user_agent if account_config else 'TravelMemo-ContentFetcher/1.0'
 
         self._update_headers()
     
@@ -73,18 +75,6 @@ class BlogContentExtractor:
         if hasattr(self, '_last_url') and 'travelmemo.com' in self._last_url:
             self.session.headers['Referer'] = 'https://www.google.com/'
 
-    def _extract_url_slug(self, url: str) -> Optional[str]:
-        """Extract the post slug from a URL."""
-        try:
-            parsed = urlparse(url)
-            # Get the last part of the path as the slug
-            path_parts = parsed.path.strip('/').split('/')
-            if path_parts:
-                return path_parts[-1]
-        except Exception as e:
-            self.logger.debug(f"Error extracting slug from URL {url}: {e}")
-        return None
-
     def _extract_via_wordpress_api(self, blog_url: str) -> Optional[Dict[str, any]]:
         """
         Extract content using WordPress REST API with optional authentication.
@@ -97,7 +87,7 @@ class BlogContentExtractor:
         """
         try:
             # Extract slug from URL
-            slug = self._extract_url_slug(blog_url)
+            slug = extract_url_slug(blog_url)
             if not slug:
                 self.logger.debug(f"Could not extract slug from URL: {blog_url}")
                 return None
@@ -133,7 +123,7 @@ class BlogContentExtractor:
 
                 # Use consistent user-agent to avoid Cloudflare blocking
                 api_headers = {
-                    'User-Agent': 'TravelMemo-ContentFetcher/1.0',
+                    'User-Agent': self.user_agent,
                     'Accept': 'application/json, text/plain, */*',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
@@ -356,7 +346,7 @@ class BlogContentExtractor:
 
             # Use consistent user-agent with cookie consent
             scraping_headers = {
-                'User-Agent': 'TravelMemo-ContentFetcher/1.0',
+                'User-Agent': self.user_agent,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',

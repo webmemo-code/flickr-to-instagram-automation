@@ -7,12 +7,25 @@ previously duplicated across caption_generator.py (two locations).
 import re
 import logging
 from typing import Optional, List
+from urllib.parse import urlparse
 
 from config import Config
 from account_config import AccountConfig, get_account_config
 from photo_models import EnrichedPhoto
 
 logger = logging.getLogger(__name__)
+
+
+def extract_url_slug(url: str) -> Optional[str]:
+    """Extract the post slug (last path segment) from a blog URL."""
+    try:
+        parsed = urlparse(url)
+        path_parts = parsed.path.strip('/').split('/')
+        if path_parts:
+            return path_parts[-1]
+    except Exception as e:
+        logger.debug(f"Error extracting slug from URL {url}: {e}")
+    return None
 
 
 def get_candidate_blog_urls(config: Config, photo: EnrichedPhoto) -> List[str]:

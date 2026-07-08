@@ -456,6 +456,60 @@ class TestCaptionGenerator:
         assert 'https://travelmemo.com/mauritius-guide/' in caption, f"Should use configured URL: {caption}"
         assert 'reisememo.ch' not in caption, f"Should not contain secondary domain URL: {caption}"
 
+    # --- WP6: fallback brand signature sourced from AccountConfig ---
+
+    def test_configured_brand_signature_used(self, generator, config):
+        """When AccountConfig.brand_signature is set, it appears verbatim in
+        the caption (this already worked; asserted here for completeness)."""
+        config.account = 'reisememo'
+        photo_data = EnrichedPhoto(
+            id='sig-test', url='https://example.com/photo.jpg', title='T',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+        )
+
+        with patch('caption_generator.get_account_config') as mock_get_config:
+            mock_get_config.return_value = AccountConfig(
+                account_id='reisememo',
+                display_name='Reisememo',
+                environment_name='secondary-account',
+                language='de',
+                brand_signature='Reisememo von einem einzigartigen Reiseerlebnis.',
+            )
+            caption = generator.build_full_caption(photo_data, 'Body text.')
+
+        assert 'Reisememo von einem einzigartigen Reiseerlebnis.' in caption
+        assert 'Travelmemo from a one-of-a-kind travel experience.' not in caption
+
+    def test_primary_default_signature_unchanged(self, generator, config):
+        """REGRESSION: with the real (unmocked) primary AccountConfig — whose
+        brand_signature now defaults to the English travelmemo string via
+        AccountConfig instead of an inline literal — the caption is
+        byte-identical to before this WP."""
+        config.account = 'primary'
+        photo_data = EnrichedPhoto(
+            id='sig-primary', url='https://example.com/photo.jpg', title='T',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+        )
+
+        caption = generator.build_full_caption(photo_data, 'Body text.')
+
+        assert 'Travelmemo from a one-of-a-kind travel experience.' in caption
+
+    def test_unrecognized_account_falls_back_to_literal(self, generator, config):
+        """An account with no AccountConfig entry at all still gets the
+        last-resort hardcoded signature (there is no config to source it
+        from)."""
+        config.account = 'totally-unknown-account'
+        photo_data = EnrichedPhoto(
+            id='sig-unknown', url='https://example.com/photo.jpg', title='T',
+            server='1', secret='a', date_taken='2024-01-01', album_position=1,
+        )
+
+        with patch('caption_generator.get_account_config', return_value=None):
+            caption = generator.build_full_caption(photo_data, 'Body text.')
+
+        assert 'Travelmemo from a one-of-a-kind travel experience.' in caption
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

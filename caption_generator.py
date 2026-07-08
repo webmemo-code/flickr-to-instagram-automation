@@ -228,6 +228,7 @@ class CaptionGenerator:
         elif account_config and account_config.language == 'de':
             caption_parts.append(f"{account_config.display_name} des Schweizer Reiseblogs über Erlebnisreisen.")
         else:
+            # Unrecognized account (no AccountConfig entry) - last-resort default.
             caption_parts.append("Travelmemo from a one-of-a-kind travel experience.")
 
         # Add blog post URL if available (centralized URL selection)

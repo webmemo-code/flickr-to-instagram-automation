@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from config import Config
+from account_config import get_account_config
 
 _logger = logging.getLogger(__name__)
 
@@ -104,7 +105,12 @@ class EmailNotifier:
     def __init__(self, config: Config):
         self.config = config
         self.logger = logging.getLogger(__name__)
-    
+
+    def _content_path_user_agent(self) -> str:
+        """User-Agent the content path sends for this account, for troubleshooting text."""
+        account_config = get_account_config(self.config.account)
+        return account_config.user_agent if account_config else 'TravelMemo-ContentFetcher/1.0'
+
     def send_completion_notification(self, total_photos: int, album_name: str) -> bool:
         """Send album completion notification to the configured email address."""
         if not self.config.email_notifications_enabled:
@@ -338,6 +344,7 @@ Generated automatically on {completion_date}
         error_message = error_details.get('error_message', 'No specific error message')
         attempted_methods = error_details.get('attempted_methods', [])
         fallback_used = error_details.get('fallback_used', False)
+        user_agent = self._content_path_user_agent()
 
         return f"""WordPress API Access Failure Alert
 
@@ -359,7 +366,7 @@ IMPACT:
 INVESTIGATION STEPS:
 1. Check Cloudflare security rules for bot protection settings
 2. Verify WordPress REST API is enabled on {blog_url}
-3. Check if user-agent 'TravelMemo-ContentFetcher/1.0' needs whitelisting
+3. Check if user-agent '{user_agent}' needs whitelisting
 4. Review server logs for blocked requests
 5. Test API endpoint manually: {blog_url}
 
@@ -367,7 +374,7 @@ CLOUDFLARE TROUBLESHOOTING:
 - Review Bot Fight Mode settings in Cloudflare dashboard
 - Check Page Rules for WordPress API endpoints (/wp-json/*)
 - Verify Rate Limiting isn't blocking automation requests
-- Consider adding user-agent bypass rule for 'TravelMemo-ContentFetcher/1.0'
+- Consider adding user-agent bypass rule for '{user_agent}'
 - Check if IP whitelisting is needed for GitHub Actions runners
 
 The automation will continue with basic captions until this issue is resolved.
@@ -389,6 +396,7 @@ Generated automatically on {timestamp}
         error_message = error_details.get('error_message', 'No specific error message')
         attempted_methods = error_details.get('attempted_methods', [])
         fallback_used = error_details.get('fallback_used', False)
+        user_agent = self._content_path_user_agent()
 
         return f"""
         <html>
@@ -442,7 +450,7 @@ Generated automatically on {timestamp}
               <ol style="color: #333; line-height: 1.6;">
                 <li><strong>Cloudflare Security:</strong> Check bot protection settings in Cloudflare dashboard</li>
                 <li><strong>WordPress API:</strong> Verify REST API is enabled on <a href="{blog_url}">{blog_url}</a></li>
-                <li><strong>User-Agent Whitelist:</strong> Check if 'TravelMemo-ContentFetcher/1.0' needs whitelisting</li>
+                <li><strong>User-Agent Whitelist:</strong> Check if '{user_agent}' needs whitelisting</li>
                 <li><strong>Server Logs:</strong> Review server logs for blocked requests</li>
                 <li><strong>Manual Test:</strong> Test API endpoint manually</li>
               </ol>
@@ -454,7 +462,7 @@ Generated automatically on {timestamp}
                 <li>Review <strong>Bot Fight Mode</strong> settings</li>
                 <li>Check <strong>Page Rules</strong> for WordPress API endpoints (/wp-json/*)</li>
                 <li>Verify <strong>Rate Limiting</strong> isn't blocking automation requests</li>
-                <li>Consider adding <strong>user-agent bypass rule</strong> for 'TravelMemo-ContentFetcher/1.0'</li>
+                <li>Consider adding <strong>user-agent bypass rule</strong> for '{user_agent}'</li>
                 <li>Check if <strong>IP whitelisting</strong> is needed for GitHub Actions runners</li>
               </ul>
             </div>

@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 from blog_content_extractor import BlogContentExtractor
 from config import Config
 from photo_models import EnrichedPhoto
+from account_config import account_manager
 
 
 class TestBlogContentExtractor:
@@ -203,6 +204,88 @@ class TestBlogContentExtractor:
                 print("INFO: No obviously Mauritius-related image context found (this may be normal)")
         else:
             print("INFO: No images found in blog content")
+
+
+class TestWP6AccountConfigWiring:
+    """De-hardcode travelmemo in the content path (WP6)."""
+
+    @pytest.fixture(autouse=True)
+    def _reload_account_manager(self):
+        yield
+        account_manager.accounts = account_manager._load_account_configs()
+
+    def _config(self, account='primary'):
+        config = MagicMock(spec=Config)
+        config.account = account
+        config.wordpress_username = None
+        config.wordpress_app_password = None
+        return config
+
+    def test_user_agent_from_account_config_everywhere(self, full_env):
+        """EVERY outbound request in the content path (custom endpoint, WP
+        REST, direct scraping) carries the account-configured User-Agent —
+        assert on captured request headers across all three fallback layers."""
+        full_env(SECONDARY_ACCOUNT_ID='reisememo')
+        account_manager.accounts = account_manager._load_account_configs()
+
+        extractor = BlogContentExtractor(self._config('reisememo'))
+        expected_ua = 'Reisememo-ContentFetcher/1.0'
+
+        # Layer 1: custom endpoint (delegated to CustomEndpointExtractor)
+        assert extractor.custom_extractor.session.headers['User-Agent'] == expected_ua
+
+        # Layer 2: standard WordPress REST API
+        assert extractor.user_agent == expected_ua
+        with patch.object(extractor.session, 'get') as mock_get:
+            mock_get.return_value = MagicMock(
+                status_code=404, json=lambda: {}, text=''
+            )
+            extractor._extract_via_wordpress_api('https://reisememo.ch/blog/my-post')
+        wp_headers = mock_get.call_args.kwargs.get('headers', {})
+        assert wp_headers.get('User-Agent') == expected_ua
+
+        # Layer 3: direct page scraping fallback
+        with patch.object(extractor.session, 'get') as mock_get:
+            mock_get.return_value = MagicMock(status_code=404, text='', content=b'')
+            extractor._try_direct_page_scraping_structured('https://reisememo.ch/blog/my-post')
+        scrape_headers = mock_get.call_args.kwargs.get('headers', {})
+        assert scrape_headers.get('User-Agent') == expected_ua
+
+    def test_fallback_domains_from_account_config(self, full_env):
+        """When no blog URL can be resolved from EXIF/metadata, the fallback
+        domain list comes from AccountConfig.blog_domains (reisememo →
+        ['reisememo.ch']), not the hardcoded ['travelmemo.com']."""
+        full_env(SECONDARY_ACCOUNT_ID='reisememo', SECONDARY_BLOG_DOMAINS='reisememo.ch')
+        account_manager.accounts = account_manager._load_account_configs()
+
+        extractor = BlogContentExtractor(self._config('reisememo'))
+        with patch.object(extractor.custom_extractor, 'extract_via_custom_endpoint', return_value=None) as mock_custom, \
+             patch.object(extractor, '_extract_via_wordpress_api', return_value=None), \
+             patch.object(extractor, '_try_direct_page_scraping_structured', return_value=None):
+            extractor.extract_blog_content('https://reisememo.ch/blog/my-post')
+            extractor.extract_blog_content('https://travelmemo.com/blog/other-post')
+
+            # reisememo.ch matched the configured domain -> custom endpoint attempted
+            assert mock_custom.call_count == 1
+            assert mock_custom.call_args.args[0] == 'https://reisememo.ch/blog/my-post'
+
+
+class TestPrimaryRegression:
+    def test_primary_defaults_unchanged(self, full_env):
+        """REGRESSION (must pass BEFORE the change): with no new env vars set,
+        the primary account's BlogContentExtractor uses the current English
+        fallback signature domain/User-Agent unchanged."""
+        full_env()
+        account_manager.accounts = account_manager._load_account_configs()
+
+        config = MagicMock(spec=Config)
+        config.account = 'primary'
+        config.wordpress_username = None
+        config.wordpress_app_password = None
+
+        extractor = BlogContentExtractor(config)
+        assert extractor.user_agent == 'TravelMemo-ContentFetcher/1.0'
+        assert extractor.custom_extractor.session.headers['User-Agent'] == 'TravelMemo-ContentFetcher/1.0'
 
 
 if __name__ == "__main__":
