@@ -84,6 +84,17 @@ class TestUserAgent:
         extractor = CustomEndpointExtractor(_config('reisememo'))
         assert extractor.session.headers['User-Agent'] == 'MyCustomBrand-ContentFetcher/1.0'
 
+    def test_user_agent_empty_string_env_falls_back_to_derived(self, full_env, _reload_account_manager):
+        """REGRESSION: GitHub Actions exports unset `${{ vars.X || '' }}`
+        secrets as an empty string, not an absent var. An empty
+        SECONDARY_USER_AGENT must still fall back to the derived default,
+        not send a blank User-Agent header."""
+        full_env(SECONDARY_ACCOUNT_ID='reisememo', SECONDARY_USER_AGENT='')
+        _reload_account_manager()
+
+        extractor = CustomEndpointExtractor(_config('reisememo'))
+        assert extractor.session.headers['User-Agent'] == 'Reisememo-ContentFetcher/1.0'
+
 
 class TestPrimaryRegression:
     def test_primary_defaults_unchanged(self, full_env, _reload_account_manager):

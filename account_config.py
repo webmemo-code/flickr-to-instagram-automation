@@ -78,7 +78,7 @@ class AccountConfigManager:
         secondary_domains = self._get_domains('SECONDARY_BLOG_DOMAINS', ['reisememo.ch', 'travelmemo.com'])
         secondary_namespace = os.getenv('SECONDARY_WP_ENDPOINT_NAMESPACE') or 'travelmemo-content/v1'
         secondary_auth_key = os.getenv('SECONDARY_WP_AUTH_KEY') or 'tm-post-retrieval'
-        secondary_user_agent = os.getenv('SECONDARY_USER_AGENT')  # None -> derived from display_name
+        secondary_user_agent = os.getenv('SECONDARY_USER_AGENT') or None  # None -> derived from display_name
 
         accounts[secondary_id] = AccountConfig(
             account_id=secondary_id,
