@@ -27,9 +27,16 @@ class AccountConfig:
     brand_signature: Optional[str] = None     # Custom signature line
     blog_domains: list = None                 # List of blog domains for this account
 
+    # WordPress content-path settings (custom endpoint + outbound request identity)
+    wp_endpoint_namespace: str = "travelmemo-content/v1"  # Custom WP REST namespace
+    wp_auth_key: str = "tm-post-retrieval"                # Custom endpoint auth_key param
+    user_agent: Optional[str] = None                      # Outbound User-Agent; derived from display_name if unset
+
     def __post_init__(self):
         if self.blog_domains is None:
             self.blog_domains = []
+        if self.user_agent is None:
+            self.user_agent = f"{self.display_name.replace(' ', '')}-ContentFetcher/1.0"
 
 
 class AccountConfigManager:
@@ -42,24 +49,36 @@ class AccountConfigManager:
         """Load account configurations from environment variables."""
         accounts = {}
 
-        # Primary account (always exists)
+        # Primary account (always exists). Explicit values preserve today's
+        # literals byte-for-byte now that the content path reads them from
+        # AccountConfig instead of hardcoding them inline.
         accounts['primary'] = AccountConfig(
             account_id='primary',
             display_name='Primary',
             environment_name='primary-account',
             language='en',
             caption_style='travel',
-            blog_domains=self._get_domains('PRIMARY_BLOG_DOMAINS', ['travelmemo.com', 'reisememo.ch'])
+            brand_signature=os.getenv('PRIMARY_BRAND_SIGNATURE') or 'Travelmemo from a one-of-a-kind travel experience.',
+            blog_domains=self._get_domains('PRIMARY_BLOG_DOMAINS', ['travelmemo.com', 'reisememo.ch']),
+            wp_endpoint_namespace=os.getenv('PRIMARY_WP_ENDPOINT_NAMESPACE') or 'travelmemo-content/v1',
+            wp_auth_key=os.getenv('PRIMARY_WP_AUTH_KEY') or 'tm-post-retrieval',
+            user_agent=os.getenv('PRIMARY_USER_AGENT') or 'TravelMemo-ContentFetcher/1.0',
         )
 
-        # Secondary account (configurable)
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
-        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME', 'Reisememo')
-        secondary_env = os.getenv('SECONDARY_ENVIRONMENT_NAME', 'secondary-account')
-        secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE', 'en')
-        secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE', 'travel')
-        secondary_signature = os.getenv('SECONDARY_BRAND_SIGNATURE')
+        # Secondary account (configurable). `or` (not getenv's default arg) so
+        # an empty-string env var - which GitHub Actions `${{ vars.X || '' }}`
+        # plumbing exports when a var is unset - doesn't override the default
+        # (getenv's default only applies when the var is truly absent).
+        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID') or 'reisememo'
+        secondary_name = os.getenv('SECONDARY_ACCOUNT_NAME') or 'Reisememo'
+        secondary_env = os.getenv('SECONDARY_ENVIRONMENT_NAME') or 'secondary-account'
+        secondary_lang = os.getenv('SECONDARY_ACCOUNT_LANGUAGE') or 'en'
+        secondary_style = os.getenv('SECONDARY_ACCOUNT_STYLE') or 'travel'
+        secondary_signature = os.getenv('SECONDARY_BRAND_SIGNATURE') or None
         secondary_domains = self._get_domains('SECONDARY_BLOG_DOMAINS', ['reisememo.ch', 'travelmemo.com'])
+        secondary_namespace = os.getenv('SECONDARY_WP_ENDPOINT_NAMESPACE') or 'travelmemo-content/v1'
+        secondary_auth_key = os.getenv('SECONDARY_WP_AUTH_KEY') or 'tm-post-retrieval'
+        secondary_user_agent = os.getenv('SECONDARY_USER_AGENT') or None  # None -> derived from display_name
 
         accounts[secondary_id] = AccountConfig(
             account_id=secondary_id,
@@ -68,7 +87,10 @@ class AccountConfigManager:
             language=secondary_lang,
             caption_style=secondary_style,
             brand_signature=secondary_signature,
-            blog_domains=secondary_domains
+            blog_domains=secondary_domains,
+            wp_endpoint_namespace=secondary_namespace,
+            wp_auth_key=secondary_auth_key,
+            user_agent=secondary_user_agent,
         )
 
         return accounts
@@ -86,8 +108,7 @@ class AccountConfigManager:
 
     def get_secondary_account_id(self) -> str:
         """Get the configured secondary account ID."""
-        secondary_id = os.getenv('SECONDARY_ACCOUNT_ID', 'reisememo')
-        return secondary_id
+        return os.getenv('SECONDARY_ACCOUNT_ID') or 'reisememo'
 
     def is_secondary_account(self, account_id: str) -> bool:
         """Check if the given account ID is the secondary account."""
