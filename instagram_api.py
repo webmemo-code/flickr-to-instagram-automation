@@ -196,10 +196,15 @@ class InstagramAPI:
             return {}
     
     def validate_image_url(self, image_url: str, max_retries: int = 2, retry_delay: int = 60) -> bool:
-        """Validate that the image URL is accessible, with retry logic for temporary failures."""
+        """Validate that the image URL is accessible, with retry logic for temporary failures.
+
+        Follows redirects because Flickr and most CDN hosts respond with
+        301/302 for canonical image URLs - treating those as failures would
+        incorrectly reject valid URLs.
+        """
         for attempt in range(max_retries):
             try:
-                response = requests.head(image_url, timeout=10)
+                response = requests.head(image_url, timeout=10, allow_redirects=True)
                 if response.status_code == 200:
                     content_type = response.headers.get('content-type', '')
                     if content_type.startswith('image/'):

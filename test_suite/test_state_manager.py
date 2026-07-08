@@ -242,12 +242,10 @@ class TestWP5Additions:
         assert not hasattr(post, 'retry_history')
 
     def test_main_uses_instagram_api_validate_image_url(self):
-        """main.instagram_api_url_ok is deleted; the posting path validates
-        image URLs via InstagramAPI.validate_image_url (canonical semantics:
-        retries, requires 200 + image/* content type)."""
+        """main.instagram_api_url_ok is deleted. The behavioral proof that
+        post_due_threads calls InstagramAPI.validate_image_url (canonical
+        semantics: retries, requires 200 + image/* content type) lives in
+        test_threads_main.py::TestPostDueThreadsUrlValidation, which exercises
+        the call via mocks rather than inspecting source."""
         import main
         assert not hasattr(main, 'instagram_api_url_ok')
-
-        import inspect
-        src = inspect.getsource(main.post_due_threads)
-        assert 'instagram_api.validate_image_url(' in src
