@@ -4,6 +4,8 @@ How to obtain `INSTAGRAM_ACCESS_TOKEN` and `INSTAGRAM_ACCOUNT_ID` for this proje
 
 There are two authentication flows depending on when the Facebook App was created. Meta migrated to a new Instagram Business API in 2024. Both flows are documented below.
 
+> **Windows/PowerShell note**: The `curl` commands below are written as single-line commands so they work as-is. If you split them across lines with `\`, PowerShell will fail with `ParameterBindingException` because `curl` is aliased to `Invoke-WebRequest` there. Use `curl.exe` explicitly (not the `curl` alias) to get real curl behavior.
+
 ## Prerequisites
 
 1. **Instagram Business or Creator account** — Personal accounts cannot use the Graph API. Convert via Instagram Settings > Account > Switch to Professional Account.
@@ -61,10 +63,7 @@ Before generating tokens, the Instagram account must be added as a tester:
 The token from Step A4 may be short-lived. Exchange it:
 
 ```bash
-curl -s "https://graph.instagram.com/access_token?\
-grant_type=ig_exchange_token&\
-client_secret={INSTAGRAM_APP_SECRET}&\
-access_token={SHORT_LIVED_TOKEN}"
+curl.exe -s "https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret={INSTAGRAM_APP_SECRET}&access_token={SHORT_LIVED_TOKEN}"
 ```
 
 Response:
@@ -85,8 +84,7 @@ The **Instagram App Secret** is found on the Use Cases > API setup page (click "
 With your `IGAA...` token:
 
 ```bash
-curl -s "https://graph.instagram.com/v21.0/me?fields=id,username&\
-access_token={LONG_LIVED_TOKEN}"
+curl.exe -s "https://graph.instagram.com/v21.0/me?fields=id,username&access_token={LONG_LIVED_TOKEN}"
 ```
 
 Response:
@@ -113,10 +111,7 @@ For the `instagram_business_content_publish` permission, Meta may require:
 Go to **Review > App Review** to submit. The test API call is a content publish to your own account — you can use the dry-run workflow or `curl`:
 
 ```bash
-curl -X POST "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/media?\
-image_url={PUBLIC_IMAGE_URL}&\
-caption=Test%20post&\
-access_token={TOKEN}"
+curl.exe -X POST "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/media?image_url={PUBLIC_IMAGE_URL}&caption=Test%20post&access_token={TOKEN}"
 ```
 
 > **Note**: App Review is only needed for Advanced Access (Live mode for non-role-holders). In Development mode, the app works for Admin/Developer/Tester roles without App Review.
@@ -153,21 +148,13 @@ https://www.facebook.com/v21.0/dialog/oauth?client_id={APP_ID}&redirect_uri=http
 After authorizing, extract the code from the redirect URL and exchange:
 
 ```bash
-curl -X GET "https://graph.facebook.com/v21.0/oauth/access_token?\
-client_id={APP_ID}&\
-redirect_uri=https://localhost/&\
-client_secret={APP_SECRET}&\
-code={CODE}"
+curl.exe -X GET "https://graph.facebook.com/v21.0/oauth/access_token?client_id={APP_ID}&redirect_uri=https://localhost/&client_secret={APP_SECRET}&code={CODE}"
 ```
 
 ### B3. Exchange for Long-Lived Token
 
 ```bash
-curl -X GET "https://graph.facebook.com/v21.0/oauth/access_token?\
-grant_type=fb_exchange_token&\
-client_id={APP_ID}&\
-client_secret={APP_SECRET}&\
-fb_exchange_token={SHORT_LIVED_TOKEN}"
+curl.exe -X GET "https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id={APP_ID}&client_secret={APP_SECRET}&fb_exchange_token={SHORT_LIVED_TOKEN}"
 ```
 
 Response:
@@ -183,13 +170,10 @@ Response:
 
 ```bash
 # Get your Facebook Page ID
-curl -X GET "https://graph.facebook.com/v21.0/me/accounts?\
-access_token={LONG_LIVED_TOKEN}"
+curl.exe -X GET "https://graph.facebook.com/v21.0/me/accounts?access_token={LONG_LIVED_TOKEN}"
 
 # Get the Instagram Business Account ID from the Page
-curl -X GET "https://graph.facebook.com/v21.0/{PAGE_ID}?\
-fields=instagram_business_account&\
-access_token={LONG_LIVED_TOKEN}"
+curl.exe -X GET "https://graph.facebook.com/v21.0/{PAGE_ID}?fields=instagram_business_account&access_token={LONG_LIVED_TOKEN}"
 ```
 
 The `instagram_business_account.id` is your `INSTAGRAM_ACCOUNT_ID`.
@@ -209,12 +193,10 @@ Test that your token and account ID work (adjust domain based on token type):
 
 ```bash
 # For IGAA... tokens
-curl -s "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?\
-fields=id,username,name&access_token={TOKEN}"
+curl.exe -s "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?fields=id,username,name&access_token={TOKEN}"
 
 # For EAA... tokens
-curl -s "https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?\
-fields=id,username&access_token={TOKEN}"
+curl.exe -s "https://graph.facebook.com/v21.0/{INSTAGRAM_ACCOUNT_ID}?fields=id,username&access_token={TOKEN}"
 ```
 
 You should see your Instagram username in the response.
@@ -248,19 +230,13 @@ Long-lived tokens expire after **60 days**. The renewal method depends on the to
 ### For `IGAA...` tokens (new Instagram Business API)
 
 ```bash
-curl -s "https://graph.instagram.com/refresh_access_token?\
-grant_type=ig_refresh_token&\
-access_token={CURRENT_LONG_LIVED_TOKEN}"
+curl.exe -s "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token={CURRENT_LONG_LIVED_TOKEN}"
 ```
 
 ### For `EAA...` tokens (legacy Facebook Login flow)
 
 ```bash
-curl -X GET "https://graph.facebook.com/v21.0/oauth/access_token?\
-grant_type=fb_exchange_token&\
-client_id={APP_ID}&\
-client_secret={APP_SECRET}&\
-fb_exchange_token={CURRENT_LONG_LIVED_TOKEN}"
+curl.exe -X GET "https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id={APP_ID}&client_secret={APP_SECRET}&fb_exchange_token={CURRENT_LONG_LIVED_TOKEN}"
 ```
 
 Both return a new long-lived token with a fresh 60-day expiry. Update the token in GitHub Secrets and/or your `.env` file.
