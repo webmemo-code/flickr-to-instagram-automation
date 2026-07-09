@@ -136,6 +136,12 @@ GRAPH_API_VERSION=v23.0
 ANTHROPIC_MODEL=claude-sonnet-4-6
 ```
 > **Security Note**: Use a fine-grained Personal Access Token with **only** `contents:write` permission instead of the broad `repo` scope for enhanced security.
+#### Token Refresh Automation (Optional)
+`.github/workflows/token-refresh.yml` refreshes long-lived Instagram (IGAA) and Threads access tokens weekly before their 60-day expiry, writing the rotated value back to the environment secret. It requires its own fine-grained PAT (separate from `PERSONAL_ACCESS_TOKEN` above, since writing secrets needs a different permission than writing repo contents):
+```
+GH_PAT_SECRETS_ADMIN=your_github_pat_with_secrets_readwrite_permission
+```
+> **Security Note**: Scope this PAT to **this repository only**, with **Secrets: read/write** and **Environments: read** permissions — nothing broader. See [docs/refactor/04-token-refresh-spec.md](docs/refactor/04-token-refresh-spec.md) and [docs/refactor/runbooks/token-refresh-ops.md](docs/refactor/runbooks/token-refresh-ops.md) for setup and operational details. Only `IGAA...`-prefixed Instagram tokens (new Instagram Business API) support automated refresh; legacy `EAA...` tokens require the manual [EAA→IGAA migration](docs/refactor/runbooks/eaa-to-igaa-migration.md) first.
 #### Environment-Specific Configuration
 Create GitHub environments (`Settings > Environments`) and configure:
 **For the main account** - `primary-account` environment:

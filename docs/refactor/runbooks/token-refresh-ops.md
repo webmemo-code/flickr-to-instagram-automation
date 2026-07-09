@@ -4,9 +4,9 @@
 
 `.github/workflows/token-refresh.yml` runs weekly (plus `workflow_dispatch`), matrixed over the `primary-account` and `secondary-account` environments. Each job:
 
-1. Reads the environment's `INSTAGRAM_ACCESS_TOKEN` (and Threads token, if implemented).
-2. Calls `graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token`.
-3. Writes the rotated token back with `gh secret set INSTAGRAM_ACCESS_TOKEN --env <environment> --body -` (stdin), authenticated via the `GH_PAT_SECRETS_ADMIN` fine-grained PAT.
+1. Reads the environment's `INSTAGRAM_ACCESS_TOKEN` and, if configured, `THREADS_ACCESS_TOKEN`.
+2. Calls `graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token`, then (if a Threads token is present) `graph.threads.net/refresh_access_token?grant_type=th_refresh_token`.
+3. Writes each rotated token back with `gh secret set <NAME> --env <environment> --body -` (stdin), authenticated via the `GH_PAT_SECRETS_ADMIN` fine-grained PAT. An environment with no Threads token configured is skipped for that part without error.
 
 Tokens live 60 days and are refreshable after 24 hours, so a weekly cadence leaves ~7 weeks of margin after any single failure.
 
@@ -27,5 +27,5 @@ A posting run that fails with `CriticalStateFailure` means a **state read/write 
 ## Manual renewal fallback (if automation is down)
 
 - Instagram (IGAA): `GET https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=<CURRENT>` → set the returned token as the environment secret.
-- Threads: analogous via `graph.threads.net` (confirm endpoint), or regenerate in the Meta app dashboard.
+- Threads: `GET https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=<CURRENT>` → same 24h-minimum-age / 60-day-lifetime contract and response shape as Instagram; set the returned token as `THREADS_ACCESS_TOKEN`. Requires the `threads_basic` permission still granted.
 - Facebook Page token: long-lived Page tokens typically do not expire; if posting fails with 190, regenerate via `me/accounts` with a long-lived user token.
