@@ -460,7 +460,9 @@ graph TB
 2. Create a new app and get your API key
 3. Find your User ID from your Flickr profile URL
 ### Instagram Graph API
-See [INSTAGRAM_AUTH_GUIDE.md](INSTAGRAM_AUTH_GUIDE.md) for the full step-by-step setup.
+**Start here:** [docs/instagram-api-creds-configuration.md](docs/instagram-api-creds-configuration.md) — the step-by-step guide to obtain and configure `INSTAGRAM_ACCESS_TOKEN` / `INSTAGRAM_ACCOUNT_ID`, including the two common pitfalls (don't use the Graph API Explorer; a `GET /me` call doesn't test any scope).
+
+For background on the two API eras and troubleshooting, see [INSTAGRAM_AUTH_GUIDE.md](INSTAGRAM_AUTH_GUIDE.md).
 
 Summary: Create a Facebook App, configure Instagram API permissions, generate a long-lived access token, and get the Instagram Account ID. The code supports both legacy (`EAA...`) and new Instagram Business API (`IGAA...`) tokens with automatic API domain detection.
 ### Anthropic API
