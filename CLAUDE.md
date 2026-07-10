@@ -81,7 +81,8 @@ Types: `fix:`, `enhance:`, `refactor:`, `chore:`, `docs:`
 - The `GitFileStorageAdapter` auto-creates the branch on first run
 
 ### Instagram API Authentication
-- See `INSTAGRAM_AUTH_GUIDE.md` for full setup instructions (both legacy and new API flows)
+- See `docs/instagram-api-creds-configuration.md` for the step-by-step guide to generate and configure a token (the practical how-to; leads with the common pitfalls — don't use the Graph API Explorer, `GET /me` tests no scope, App Review is usually unnecessary in Development mode)
+- See `INSTAGRAM_AUTH_GUIDE.md` for background on both API eras (legacy `EAA` vs new `IGAA`) and troubleshooting
 - `config.py:_detect_graph_api_domain()` auto-selects `graph.instagram.com` or `graph.facebook.com` based on token prefix (`IGAA...` vs `EAA...`)
 - Primary account (`travelmemo_blog`) uses legacy `EAA...` token; secondary account (`reisememo`) uses new `IGAA...` token
 - Long-lived tokens expire after 60 days — renewal endpoints differ by token type
