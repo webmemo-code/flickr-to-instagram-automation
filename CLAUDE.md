@@ -38,6 +38,10 @@ python -m pytest test_suite/test_blog_content_extractor.py  # A single file
 | `instagram_api.py` | Instagram Graph API — media container creation, publishing, URL validation. Supports both `graph.facebook.com` (legacy `EAA...` tokens) and `graph.instagram.com` (new `IGAA...` tokens) via auto-detection in `config.py` |
 | `blog_content_extractor.py` | WordPress REST API — authenticated blog content extraction |
 | `blog_url_resolver.py` | Resolves blog post URLs from EXIF data and photo metadata |
+| `custom_endpoint_extractor.py` | Custom WordPress endpoint extraction that bypasses Cloudflare bot protection |
+| `facebook_api.py` | Facebook Graph API — cross-posts photos to a linked Facebook Page |
+| `threads_api.py` | Threads Graph API — delayed cross-posting of Instagram photos to Threads |
+| `token_refresh.py` | Automated long-lived token refresh (Instagram IGAA, Threads) for `token-refresh.yml` |
 | `state_manager.py` | Orchestrates state operations via storage adapter |
 | `storage_adapter.py` | `GitFileStorageAdapter` — reads/writes JSON state on `automation-state` branch via GitHub Contents API |
 | `state_models.py` | Dataclasses: `InstagramPost`, `AlbumMetadata`, `FailedPosition`; enums: `PostStatus`, `AlbumStatus` |
