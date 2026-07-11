@@ -251,11 +251,11 @@ The app doesn't have the required permissions. Check that `instagram_business_co
 The Instagram account is not a Business or Creator account, or it's not linked to the Facebook Page. Check the Prerequisites.
 
 ### Token works in Explorer but not in code
-Make sure you selected the correct Page and Instagram account during authorization. Also verify the API version matches — this project defaults to `v18.0` (configurable via `GRAPH_API_VERSION`).
+Make sure you selected the correct Page and Instagram account during authorization. Also verify the API version matches — this project defaults to `v23.0` (configurable via `GRAPH_API_VERSION`).
 
 ## API Version Notes
 
-- This project defaults to Graph API **v18.0** (set in [config.py](config.py))
+- This project defaults to Graph API **v23.0** (set in [config.py](config.py))
 - Can be overridden via `GRAPH_API_VERSION` environment variable
 - Meta deprecates API versions ~2 years after release — check [Meta API Changelog](https://developers.facebook.com/docs/graph-api/changelog) for current versions
 - The `curl` examples in this guide use `v21.0` — adjust to match your configured version

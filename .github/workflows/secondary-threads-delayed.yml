@@ -38,6 +38,6 @@ jobs:
       account_id: reisememo
       environment_name: secondary-account
       account_flag: reisememo
-      dry_run: ${{ inputs.dry_run || false }}
-      threads_limit: ${{ inputs.threads_limit || 1 }}
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+      threads_limit: ${{ github.event_name == 'workflow_dispatch' && inputs.threads_limit || 1 }}
     secrets: inherit
