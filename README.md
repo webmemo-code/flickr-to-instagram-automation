@@ -103,7 +103,7 @@ Modern, secure state storage using Git files on a dedicated `automation-state` o
 - **Reliability**: Atomic operations with conflict resolution
 ### Testing Strategy
 The modular architecture enables comprehensive testing at multiple levels:
-- **Unit Tests**: Individual orchestrator modules (`test_suite/test_orchestration.py`)
+- **Unit Tests**: Individual orchestrator modules (`test_suite/test_main_workflow.py`)
 - **Integration Tests**: End-to-end workflow testing (`test_suite/test_integration.py`)
 - **Mock-based Testing**: No live API credentials required for most tests
 ## Quick Start
