@@ -58,26 +58,13 @@ Before generating tokens, the Instagram account must be added as a tester:
 4. Authorize the permissions when prompted
 5. Copy the generated token (starts with `IGAA...`)
 
-### A5. Exchange for Long-Lived Token
+### A5. No Exchange Step Needed
 
-The token from Step A4 may be short-lived. Exchange it:
+The **API setup page already issues a long-lived token directly** (60-day expiry). The token copied in Step A4 is already long-lived — no `ig_exchange_token` call is required.
 
-```bash
-curl.exe -s "https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret={INSTAGRAM_APP_SECRET}&access_token={SHORT_LIVED_TOKEN}"
-```
+> **Do NOT run an `ig_exchange_token` exchange on this token.** Running the exchange endpoint against an already-long-lived token returns `error 452 "Session key invalid"` (subcode 2207055). Use the token from Step A4 directly.
 
-Response:
-```json
-{
-  "access_token": "IGAAbF...long-lived-token...",
-  "token_type": "bearer",
-  "expires_in": 5184000
-}
-```
-
-> **Note**: If this returns error 452 ("Session key invalid"), the token is likely already long-lived. Verify by calling the refresh endpoint instead (see Token Renewal below).
-
-The **Instagram App Secret** is found on the Use Cases > API setup page (click "Show" next to the masked secret).
+If you need to *renew* a still-valid long-lived token (before it expires), see the [Token Renewal](#token-renewal) section below.
 
 ### A6. Get the Instagram Account ID
 
@@ -252,7 +239,7 @@ The token has expired or been revoked. Generate a new one following the relevant
 New Instagram Business API tokens (`IGAA...` prefix) only work with `graph.instagram.com`, not `graph.facebook.com`. The code auto-detects this. If you see this error, ensure you're running the latest version of `config.py`.
 
 ### Error 452: Session key invalid (during token exchange)
-The token is likely already long-lived. Try the refresh endpoint instead of the exchange endpoint.
+You ran an `ig_exchange_token` exchange on an already-long-lived token. The API setup page (Flow A, Step A4) issues a long-lived token directly — do not exchange it. Use the token as-is.
 
 ### Error 10: No Page linked
 The Instagram account is not connected to a Facebook Page, or the token doesn't have permission for that Page. Re-authorize and make sure you select the correct Page.

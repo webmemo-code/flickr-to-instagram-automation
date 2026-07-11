@@ -9,8 +9,7 @@
 1. **Generate an IGAA token for the Travelmemo Instagram account** following `INSTAGRAM_AUTH_GUIDE.md`, Flow A (New Instagram Business API):
    - Meta app with the **Instagram API** use case and `instagram_business_content_publish` permission.
    - Add the Travelmemo IG account as an **Instagram Tester** and accept the invite in the IG app.
-   - Generate the token (starts `IGAA`), then exchange for the long-lived variant:
-     `GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=<APP_SECRET>&access_token=<SHORT_TOKEN>`
+   - Generate the token via **Use Cases → Instagram API → API setup with Facebook login → Step 2: Generate access tokens** (starts `IGAA`). The API setup page issues a long-lived token directly — **do not run an `ig_exchange_token` exchange** (that returns error 452 on an already-long-lived token).
 2. **Verify the account ID** matches the existing `INSTAGRAM_ACCOUNT_ID` secret:
    `GET https://graph.instagram.com/v23.0/me?fields=id,username&access_token=<NEW_TOKEN>` — use the `id` field. If it differs from the current secret, stop and investigate before proceeding.
 3. **Swap the secret:** in the repo's `primary-account` GitHub environment, replace `INSTAGRAM_ACCESS_TOKEN` with the new IGAA token. Do **not** revoke or delete the old EAA token.
