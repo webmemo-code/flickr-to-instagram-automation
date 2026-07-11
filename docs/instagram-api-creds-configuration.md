@@ -33,7 +33,7 @@ API eras and troubleshooting, see [INSTAGRAM_AUTH_GUIDE.md](../INSTAGRAM_AUTH_GU
 2. **A `GET /me?fields=id,name` call proves nothing.** That endpoint requires no
    Instagram permission, so it will never satisfy Meta's "0 of 1 API call(s)
    required" testing tracker and it does not verify you can post. Use the
-   verification calls in Step 5 instead.
+   verification calls in Step 4 instead.
 
 > **You almost certainly do NOT need App Review.** In **Development mode**, the
 > app works for accounts holding an Admin / Developer / **Instagram Tester**
@@ -103,41 +103,24 @@ Until the invite is accepted, token generation for that account will fail.
 2. Expand **Step 2: Generate access tokens**.
 3. Click **Generate token** for the target Instagram account.
 4. Authorize the permissions when prompted.
-5. Copy the token — it starts with **`IGAA...`**. This may be short-lived.
+5. Copy the token — it starts with **`IGAA...`**.
+
+The **API setup page issues a long-lived token directly** (60-day expiry) — no
+exchange step is needed. Keep this token; it's the value you'll store as
+`INSTAGRAM_ACCESS_TOKEN`.
 
 > If the token you copied starts with `EAA...`, you used the wrong tool (the
 > Graph API Explorer). Go back and use the **API setup** page as above.
 
----
-
-## Step 4 — Exchange for a long-lived token
-
-The **Instagram App Secret** is on the **Use Cases → API setup** page (click
-"Show" next to the masked secret). Note this is the *Instagram* app secret on
-that page — **not** the legacy Settings → Basic "App Secret".
-
-```powershell
-curl.exe -s "https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret={INSTAGRAM_APP_SECRET}&access_token={SHORT_LIVED_TOKEN}"
-```
-
-Response:
-
-```json
-{
-  "access_token": "IGAAbF...long-lived-token...",
-  "token_type": "bearer",
-  "expires_in": 5184000
-}
-```
-
-`expires_in: 5184000` seconds = 60 days. Keep this `access_token`.
-
-> If this returns error 452 ("Session key invalid"), the token is likely already
-> long-lived. Verify with the [refresh endpoint](#token-renewal) instead.
+> **Do NOT run an `ig_exchange_token` exchange on this token.** The exchange
+> endpoint is only for converting a *short-lived* token to a long-lived one.
+> Running it against an already-long-lived token returns
+> `error 452 "Session key invalid"` (subcode 2207055). The API setup page
+> already gives you the long-lived token, so skip straight to Step 4.
 
 ---
 
-## Step 5 — Verify the token and get the account ID
+## Step 4 — Verify the token and get the account ID
 
 ```powershell
 curl.exe -s "https://graph.instagram.com/v25.0/me?fields=id,username&access_token={LONG_LIVED_TOKEN}"
@@ -158,6 +141,8 @@ Response:
   personal Facebook name). If it's wrong, you generated the token for the wrong
   identity — redo Step 3 for the correct account.
 
+The token from Step 3 is the `{LONG_LIVED_TOKEN}` used in the commands below.
+
 Optional — confirm you can actually publish (this is the meaningful test, and it
 registers against the `instagram_business_content_publish` tracker if you ever
 do need Advanced Access):
@@ -171,7 +156,7 @@ A successful call returns a media container `id`. (Follow with a
 
 ---
 
-## Step 6 — Store the credentials
+## Step 5 — Store the credentials
 
 ### GitHub Actions (production)
 
@@ -180,8 +165,8 @@ Repository **Settings → Environments**, in the environment for this account
 
 | Secret | Value |
 |---|---|
-| `INSTAGRAM_ACCESS_TOKEN` | The long-lived `IGAA...` token from Step 4 |
-| `INSTAGRAM_ACCOUNT_ID` | The `id` from Step 5 |
+| `INSTAGRAM_ACCESS_TOKEN` | The long-lived `IGAA...` token from Step 3 |
+| `INSTAGRAM_ACCOUNT_ID` | The `id` from Step 4 |
 
 Both accounts read the **same unsuffixed variable names**, resolved per
 environment — see [reisememo-activation.md](refactor/runbooks/reisememo-activation.md)
@@ -198,7 +183,7 @@ INSTAGRAM_ACCOUNT_ID=your_instagram_account_id
 
 ---
 
-## Step 7 — Verify end-to-end with a dry run
+## Step 6 — Verify end-to-end with a dry run
 
 Dispatch the account's workflow in dry-run mode and confirm the log shows
 requests going to `graph.instagram.com` and the run succeeds:
@@ -236,8 +221,8 @@ curl.exe -s "https://graph.instagram.com/refresh_access_token?grant_type=ig_refr
 | Error 190 on `graph.instagram.com` | Token expired/invalid, or app lacks `instagram_business_content_publish`. Regenerate (Step 3). |
 | Error 190 on `graph.facebook.com` with an `IGAA` token | Token has stray whitespace or the run used a stale secret — new tokens only work on `graph.instagram.com`. |
 | `(#10) Application does not have permission` | Account not accepted as Instagram Tester (Step 2), or publish permission missing (Step 1). |
-| `username` in Step 5 is a personal name | Token generated for the wrong identity — redo Step 3 for the correct account. |
-| Error 452 during exchange | Token is already long-lived; use the refresh endpoint. |
+| `username` in Step 4 is a personal name | Token generated for the wrong identity — redo Step 3 for the correct account. |
+| Error 452 "Session key invalid" (subcode 2207055) | You ran an `ig_exchange_token` exchange on an already-long-lived token. Don't exchange — the API setup page (Step 3) already returns a long-lived token; use it directly. |
 
 For anything not covered here, see
 [INSTAGRAM_AUTH_GUIDE.md](../INSTAGRAM_AUTH_GUIDE.md).
