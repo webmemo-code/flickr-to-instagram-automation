@@ -40,6 +40,6 @@ jobs:
       account_id: primary
       environment_name: primary-account
       account_flag: ''
-      dry_run: ${{ inputs.dry_run || false }}
-      threads_limit: ${{ inputs.threads_limit || 1 }}
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+      threads_limit: ${{ github.event_name == 'workflow_dispatch' && inputs.threads_limit || 1 }}
     secrets: inherit
